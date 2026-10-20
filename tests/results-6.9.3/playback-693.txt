@@ -1,0 +1,1 @@
+8.1–10 u/s travel range and 9 u/s playback, recorded-time and distance interpolation, short trails, gaps, start/end, repeated points, incomplete geometry, pause/restart/scrub and independent toggles: PASS

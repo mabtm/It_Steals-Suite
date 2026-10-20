@@ -1,0 +1,1 @@
+PracticeSuite 7.11.0 / mab. Echte produktive ImGui-Zeichenlisten mit bewusst synthetischer QA-Auswahl, keine Screenshots aus einem laufenden Spiel. Properties, Geometry, Watch, Compare; kleines Fenster bei 150% DPI. Gerendert mit tests/render_ui.py aus dem vollständigen letzten UI-Test. Native Windows-Schriften/Rendering können geringfügig abweichen.

@@ -1,0 +1,22 @@
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+
+Unhandled Exception:
+System.Exception: REGRESSION 7.3.3: a horizontal floor using the Wall material and Walls layer must stay floor
+  at ReplayVisualTests.MainWallCases (UnityEngine.Material[] normal, UnityEngine.Material[] transparent, UnityEngine.Material hidden, UnityEngine.Bounds bounds, UnityEngine.Vector3 camera, UnityEngine.Vector3 focus, System.UInt32 options) [0x00721] in <5e0eed7173ba4772b28c1b2502a566b4>:0 
+  at ReplayVisualTests.VisibilityCases () [0x004e8] in <5e0eed7173ba4772b28c1b2502a566b4>:0 
+  at ReplayVisualTests.Main () [0x00e65] in <5e0eed7173ba4772b28c1b2502a566b4>:0 
+[ERROR] FATAL UNHANDLED EXCEPTION: System.Exception: REGRESSION 7.3.3: a horizontal floor using the Wall material and Walls layer must stay floor
+  at ReplayVisualTests.MainWallCases (UnityEngine.Material[] normal, UnityEngine.Material[] transparent, UnityEngine.Material hidden, UnityEngine.Bounds bounds, UnityEngine.Vector3 camera, UnityEngine.Vector3 focus, System.UInt32 options) [0x00721] in <5e0eed7173ba4772b28c1b2502a566b4>:0 
+  at ReplayVisualTests.VisibilityCases () [0x004e8] in <5e0eed7173ba4772b28c1b2502a566b4>:0 
+  at ReplayVisualTests.Main () [0x00e65] in <5e0eed7173ba4772b28c1b2502a566b4>:0 
+Traceback (most recent call last):
+  File "/workspace/scratch/ef104db600fd/checks.py", line 71, in <module>
+    target=out/'replay-visual-tests.exe';run(mcs+['-langversion:7.2','-nostdlib','-optimize+','-warnaserror','-out:'+str(target)]+csrefs[:4]+[str(p/name) for name in ['tests/replay_visual_tests.cs','Mod/ReplayColliderCapture.cs','Mod/ReplayColliders.cs','Mod/ReplayFollowOrbit.cs','Mod/ReplayTrailVisual.cs','Mod/Replay3DOverlay.cs','Mod/ColliderWireGeometry.cs','Mod/ReplayWireVisual.cs','Mod/ReplaySceneVisibility.cs']]);run(mono+[str(target)])
+                                                                                                                                                                                                                                                                                                                                                                                                                                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/ef104db600fd/checks.py", line 12, in run
+    print('RUN',cmd[0],flush=True);subprocess.run(cmd,env=env,check=True)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono', '--config', '/workspace/scratch/7083248ce79b/analysis/tools/etc/mono/config', '/workspace/scratch/ef104db600fd/checks/replay-visual-tests.exe']' returned non-zero exit status 1.

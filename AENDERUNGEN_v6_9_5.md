@@ -1,0 +1,9 @@
+# 6.9.5
+
+- **Hide & Seek / Outside:** Der feste Vergleich zwischen NavMesh-Höhe und Spielerunterkante konnte alle Bodendreiecke entfernen. Die Auswahl nutzt jetzt die tragenden Flächen unter den echten Spawn-/Kristallpositionen und deren Zusammenhang. Karte, Minimap, Replay und Routing verwenden diese Flächen; Rampen bleiben erhalten, darüberliegende Dächer ausgeschlossen. Exakte Box-Konturen werden wieder angezeigt. Rechtecke um komplette Mesh-Collider schließen weiterhin keine Durchgänge.
+- **Replay-Flashes:** Die Auslösung wird direkt an den vorhandenen Taschenlampen-Schaltstellen und am Beginn des Kamera-Blitzes erfasst. Auch Fehlschüsse ohne Monster-Treffer erscheinen als weißer, ausblendender Puls. Die Classic-Lichtprüfung verwendet jetzt die tatsächliche Taschenlampe. Unmittelbare Treffer ergänzen denselben Puls; schnelle separate Aktivierungen bleiben erhalten.
+- **ABORTED:** Reset, Tod, Unterbrechung und Abbruch erscheinen in Liste und Wiedergabe orange als ABORTED. Die lokale Integritätsprüfung bleibt gesondert gespeichert und im Tooltip sichtbar. Fertige Runs zeigen weiterhin VALID oder UNVALID; die obligatorische HUD-Prüfung bleibt erhalten.
+- **Diagnose:** Erfasste und ausgewählte Bodendreiecke, Randkanten und Spielermaße sind im Geometrieblock sichtbar. Details im Replay nennt die aufgezeichneten Lichtereignisse.
+- **Dateien:** Neue Karten/Replays verwenden Format 9 für Blitze ohne bestätigten Gegner. Bestehende Karten und Replays bleiben lesbar. Fehlende Ereignisse alter Aufnahmen lassen sich nicht nachträglich ergänzen.
+
+DLL und EXE gemeinsam austauschen, danach beide Hide-&-Seek-Level neu laden. Neue Runs für die vollständige Flash-Aufzeichnung aufnehmen. Die 6.9-Linie wird fortgesetzt. Prüfungen und verbleibende Live-Test-Grenzen stehen in PRUEFUNG.md.

@@ -1,0 +1,1 @@
+PracticeSuite 7.10.1 / mab. Produktive ImGui-Zeichenlisten mit synthetischem QA-Katalog, keine Spielscreenshots. WIP bleibt sichtbar; Radar und Karte verwenden physische Teile und den gemeinsamen Boden. Gerendert mit tests/render_ui.py.

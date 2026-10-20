@@ -1,0 +1,2 @@
+Historical compiled test programs are not needed in the source package; their source and fixtures remain included.
+tests/results-7.8.1/experience/experience.exe

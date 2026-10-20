@@ -1,0 +1,21 @@
+ItStealsTrainer.exe: Windows x64; no runtime codec/compiler DLL dependency
+DLL Name: bcrypt.dll
+DLL Name: d3d11.dll
+DLL Name: D3DCOMPILER_47.dll
+DLL Name: dwmapi.dll
+DLL Name: GDI32.dll
+DLL Name: KERNEL32.dll
+DLL Name: MFPlat.DLL
+DLL Name: MFReadWrite.dll
+DLL Name: msvcrt.dll
+DLL Name: ole32.dll
+DLL Name: SHELL32.dll
+DLL Name: USER32.dll
+DLL Name: WINMM.dll
+
+PracticeSuiteEncoder.exe: Windows x64; no runtime codec/compiler DLL dependency
+DLL Name: bcrypt.dll
+DLL Name: KERNEL32.dll
+DLL Name: msvcrt.dll
+DLL Name: SHELL32.dll
+Encoder identity matches final binary: PASS

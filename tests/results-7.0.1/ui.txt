@@ -1,0 +1,21 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/ui-tests
+Seed Map SET/UNKNOWN/mismatch/no-navmesh/missing-spawn/offline and live route identity gates: PASS (6 states + 9 route checks)
+Actual Random Seed / Search request actions and result/progress/stop UI: PASS (3 states)
+Spawn-only filters / frozen criteria / automatic and manual generation / optional route UI: PASS
+Missing navigation search UI retains results and hides unverified path legs: PASS
+Replay library/edit popup, mandatory saved validation, enemy/path/flash toggles and v8 drawing: PASS
+Replay map: large responsive view, previous size restoration and all four independent route toggle combinations: PASS
+Mandatory foreground VALID / UNVALID despite hidden metrics/F2/disconnection, HUD alpha/coordinates and frozen review identity: PASS
+Occupied HUD transfer: 611328 vs 8294400 bytes/frame at 1920x1080 (two corners, same pixels and alpha)
+Clipped ImGui primitives fully covered by <=4 nonoverlapping HUD regions, mandatory badge, two corner panels/opacity, WIP only for 5/13, and live timing cache refresh: PASS
+Experience interaction: mouse/keyboard toggles fire once; disabled controls/hover silent; copied acknowledgement keeps button ID/size; cue priority/mute; section reduced motion; start/exit no-input graphics, active-run suppression and real menus: PASS
+Appearance: 24 actual settings subpages at three viewports/two DPIs; safe repeated font-atlas replacement; palette edits without font rebuilds; inherited/custom HUD colors at both opacity extremes; mandatory green status independent of palette: PASS
+7.0.1 real UI: native 1080p fonts, restricted HUD fields, single expiring mode cue, active-run replay guard, valid/invalid no-overlap result cards at 100/150 percent DPI, pulsing spawn preview and optimal-route reset on two new seeds: PASS
+Persistent feedback: result survives automatic ending and one hour, real mouse X / keyboard close restores prior input, bounded scrollable dialog at 480/1920 and 100/150 percent DPI; intro waits for ready game and successful presentation, defers active run, pauses hidden, supports reduced motion and explicit off: PASS
+Real ImGui UI: PASS (144 tab / viewport / DPI / connection cases)
+Two HUD configurations / customization / mandatory warnings: PASS (216 cases)
+Aborted / completed / ready status and stopped overlay timer: PASS
+Actual overlay mode exclusivity / stale telemetry / hiding: PASS (128 cases)
+Actual minimap transforms / filters / zoom: PASS (288 cases)
+ui PASS

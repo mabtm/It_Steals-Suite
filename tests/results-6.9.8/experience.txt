@@ -1,0 +1,5 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/experience-model-tests
+100,000 bounded motion lookups: 6.45126 ms (host/sanitizers)
+Experience v13 roundtrip/default migration/custom colors, finite volume, all audio policy gates, bounded/reversible/reduced motion, hidden/active-run lifecycle, quiet gain-scaled original PCM envelopes: PASS
+experience PASS

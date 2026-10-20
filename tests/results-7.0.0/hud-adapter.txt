@@ -1,0 +1,4 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/hud-adapter-tests
+Production LayeredHud: cropped CopySubresourceRegion, padded row pitch, per-pixel alpha, two nonblocking readback slots, stale badge exclusion, queued crop coordinates, negative/moving origins, owned NoActivate surfaces, hiding/shrink/resize and repeat cleanup: PASS
+hud-adapter PASS

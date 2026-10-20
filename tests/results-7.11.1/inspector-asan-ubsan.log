@@ -1,0 +1,3 @@
+Inspector packet/worker/pointer/common-floor regression completed with exit 0 under AddressSanitizer and UndefinedBehaviorSanitizer.
+ASAN_OPTIONS=detect_leaks=0:halt_on_error=1; UBSAN_OPTIONS=halt_on_error=1.
+2000 re-signed fuzz packets, truncations, cross-language data, scene resets, pointer freeze, snapshot JSON and eight-mode physical route probe: PASS

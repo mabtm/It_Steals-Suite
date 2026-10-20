@@ -1,0 +1,6 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/experience-model-tests
+One 384 x 157 startup blur: 23.8667 ms (host/sanitizers)
+100,000 bounded motion lookups: 7.0575 ms (host/sanitizers)
+Appearance v14: all colors/fonts/flags roundtrip, v13 preservation, hostile numeric inputs; bounded startup blur with stable colors/monotonic edges. Experience: finite volume, all audio policy gates, bounded/reversible/reduced motion, 2.6-second hidden/active-run lifecycle, quiet gain-scaled original PCM envelopes: PASS
+experience PASS

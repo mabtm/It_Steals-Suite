@@ -1,0 +1,1 @@
+Vorschauen aus produktiven ImGui-Drawlisten mit synthetischen Testdaten; keine Screenshots des laufenden Unity-Spiels. Auflösung 1280×720 bzw. 1920×1080. Angezeigt werden beide animierten Marker und kurze Spuren, eine Momentaufnahme des Replays.

@@ -1,0 +1,8 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/replay-tests-final-700
+Replay v9: emitted flashlight/camera flashes without monsters; valid v8 compatibility, invalid actor rejection, and every aborted outcome takes precedence over VALID: PASS
+Cross-language v8: validation, Outside, monster paths/events, timestamps, checksum and conservative legacy validity: PASS
+Replay library: >8 completed/aborted records, repeated loading, save/rename/category/UTF-8 notes, restart, immutable validity, damaged notes backup and limits: PASS
+Timing regression: integrated tight-turn distance, natural duration reconstruction without fitted scaling, no invented pickup pause, and verified fixed-step diagonal mechanics: PASS
+Timing: exact recorded-duration reconstruction, explicit waits, gaps and verified-path gating: PASS
+replay PASS

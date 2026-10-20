@@ -1,0 +1,4 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/milestone-model-tests
+7.0.2: frozen results, all sticky validation flags, 15-second prompt / scene / session / active-run guards, 10,000 collision-free notification placements, diagnostic evidence, v15 preferences and actual state labels: PASS
+milestone PASS

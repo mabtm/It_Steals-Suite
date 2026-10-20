@@ -1,0 +1,7 @@
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+20000-triangle catalog, 1000 bounded BVH queries: 1.6 ms host adapter (not in-game FPS)
+Surface geometry: read-only mesh fallback, UInt16/32 / Float16/32 / stride/offset/baseVertex, static-batch ownership/matrix, mixed-slot separation, wall/floor sharing, props, doorway holes, malformed/GPU failure and large-catalog BVH: PASS
+Replay visibility: actual non-readable vertex/index snapshots, per-slot triangle occlusion, BVH, shared floor/wall material protection, prop/clock exclusion, 20 Hz, reverse/inside rays, independent ceiling and restore: PASS
+Production replay visual adapters: sources, actual shapes/states, independent orbit and wheel zoom, near-plane clipped outlined player wire, 10000 continuous gradient steps, bounded GL geometry, shader fallback, ceiling/wall visibility and toggles: PASS
+replay-visuals PASS

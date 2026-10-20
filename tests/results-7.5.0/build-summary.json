@@ -1,0 +1,51 @@
+{
+  "version": "7.5.0",
+  "author": "mab",
+  "mainProtocol": 21,
+  "frameProtocol": 2,
+  "settingsFormat": 17,
+  "clipProjectFormat": 1,
+  "inputFormats": [
+    1,
+    2,
+    3
+  ],
+  "gameAssemblySha256": "ead3f5f861ad7988ad5fdb6f188bb3f77639927dd496b73066860d6c853f0dd8",
+  "builds": {
+    "trainerWindowsX64": {
+      "exitCode": 0,
+      "compiler": "MinGW-w64 GCC 13 POSIX / C++20 / warnings as errors"
+    },
+    "helper": {
+      "exitCode": 0,
+      "compiler": "Mono C# / actual game, Unity, MelonLoader and Harmony references / warnings as errors"
+    }
+  },
+  "tests": {
+    "ui-final.log": {
+      "passed": true
+    },
+    "native-final.log": {
+      "passed": true
+    },
+    "settings-final.log": {
+      "passed": true
+    },
+    "clips-final.log": {
+      "passed": true
+    },
+    "camera-final.log": {
+      "passed": true
+    },
+    "camera-sanitizer.txt": {
+      "passed": true
+    },
+    "clip-channel.log": {
+      "passed": true
+    },
+    "independent-output.txt": {
+      "passed": true
+    }
+  },
+  "liveWindowsUnityTest": false
+}

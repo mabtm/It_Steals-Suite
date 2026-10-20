@@ -1,0 +1,1 @@
+Echte produktive ImGui-Ausgaben mit ausdrücklich synthetischen Karten, keine Spielscreenshots. Physische Wand- und Propkonturen, durchgehende Pickup-Kontakte und WIP-Kennzeichnung. Gerendert mit tests/render_ui.py.

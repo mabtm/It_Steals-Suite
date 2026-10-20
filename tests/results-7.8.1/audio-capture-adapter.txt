@@ -1,0 +1,1 @@
+Production capture adapter: actual GetPoints bypass configuration, shared DSP timestamps, pass-through PCM, source/mixer deduplication, live mute/gain/routing, closing blocks and untouched game settings: PASS

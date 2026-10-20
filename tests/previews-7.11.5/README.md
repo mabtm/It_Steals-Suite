@@ -1,0 +1,1 @@
+PracticeSuite 7.11.5 / mab. Echte produktive ImGui-Zeichenlisten mit synthetischen QA-Objekten, gerendert durch tests/render_ui.py mit Host-Schrift. Kein Screenshot aus einer laufenden Unity-Szene. Die Auswahlrahmen beziehen sich auf die bereitgestellten QA-Bounds. Windows-Schrift-/Compositingdarstellung kann abweichen.

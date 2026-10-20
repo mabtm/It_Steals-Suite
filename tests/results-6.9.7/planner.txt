@@ -1,0 +1,5 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/planner-tests
+C# run-review wire, exact timed pickup subset, recorded distance, malformed traces and review/live-cache isolation: PASS
+Seed map decoder, 10,000 malformed packets, navigation holes/floors, exact/heuristic tours, cancellation and atomic map cache: PASS
+planner PASS

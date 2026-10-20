@@ -1,0 +1,5 @@
+Production v4 channel + GPU adapter / host graphics doubles / bgra-bottom: ordered identity, 3-slot overlap, pixel format/orientation, backpressure, cancellation, GPU lifetime and fallback: PASS
+Production v4 channel + GPU adapter / host graphics doubles / bgra-top: ordered identity, 3-slot overlap, pixel format/orientation, backpressure, cancellation, GPU lifetime and fallback: PASS
+Production v4 channel + GPU adapter / host graphics doubles / rgba-bottom: ordered identity, 3-slot overlap, pixel format/orientation, backpressure, cancellation, GPU lifetime and fallback: PASS
+Production v4 channel + GPU adapter / host graphics doubles / rgba-top: ordered identity, 3-slot overlap, pixel format/orientation, backpressure, cancellation, GPU lifetime and fallback: PASS
+Production v4 channel + GPU adapter / host graphics doubles / unsupported: ordered identity, 3-slot overlap, pixel format/orientation, backpressure, cancellation, GPU lifetime and fallback: PASS

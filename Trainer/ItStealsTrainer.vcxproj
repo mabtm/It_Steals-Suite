@@ -1,0 +1,287 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ItStealsTrainer.cpp" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_tables.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
+    <ClCompile Include="imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="imgui\backends\imgui_impl_dx11.cpp" />
+    <ClInclude Include="InspectorPresentation.h" />
+    <ClInclude Include="InspectorVisuals.h" />
+    <ClInclude Include="ClipCamera.h" />
+    <ClInclude Include="ClipTiming.h" />
+    <ClInclude Include="ExportProfiles.h" />
+    <ClInclude Include="ExportReport.h" />
+    <ClInclude Include="ClipGuides.h" />
+    <ClInclude Include="ClipProject.h" />
+    <ClInclude Include="EncoderIdentity.h" />
+    <ClInclude Include="InputModules.h" />
+    <ClInclude Include="InputPalette.h" />
+    <ClInclude Include="LosslessProcess.h" />
+    <ClInclude Include="PngSequence.h" />
+    <ClInclude Include="AppearancePreferences.h" />
+    <ClInclude Include="AppearanceUI.h" />
+    <ClInclude Include="IntroBackdrop.h" />
+    <ClInclude Include="IntroBlur.h" />
+    <ClInclude Include="SuiteAppearance.h" />
+    <ClInclude Include="DesignModel.h" />
+    <ClInclude Include="SuiteDesign.h" />
+    <ClInclude Include="ReplayExperience.h" />
+    <ClInclude Include="ReplayExperienceUI.h" />
+    <ClInclude Include="ClipFrameWire.h" />
+    <ClInclude Include="ReplayCoverage.h" />
+    <ClInclude Include="ReplayHealth.h" />
+    <ClInclude Include="ReplayHealthUI.h" />
+    <ClInclude Include="ReplayAudioIO.h" />
+    <ClInclude Include="ClipAudio.h" />
+    <ClInclude Include="Replay3DControls.h" />
+    <ClInclude Include="Replay3DViewUI.h" />
+    <ClInclude Include="ReplayMarkersUI.h" />
+    <ClInclude Include="ReplayAnnotations.h" />
+    <ClInclude Include="ReplayColliders.h" />
+    <ClInclude Include="ReplayTextValidation.h" />
+    <ClInclude Include="ReplayTimelineUI.h" />
+    <ClInclude Include="SuiteBranding.h" />
+    <ClInclude Include="TrainerTray.h" />
+    <ClInclude Include="VerificationUI.h" />
+    <ClInclude Include="MapLevels.h" />
+    <ClInclude Include="PlannerPreferences.h" />
+    <ClInclude Include="PracticeMapData.h" />
+    <ClInclude Include="PracticeMapClient.h" />
+    <ClInclude Include="InspectorModel.h" />
+    <ClInclude Include="InspectorRuntime.h" />
+    <ClInclude Include="InspectorClient.h" />
+    <ClInclude Include="InspectorUI.h" />
+
+    <ClInclude Include="PracticeMapWorker.h" />
+    <ClInclude Include="PracticeRouting.h" />
+    <ClInclude Include="PhysicalNavigation.h" />
+    <ClInclude Include="PickupRouting.h" />
+    <ClInclude Include="SeedMapUI.h" />
+    <ClInclude Include="RouteDrawing.h" />
+    <ClInclude Include="SeedSearch.h" />
+    <ClInclude Include="PortableRandom.h" />
+    <ClInclude Include="SeedSearchOptions.h" />
+    <ClInclude Include="SearchTiming.h" />
+    <ClInclude Include="SeedBatch.h" />
+    <ClInclude Include="RandomSeedOrder.h" />
+    <ClInclude Include="PlannerRandom.h" />
+    <ClInclude Include="MinimapOptions.h" />
+    <ClInclude Include="MinimapUI.h" />
+    <ClInclude Include="OverlayPolicy.h" />
+    <ClInclude Include="GameWindowBinding.h" />
+    <ClInclude Include="TrainerPreferences.h" />
+    <ClInclude Include="TrainerSettings.h" />
+    <ClInclude Include="TrainerUI.h" />
+    <ClInclude Include="OverlayConfiguration.h" />
+    <ClInclude Include="TelemetryPresentation.h" />
+    <ClInclude Include="OverlayUI.h" />
+    <ClInclude Include="GraphicsComposition.h" />
+    <ClInclude Include="SharedProtocol.h" />
+    <ClInclude Include="MinimapGeometry.h" />
+    <ClInclude Include="imgui\imgui.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{d657e815-b3e6-4d48-8b1d-13359febccf9}</ProjectGuid>
+    <RootNamespace>ItStealsTrainer</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)imgui;$(ProjectDir)imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;gdi32.lib;shell32.lib;bcrypt.lib;winmm.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)imgui;$(ProjectDir)imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;gdi32.lib;shell32.lib;bcrypt.lib;winmm.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir)imgui;$(ProjectDir)imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;gdi32.lib;shell32.lib;bcrypt.lib;winmm.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)imgui;$(ProjectDir)imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;gdi32.lib;shell32.lib;bcrypt.lib;winmm.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)..\bin\</OutDir>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <ClInclude Include="FrameCost.h" />
+    <ClInclude Include="HudSurfaceBounds.h" />
+    <ClInclude Include="LayeredHud.h" />
+    <ClInclude Include="MovementTelemetry.h" />
+    <ClInclude Include="RecordedTiming.h" />
+    <ClInclude Include="ReplayArchive.h" />
+    <ClInclude Include="ReplayMotion.h" />
+    <ClInclude Include="ReplayPackage.h" />
+    <ClInclude Include="ReplayInputUI.h" />
+    <ClInclude Include="RoutePlayback.h" />
+    <ClInclude Include="RouteTravelTime.h" />
+    <ClInclude Include="RunReviewState.h" />
+    <ClInclude Include="RunReviewUI.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ExperiencePreferences.h" />
+    <ClInclude Include="ExperienceModel.h" />
+    <ClInclude Include="SuiteExperience.h" />
+    <ClInclude Include="InterfaceAudio.h" />
+    <ClInclude Include="ReplayPreferences.h" />
+    <ClInclude Include="HudTelemetry.h" />
+    <ClInclude Include="RunExperienceModel.h" />
+    <ClInclude Include="RunExperienceUI.h" />
+    <ClInclude Include="DiagnosticScan.h" />
+    <ClInclude Include="DiagnosticUI.h" />
+    <ClInclude Include="InputModel.h" />
+    <ClInclude Include="InputDrawing.h" />
+    <ClInclude Include="InputUI.h" />
+    <ClInclude Include="HudEditorModel.h" />
+    <ClInclude Include="HudEditor.h" />
+    <ClInclude Include="ClipModel.h" />
+    <ClInclude Include="ClipComposition.h" />
+    <ClInclude Include="ClipEncoding.h" />
+    <ClInclude Include="GifWriter.h" />
+    <ClInclude Include="ClipSurface.h" />
+    <ClInclude Include="ClipUI.h" />
+    <ClInclude Include="ClipRuntime.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,0 +1,4 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/settings-tests
+Real settings worker, coalescing, backup recovery, future-version protection and failed-commit retry: PASS
+settings PASS

@@ -1,0 +1,1 @@
+Production InspectorVisualPicking engine-contract doubles: collider-free meshes/sprites, cached geometry, one new copy/frame, no source writes, geometry scope, thin graphics, current bounds/layers, static batch ownership, frozen resources and candidate budgets: PASS

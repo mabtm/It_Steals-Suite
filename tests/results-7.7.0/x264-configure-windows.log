@@ -1,0 +1,27 @@
+platform:       X86_64
+byte order:     little-endian
+system:         WINDOWS
+cli:            no
+libx264:        internal
+shared:         no
+static:         yes
+bashcompletion: no
+asm:            yes
+interlaced:     yes
+avs:            no
+lavf:           no
+ffms:           no
+mp4:            no
+gpl:            yes
+thread:         win32
+opencl:         no
+filters:        crop select_every
+lto:            no
+debug:          no
+gprof:          no
+strip:          no
+PIC:            no
+bit depth:      8
+chroma format:  420
+
+You can run 'make' or 'make fprofiled' now.

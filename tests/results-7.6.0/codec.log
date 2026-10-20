@@ -1,0 +1,3 @@
+PNG: all RGBA pixels/alpha, frame count and manifest exact: PASS
+FFV1 production arguments / independent decode: 30 FPS, 37/37 unique frames, exact RGB+alpha, PTS error 0.3333 ms: PASS
+FFV1 production arguments / independent decode: 60 FPS, 67/67 unique frames, exact RGB+alpha, PTS error 0.3333 ms: PASS

@@ -1,0 +1,5 @@
+Replay policies: original camera mask / radar layers, exact recorded head focus, floor-height / layer precedence, Clock/prop ancestors, hit-normal rejection, source identity and measured diagnostics: PASS
+Replay visibility: non-instanced shader state, actual owned-material alpha, physical normals, floor/prop protection, 20 Hz, reversed hits, original scene slots and idempotent material cleanup: PASS
+Production replay visual adapters: sources, actual shapes/states, independent orbit and wheel zoom, near-plane clipped outlined player wire, 10000 continuous gradient steps, bounded GL geometry, shader fallback, ceiling/wall visibility and toggles: PASS
+
+visuals-adapter PASS

@@ -1,0 +1,162 @@
+{
+  "protocol-layout.json": {
+    "baselineSha256": "ba5ddb47ed4780bd3110169101c74d89f15b47f06576ea2a8274c0bcbb2ab5e2",
+    "currentSha256": "d001347640212f41db4c2a27b83ee86ee6fa401758766b5975232274f43f656f",
+    "versionOnly": false
+  },
+  "Mod/ItStealsMod.cs": {
+    "baselineSha256": "3ce74090e54aacfa9c299d3ed34e4bae9c23b0baa7794a8e17971903458ad28b",
+    "currentSha256": "68392f4c8f8d6bf79c4c3b6662c7cae5306f48cfce300103836cc5d9f5abdfa5",
+    "versionOnly": false
+  },
+  "Mod/Verification.cs": {
+    "baselineSha256": "7d7fbd8e10d17b72ed264f092cdb5c031974058b6ae3ec476e550a95c36fb30d",
+    "currentSha256": "2786f937bb971fef09078035289785420e3d982064510b1e0a51b9ac4314fc8b",
+    "versionOnly": true
+  },
+  "Mod/Replay3D.cs": {
+    "baselineSha256": "a5b15de962e100a6f4fd8a818e0a8b603da43c65f1b660bbbf792f6db6277997",
+    "currentSha256": "f2fd72e3cd170f1a4561c0322c79cf836fcb033ada97d5814e4ccaa847758cd1",
+    "versionOnly": false
+  },
+  "Mod/ReplayMotion.cs": {
+    "baselineSha256": "d4090f2715a91c94b6349a2dcc49021c0105ba8d7e782d7dbcb11dac0d65af50",
+    "currentSha256": "8aac1254333d3ee2c22df6beade2a397882895e52ef821372b8d2c26f165f056",
+    "versionOnly": false
+  },
+  "Mod/ReplaySceneVisibility.cs": {
+    "baselineSha256": "569f4c3756a70251b6867d7727f9b958ac3f5d2299f44c4a706ab60fc68de72d",
+    "currentSha256": "5c1565ff64e70d80f5ce431a6e20bda827ee96ba30ef6160139dcbeb57164872",
+    "versionOnly": false
+  },
+  "Mod/SharedMemoryProtocol.cs": {
+    "baselineSha256": "71238c8d332252caf65641266449d877c3f144971d1839989f45e3f268292f55",
+    "currentSha256": "2a0de6bc5105642bd689d613dd595392c5d795f234081daa650908b37ffb47bb",
+    "versionOnly": false
+  },
+  "Mod/ReplayFollowOrbit.cs": {
+    "baselineSha256": "a43c2d28935f1b841374f77894933d88770e8c4e91f3108595e4af21cdd807a4",
+    "currentSha256": "948c618a13b3cab506994a2b83859d86aefecba9a9824cbcdeef00c5da00fe85",
+    "versionOnly": false
+  },
+  "Mod/ReplayInputCapture.cs": {
+    "baselineSha256": "137826a9e2e9494a7b5c88f5640cee5081f5d09ec68baea758d404df7671232f",
+    "currentSha256": "4a2696b133636241fee918efb1d8352955cf405507046e4b9e1f28bae59aa3da",
+    "versionOnly": false
+  },
+  "Mod/SharedLayout.cs": {
+    "baselineSha256": "27a97bbe222c8c03e37d10f67dd3bd7c2fede058c05e36ea4c47d7f37df3d9c8",
+    "currentSha256": "7e114b840e494831e7f5232c6fec515318765163f1d1990950dea57bc7c0f119",
+    "versionOnly": false
+  },
+  "Trainer/SharedProtocol.h": {
+    "baselineSha256": "636c0574b43e8d1dff5f5672a4bce81f5b35adea2b2fb1b182dd37904ed5e550",
+    "currentSha256": "2ab787a6ce3cbb25b43642706ede4df90e081436333cf4b2580d27d3e948a891",
+    "versionOnly": false
+  },
+  "Trainer/TrainerSettings.h": {
+    "baselineSha256": "d1de1ad7be7376725edd9be4c24b58163380d57ba27561602073072302acdfff",
+    "currentSha256": "b01f29d91d90f0730e7b59ac879d8341c2c7799342c86e2f22f82ace853ba264",
+    "versionOnly": false
+  },
+  "Trainer/Replay3DViewUI.h": {
+    "baselineSha256": "8cf28a83c3e604670a3c03aa7d8c7b838c60cd672886c5e9153a9d0efb012b84",
+    "currentSha256": "af93dd1c21538ae57c9f3b8838e9a47baba0ac1a5de541c70288d9dfbb2af77f",
+    "versionOnly": false
+  },
+  "Trainer/ReplayArchive.h": {
+    "baselineSha256": "f96ad30417437ad7784775a2a97f094f1c3b01bb9d5cd70685ddba7a379bd2c6",
+    "currentSha256": "846656de2c028bde3704625d0b73250efee6053e26bb9d7e8566d977db46f48b",
+    "versionOnly": false
+  },
+  "Trainer/ReplayMotion.h": {
+    "baselineSha256": "c6472bb13c32694ec9c653ba78ba4799d57e8e53766d353524ed0583d23670c5",
+    "currentSha256": "0e6f61bdafdf8eaed7737f3e747f3dd94b02dbab02c35e6cc372c46374cf5d41",
+    "versionOnly": false
+  },
+  "Trainer/ReplayMarkersUI.h": {
+    "baselineSha256": "d74c6284e64cf1a2e1b1d65b6f84b034dd967a5b090416eb0ca8dc286c681152",
+    "currentSha256": "0bf5cafac2499db1da6f22c8346b8375ee254ffaad2f79318b316117b43ac171",
+    "versionOnly": false
+  },
+  "Trainer/TrainerUI.h": {
+    "baselineSha256": "eee46dd6cc56f1385e461479ef4296592636e49b4da34864ad0feae3a40f210d",
+    "currentSha256": "5b010e96e5574fbc7e564d8e92ef89b9e5d312cd78978b3c041e6f87bd0e21c1",
+    "versionOnly": false
+  },
+  "Trainer/ItStealsTrainer.cpp": {
+    "baselineSha256": "83bab5f622d296ca4bb5cad97b7174ca3e3a5ecfa22b6dd0e759a93919dafff8",
+    "currentSha256": "ef9c6b0029acba8902fabd759b2de46424c6f5da0e664785d8d5ce36a09bd5fa",
+    "versionOnly": false
+  },
+  "Trainer/OverlayUI.h": {
+    "baselineSha256": "f7ab229cc1f42239940ff50609fb933227bf478c41bc739d1ea91dd48f93211e",
+    "currentSha256": "fd182d13b96d0c1a460507646358bf40730e521f201fffa4d01d6e16c2466e98",
+    "versionOnly": false
+  },
+  "Trainer/ReplayAnnotations.h": {
+    "baselineSha256": "cf0ccacae6b45978c08e76f40563d88217fb341489621d2e7853d326134e2262",
+    "currentSha256": "8c3a0ffbec1d14ab5498f5af128dc69c82a98cfcd976c7d76c270ddcecc1d4a7",
+    "versionOnly": false
+  },
+  "Trainer/TrainerPreferences.h": {
+    "baselineSha256": "18e6f80fbd8fdd8c9bca3f63f0de5ac4f382d9b3393339becf0d36ded849f94d",
+    "currentSha256": "cfadfb16120a87268a72e32a797bdc5480bc7625c715dc3d83155c4cdbdb7570",
+    "versionOnly": false
+  },
+  "Trainer/ItStealsTrainer.vcxproj": {
+    "baselineSha256": "946e35a48433bf50355ff285494f8a0354bd81fc84e9a76632a9bdbb9c4b0e76",
+    "currentSha256": "da7526999c0221995342f3fbbb8fb24ba581cadb821e84b56b242a3816cdd524",
+    "versionOnly": false
+  },
+  "Trainer/SuiteBranding.h": {
+    "baselineSha256": "2d727fb989c51f76393c6d0973c259a55b7e8f5a9e3701e2b5a01f4836dbbbc8",
+    "currentSha256": "9e13331be83462f544bb538c3a9088b6ea71f03a3510fe3bea0c5dc45e0ba07e",
+    "versionOnly": true
+  },
+  "Trainer/ReplayInputUI.h": {
+    "baselineSha256": "8d4999c4e03de2d2e0046da02b6de3b6017b7a35ee135620b80eb429d18299ab",
+    "currentSha256": "cd65ec06c70fc49831f0d0a69084808e0a4a0a014d8ed4a958624e7324f2604c",
+    "versionOnly": false
+  },
+  "Trainer/RunReviewUI.h": {
+    "baselineSha256": "6f27be2ba0e0fb9254ed7c6c475c99f42b9dce3099a7046c1e305d2b6516b35b",
+    "currentSha256": "7906711e9561c25be443141468b551a99a593bb863b64ffc5bdfc3be4be6f528",
+    "versionOnly": false
+  },
+  "tests/replay_visual_tests.cs": {
+    "baselineSha256": "90523b65abc4020f331e44ab1e216c97b84d6e21c7e2029b0c3c101517ace5ac",
+    "currentSha256": "cf15ef6a49970d5d801c0e03b6117aa15bafbafb2b3aab04f23f22ede382ff69",
+    "versionOnly": false
+  },
+  "tests/native_tests.cpp": {
+    "baselineSha256": "8f0543b73ef2532c03d6a2cce41d4d3b136bf29549b659b9b1d7e64a004a4871",
+    "currentSha256": "55d3d50f528c2adf12d61860352192b5bc398fe517a7f599ce8a4c730400ec05",
+    "versionOnly": false
+  },
+  "tests/managed_tests.cs": {
+    "baselineSha256": "60b9a97bc13570268c15962716e2a6fbb067bf943c9e03dd205362e6b7032ad9",
+    "currentSha256": "706a1b088b8d59c10aee93e0ea484de4684c3fa6a266e422f03c7062c1b541bc",
+    "versionOnly": false
+  },
+  "tests/milestone_tests.cpp": {
+    "baselineSha256": "94f2523b3b40edd99c3bc50ece9af9285660f213648b405b90a4026cb3d3a159",
+    "currentSha256": "be37b2fd9153dfb4560f1ef62416499188a558b4671f5b87c4817cf8c7361fee",
+    "versionOnly": false
+  },
+  "tests/replay_motion_tests.cpp": {
+    "baselineSha256": "2cb1a75c6a707d5fabfd8780814e2230fb8b6bc292bb560d64aa4cbe54d07aed",
+    "currentSha256": "a9cc01b90ad7304579b56ff7b5260a72eaf835bb567ff445afa21fa811bcc39c",
+    "versionOnly": false
+  },
+  "tests/ui_tests.cpp": {
+    "baselineSha256": "db97b685979f5fe19c4ec7a28334c09065747268333f6812e22c69d8e9c458d9",
+    "currentSha256": "3bd9479f1eaebd9d1c4cb6eea1307cb6e233a95061fb277e5ad247c4d3b33372",
+    "versionOnly": false
+  },
+  "tests/replay_motion_tests.cs": {
+    "baselineSha256": "7a4ca60f24c0fcfca675b69764b238ba2f1b51a088dcf1f10c92a1e7aecd71d3",
+    "currentSha256": "48e8d05f87bd750e38a52fd53625c1b2cff1ca4378b9846d1eaa61de79f3d234",
+    "versionOnly": false
+  }
+}

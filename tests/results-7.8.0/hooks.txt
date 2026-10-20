@@ -1,0 +1,4 @@
+Observed IL hooks: audio=364 queries=21 state stores=89 failures=0
+Existing light-event field-store patches compose with observation: PASS
+
+Host patch generation only. Unity ICalls were not executed.

@@ -1,0 +1,7 @@
+All original starts retained; 16/22/40/52/64 crystal quality vs prior solver: 50 cases, mean improvement 0.413026%, old 0.0336765 s / new 0.0299232 s. Timing is a host measurement, not an FPS guarantee.
+Scene 5 / 22 crystals: checked drawn route 597.684 units, time estimate present, preview/search agree.
+Asset-derived BoxCollider standing-band fixture scene 5: 45 positions / 990 checked pairs / 910 recovered / 0 estimated / 112 repairs / 1.05456 s preparation. Scope: static fixture, not a live Unity capture.
+Scene 13 / 40 crystals: checked drawn route 455.01 units, time estimate present, preview/search agree.
+Scene 13 / 52 crystals: checked drawn route 485.699 units, time estimate present, preview/search agree.
+Asset-derived BoxCollider standing-band fixture scene 13: 80 positions / 3160 checked pairs / 2950 recovered / 0 estimated / 190 repairs / 1.39533 s preparation. Scope: static fixture, not a live Unity capture.
+Partial-route gaps never joined, stable layout identity, checked shortest-path reuse, cancellation retry, 22/40/52 targets, route/time visibility and unchanged seed identities: PASS

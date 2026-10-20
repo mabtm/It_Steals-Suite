@@ -1,0 +1,4 @@
+Scene renderer adapter: original batched ranges/material slots, property blocks, culled geometry vs inactive variants, shared flat materials, no scene copies, complete/idempotent/failure rollback: PASS
+Monotonic replay clock: 2000 uneven frames/stalls, pause, speed changes, exact seek, end and invalid values: PASS
+
+renderer-adapter PASS

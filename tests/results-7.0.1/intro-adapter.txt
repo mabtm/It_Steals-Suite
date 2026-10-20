@@ -1,0 +1,4 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/intro-adapter-tests
+Production IntroBackdrop: single bounded game-client crop, GDI flush, immutable opaque texture, restored GDI objects, no recapture, null/minimized suppression, every GDI/D3D failure, black-capture fallback and repeat cleanup: PASS
+intro-adapter PASS

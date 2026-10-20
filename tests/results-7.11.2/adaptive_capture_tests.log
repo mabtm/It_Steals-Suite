@@ -1,0 +1,4 @@
+Adaptive signal 0.5: 1201 checked poses / 145 stored / maximum angular error 0.14985
+Adaptive signal 4: 1201 checked poses / 1122 stored / maximum angular error 0.03375
+Adaptive signal 12: 1201 checked poses / 962 stored / maximum angular error 0.02431
+Adaptive production capture: bounded positional/angular interpolation error, high-frequency motion, constant-pose compression, exact boundaries/endpoints, adaptive detail, strict heartbeat coverage and late-callback isolation: PASS

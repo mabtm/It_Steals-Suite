@@ -1,0 +1,1 @@
+Current 7.9.0 host evidence. Contract doubles are explicitly marked. Synthetic PCM and pose signals; no game assets or original game/Loader DLLs. The ui-complete.txt marker is written only after all UI groups return. The new v6 fixtures and the prior v5/7.8.1 package are retained for compatibility tests. See ../../PRUEFUNG.md for exact limits.

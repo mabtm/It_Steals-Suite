@@ -1,0 +1,2 @@
+Independent GIF decode: 5 exact palette frames, 50 ms timing, 3-frame streamed output: PASS
+Independent Python ZIP/CRC, JSON exporter, original input companion and SHA-256 list: PASS

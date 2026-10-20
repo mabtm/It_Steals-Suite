@@ -1,0 +1,5 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/motion-native-tests
+Cross-language input format, immutable run matching, separate frame/tick clocks, radar request/acceptance, frame stepping, gaps, 1500 fuzz cases, legacy v11 and SHA256/CRC reference vectors: PASS
+Replay packages: full background export/import, named UTF-8 markers and A-B loops, format-1 inputs, 7.2.0/7.2.1 packages, original validation/notes, immutable companions, independent game inbox, manifest conflicts, missing input rejection and legacy export: PASS
+motion-native PASS

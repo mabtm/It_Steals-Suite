@@ -1,0 +1,7 @@
+RUN g++
+RUN /workspace/scratch/ef104db600fd/checks/experience-model-tests
+One 384 x 157 startup blur: 29.149 ms (host/sanitizers)
+100,000 bounded motion lookups: 7.64689 ms (host/sanitizers)
+Design model: bounded page selection / stable top-result identity, new-search reset / reduced motion; finite timeline clamping, exact event time and 4096 observations in <=2048 screen bins: PASS
+Appearance v14: all colors/fonts/flags roundtrip, v13 preservation, hostile numeric inputs; bounded startup blur with stable colors/monotonic edges. Experience: finite volume, all audio policy gates, bounded/reversible/reduced motion, 2.6-second hidden/active-run lifecycle, quiet gain-scaled original PCM envelopes: PASS
+experience PASS

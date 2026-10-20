@@ -1,0 +1,4 @@
+Synthetic physical/contact preparation: 0.0215347 s
+Workers 1: checked 4096, scored 1212, safely pruned 2884, elapsed 0.137783 s, best 55.1648 u
+Workers 6: checked 4096, scored 1284, safely pruned 2812, elapsed 0.0476637 s, best 55.1648 u
+Physical contacts in actual seed coordinator: 1/6-worker parity, exact accounting, continuous lines and exhaustive Top 10 comparison: PASS

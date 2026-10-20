@@ -1,0 +1,1 @@
+PASS: built current sources with warnings as errors. See PRUEFUNG.md for compiler/reference/runtime boundaries.

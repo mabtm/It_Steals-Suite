@@ -1,0 +1,4 @@
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+Production replay visual adapters: source hierarchy / separate agent body, actual dimensions/states, independent seek-stable orbit, pole reversal, 10000 continuous gradient steps, thick bounded GL geometry, missing/unsupported shader fallback, xray and category toggles: PASS
+replay-visuals PASS

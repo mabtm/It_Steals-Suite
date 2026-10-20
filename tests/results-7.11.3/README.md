@@ -1,0 +1,1 @@
+Current native-only hotfix 7.11.3 / mab. Helper and encoder byteidentical to published full 7.11.2. Host model, archive and actual ImGui tests pass; Win64 optimized static trainer builds with warnings as errors. No live Windows/Unity test. Full source/tests and bounds in PRUEFUNG.md; older evidence kept historically.

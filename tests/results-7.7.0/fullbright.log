@@ -1,0 +1,1 @@
+Fullbright production lighting scope: original materials/property blocks/batch ranges, baked/realtime/probe/fog lifecycle, 10000 stable frames, late objects, repeated activation, external writes, partial-failure rollback and scene ownership: PASS

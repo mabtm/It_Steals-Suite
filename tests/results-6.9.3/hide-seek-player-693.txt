@@ -1,0 +1,2 @@
+Uploaded Hide & Seek NavMesh: 824 vertices, 876 triangles, 76 roof triangles, 31 ground targets; all emitted legs on captured ground: PASS
+Wall-safe coarse triangles, no native bake, roof exclusion, obstacle/radius cache invalidation, unchanged Classic/Bonus/Camera/Timer, 22-crystal 1/6-worker Top 10 and full accounting: PASS

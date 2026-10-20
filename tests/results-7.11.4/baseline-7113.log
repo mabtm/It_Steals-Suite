@@ -1,0 +1,15 @@
+row 0 known 7/44
+row 10 known 87/429
+row 20 known 161/714
+row 30 known 211/899
+row 40 known 231/984
+/workspace/scratch/ef104db600fd/checks/routing-7114/scene-5.probe pairs 990 originally known 232 remaining unknown after checked-network closure 0 time 18.3382
+row 0 known 74/79
+row 10 known 773/814
+row 20 known 1332/1449
+row 30 known 1839/1984
+row 40 known 2244/2419
+row 50 known 2526/2754
+row 60 known 2743/2989
+row 70 known 2862/3124
+/workspace/scratch/ef104db600fd/checks/routing-7114/scene-13.probe pairs 3160 originally known 2886 remaining unknown after checked-network closure 0 time 19.5192

@@ -1,0 +1,1425 @@
+{
+  "version": 29,
+  "mappingSize": 32768,
+  "payloadOffset": 256,
+  "payloadSize": 16952,
+  "fields": [
+    {
+      "name": "playerX",
+      "offset": 0,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "playerY",
+      "offset": 4,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "playerZ",
+      "offset": 8,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "playerRotY",
+      "offset": 12,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "objectives",
+      "offset": 16,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "totalObjectives",
+      "offset": 20,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "speed",
+      "offset": 24,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "canMove",
+      "offset": 28,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "isSprinting",
+      "offset": 32,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "health",
+      "offset": 36,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "cameraMode",
+      "offset": 40,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "cameraBright",
+      "offset": 41,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hideAndSeekMode",
+      "offset": 42,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hideAndSeekOutside",
+      "offset": 43,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "timerMode",
+      "offset": 44,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "ghostMode",
+      "offset": 45,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "classicBonus",
+      "offset": 46,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "isCrouching",
+      "offset": 47,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "crystalCount",
+      "offset": 48,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "crystalPositions",
+      "offset": 52,
+      "type": "float",
+      "count": 200
+    },
+    {
+      "name": "wallCount",
+      "offset": 852,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "wallBoxes",
+      "offset": 856,
+      "type": "float",
+      "count": 800
+    },
+    {
+      "name": "monsterX",
+      "offset": 4056,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "monsterZ",
+      "offset": 4060,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "monsterSneak",
+      "offset": 4064,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "monsterSpotted",
+      "offset": 4065,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "monsterStrikes",
+      "offset": 4066,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "monsterMaxStrikes",
+      "offset": 4070,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "monsterTimer",
+      "offset": 4074,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "monsterActive",
+      "offset": 4078,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad3",
+      "offset": 4079,
+      "type": "byte",
+      "count": 17
+    },
+    {
+      "name": "playerNoise",
+      "offset": 4096,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "ghostHidden",
+      "offset": 4100,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "ghostChasing",
+      "offset": 4101,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "ghostHunting",
+      "offset": 4102,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "ghostRunning",
+      "offset": 4103,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "ghostChaseCount",
+      "offset": 4104,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "ghostDetectionRange",
+      "offset": 4108,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "ghostDefaultSpeed",
+      "offset": 4112,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "_pad_gap1",
+      "offset": 4116,
+      "type": "byte",
+      "count": 84
+    },
+    {
+      "name": "activeModeId",
+      "offset": 4200,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_hiding",
+      "offset": 4201,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_running",
+      "offset": 4202,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_foundPlayer",
+      "offset": 4203,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_seekingMode",
+      "offset": 4204,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_chaseCount",
+      "offset": 4205,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_spottedCounter",
+      "offset": 4209,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_chasingSpeed",
+      "offset": 4213,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_wallCoolDown",
+      "offset": 4217,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "hideSeek_coolDownSpeed",
+      "offset": 4221,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "timer_active",
+      "offset": 4225,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "timer_playerIsSafe",
+      "offset": 4226,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "timer_clockTime",
+      "offset": 4227,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "timer_clockStartingTime",
+      "offset": 4231,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "timer_distanceToClosestMonster",
+      "offset": 4235,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "timer_activeRadius",
+      "offset": 4239,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "timer_speedMultiplier",
+      "offset": 4243,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "timer_alwaysMakesSoundWhenMoving",
+      "offset": 4247,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "timer_playerIsStaring",
+      "offset": 4248,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "timer_randomEventInVault",
+      "offset": 4249,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_gap2",
+      "offset": 4250,
+      "type": "byte",
+      "count": 50
+    },
+    {
+      "name": "levelSeed",
+      "offset": 4300,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "seedActive",
+      "offset": 4304,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "rngPatchComplete",
+      "offset": 4305,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_gap3",
+      "offset": 4306,
+      "type": "byte",
+      "count": 4
+    },
+    {
+      "name": "smoothedSpeed",
+      "offset": 4310,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "_pad_gap4",
+      "offset": 4314,
+      "type": "byte",
+      "count": 6
+    },
+    {
+      "name": "mapMinX",
+      "offset": 4320,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "mapMaxX",
+      "offset": 4324,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "mapMinZ",
+      "offset": 4328,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "mapMaxZ",
+      "offset": 4332,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "mapBoundsValid",
+      "offset": 4336,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "wallOverflowCount",
+      "offset": 4340,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "_pad_gap5",
+      "offset": 4344,
+      "type": "byte",
+      "count": 156
+    },
+    {
+      "name": "title",
+      "offset": 4500,
+      "type": "char",
+      "count": 64
+    },
+    {
+      "name": "author",
+      "offset": 4564,
+      "type": "char",
+      "count": 64
+    },
+    {
+      "name": "version",
+      "offset": 4628,
+      "type": "char",
+      "count": 64
+    },
+    {
+      "name": "_pad_gap6",
+      "offset": 4692,
+      "type": "byte",
+      "count": 8
+    },
+    {
+      "name": "pid",
+      "offset": 4700,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "baseAddress",
+      "offset": 4704,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "playerPtr",
+      "offset": 4712,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "_pad_gap7",
+      "offset": 4720,
+      "type": "byte",
+      "count": 280
+    },
+    {
+      "name": "hitboxEnabled",
+      "offset": 5000,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "brightnessEnabled",
+      "offset": 5001,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hidePlayerHitbox",
+      "offset": 5002,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "accurateHitboxes",
+      "offset": 5003,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_gap8",
+      "offset": 5004,
+      "type": "byte",
+      "count": 196
+    },
+    {
+      "name": "pathCornerCount",
+      "offset": 5200,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "pathCorners",
+      "offset": 5204,
+      "type": "float",
+      "count": 40
+    },
+    {
+      "name": "levelLoadCmd",
+      "offset": 5364,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "levelLoadIndex",
+      "offset": 5365,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_level",
+      "offset": 5366,
+      "type": "byte",
+      "count": 63
+    },
+    {
+      "name": "teleportCmd",
+      "offset": 5429,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "teleportX",
+      "offset": 5430,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "teleportY",
+      "offset": 5434,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "teleportZ",
+      "offset": 5438,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "freecamActive",
+      "offset": 5442,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_fc",
+      "offset": 5443,
+      "type": "byte",
+      "count": 3
+    },
+    {
+      "name": "freecamX",
+      "offset": 5446,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "freecamY",
+      "offset": 5450,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "freecamZ",
+      "offset": 5454,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "currentSceneIndex",
+      "offset": 5458,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "playerDead",
+      "offset": 5462,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "speedrunModeActive",
+      "offset": 5463,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "practiceModeActive",
+      "offset": 5464,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "speedrunLevelIndex",
+      "offset": 5465,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "practiceSeed",
+      "offset": 5466,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "setSeedCmd",
+      "offset": 5470,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "timerState",
+      "offset": 5471,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "currentRunTimeSeconds",
+      "offset": 5472,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "personalBestSeconds",
+      "offset": 5480,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "speedrunLoadLevelCmd",
+      "offset": 5488,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_sr1",
+      "offset": 5489,
+      "type": "byte",
+      "count": 15
+    },
+    {
+      "name": "totalRuns",
+      "offset": 5504,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "totalFinishedRuns",
+      "offset": 5508,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "totalDeaths",
+      "offset": 5512,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "totalTimeForAverage",
+      "offset": 5516,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "averagePace",
+      "offset": 5524,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "gameFps",
+      "offset": 5532,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "seedKind",
+      "offset": 5536,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "seedKnown",
+      "offset": 5537,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "runAssisted",
+      "offset": 5538,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "seedSourcesVerified",
+      "offset": 5539,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "runSeed",
+      "offset": 5540,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "initialRngSeed",
+      "offset": 5544,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "rngReseedCount",
+      "offset": 5548,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "trainerFeatures",
+      "offset": 5552,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "totalResets",
+      "offset": 5556,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "currentRunNumber",
+      "offset": 5560,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "sessionAttempts",
+      "offset": 5564,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "sessionCompleted",
+      "offset": 5568,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "sessionResets",
+      "offset": 5572,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "attemptsToday",
+      "offset": 5576,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "completedToday",
+      "offset": 5580,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "resetsToday",
+      "offset": 5584,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "statsSaveStatus",
+      "offset": 5588,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "sessionTimeSeconds",
+      "offset": 5592,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "averageResetSeconds",
+      "offset": 5600,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "furthestProgress",
+      "offset": 5608,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "runProgress",
+      "offset": 5612,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "lastRunPb",
+      "offset": 5616,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "runIntegrity",
+      "offset": 5617,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_stats",
+      "offset": 5618,
+      "type": "byte",
+      "count": 6
+    },
+    {
+      "name": "runStartedUtc",
+      "offset": 5624,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "historyCount",
+      "offset": 5632,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "historyBytes",
+      "offset": 5636,
+      "type": "byte",
+      "count": 1024
+    },
+    {
+      "name": "statsError",
+      "offset": 6660,
+      "type": "char",
+      "count": 96
+    },
+    {
+      "name": "runUsedFeatures",
+      "offset": 6756,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "runWarnings",
+      "offset": 6760,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "lastTeleportSerial",
+      "offset": 6764,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "sceneEpoch",
+      "offset": 6768,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "runOutcome",
+      "offset": 6772,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "playerReady",
+      "offset": 6773,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "reportsEnabled",
+      "offset": 6774,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "reportSaveStatus",
+      "offset": 6775,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "reportEventCount",
+      "offset": 6776,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "gameVersion",
+      "offset": 6780,
+      "type": "char",
+      "count": 64
+    },
+    {
+      "name": "unityVersion",
+      "offset": 6844,
+      "type": "char",
+      "count": 32
+    },
+    {
+      "name": "gameAssemblyHash",
+      "offset": 6876,
+      "type": "char",
+      "count": 65
+    },
+    {
+      "name": "reportError",
+      "offset": 6941,
+      "type": "char",
+      "count": 96
+    },
+    {
+      "name": "statsWarning",
+      "offset": 7037,
+      "type": "char",
+      "count": 96
+    },
+    {
+      "name": "runSceneIndex",
+      "offset": 7133,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "runEndedUtc",
+      "offset": 7137,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "observedFromStart",
+      "offset": 7145,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "hitboxDetails",
+      "offset": 7146,
+      "type": "char",
+      "count": 192
+    },
+    {
+      "name": "timerMonsterCount",
+      "offset": 7338,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "timerMonsterOverflow",
+      "offset": 7342,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "timerMonsterPositions",
+      "offset": 7346,
+      "type": "float",
+      "count": 256
+    },
+    {
+      "name": "timerMonsterIds",
+      "offset": 8370,
+      "type": "int",
+      "count": 128
+    },
+    {
+      "name": "plannerGenerationMs",
+      "offset": 8882,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "timerMonsterStates",
+      "offset": 8886,
+      "type": "byte",
+      "count": 128
+    },
+    {
+      "name": "_extensionPad",
+      "offset": 9014,
+      "type": "byte",
+      "count": 2
+    },
+    {
+      "name": "gameTargetFps",
+      "offset": 9016,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "gameVSync",
+      "offset": 9020,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "gameRefreshHz",
+      "offset": 9024,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "viewCamera",
+      "offset": 9028,
+      "type": "char",
+      "count": 64
+    },
+    {
+      "name": "cursorLock",
+      "offset": 9092,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "menuInputOwned",
+      "offset": 9096,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "runValidity",
+      "offset": 9097,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "externalScanStatus",
+      "offset": 9098,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_integrityPad",
+      "offset": 9099,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "externalTool",
+      "offset": 9100,
+      "type": "char",
+      "count": 96
+    },
+    {
+      "name": "validationDetail",
+      "offset": 9196,
+      "type": "char",
+      "count": 192
+    },
+    {
+      "name": "reviewRunId",
+      "offset": 9388,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "reviewScene",
+      "offset": 9396,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "reviewSpawnSeed",
+      "offset": 9400,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "reviewSamples",
+      "offset": 9404,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "reviewReady",
+      "offset": 9408,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_wallPad",
+      "offset": 9409,
+      "type": "byte",
+      "count": 3
+    },
+    {
+      "name": "wallOutlineCount",
+      "offset": 9412,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "wallOutlines",
+      "offset": 9416,
+      "type": "float",
+      "count": 1600
+    },
+    {
+      "name": "wallOutlineApproximate",
+      "offset": 15816,
+      "type": "byte",
+      "count": 200
+    },
+    {
+      "name": "movementScene",
+      "offset": 16016,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "movementRevision",
+      "offset": 16020,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "movementRejected",
+      "offset": 16024,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "movementTick",
+      "offset": 16028,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "movementRadius",
+      "offset": 16032,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "movementHeight",
+      "offset": 16036,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "movementCounts",
+      "offset": 16040,
+      "type": "int",
+      "count": 5
+    },
+    {
+      "name": "movementSpeeds",
+      "offset": 16060,
+      "type": "float",
+      "count": 15
+    },
+    {
+      "name": "movementLengths",
+      "offset": 16120,
+      "type": "float",
+      "count": 5
+    },
+    {
+      "name": "movementNote",
+      "offset": 16140,
+      "type": "char",
+      "count": 128
+    },
+    {
+      "name": "helperWorkMean",
+      "offset": 16268,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "helperWorkP95",
+      "offset": 16272,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "previousBestSeconds",
+      "offset": 16276,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "reviewRetained",
+      "offset": 16284,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_v16",
+      "offset": 16285,
+      "type": "byte",
+      "count": 7
+    },
+    {
+      "name": "replay3dState",
+      "offset": 16292,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "replay3dRunId",
+      "offset": 16296,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "replay3dSeconds",
+      "offset": 16304,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "replay3dMessage",
+      "offset": 16312,
+      "type": "char",
+      "count": 160
+    },
+    {
+      "name": "replay3dOptions",
+      "offset": 16472,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "replay3dSpeed",
+      "offset": 16476,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "replay3dLoopA",
+      "offset": 16480,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "replay3dLoopB",
+      "offset": 16488,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "replay3dFollowDistance",
+      "offset": 16496,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "replay3dFollowHeight",
+      "offset": 16500,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "replay3dTrailSeconds",
+      "offset": 16504,
+      "type": "float",
+      "count": 1
+    },
+    {
+      "name": "replay3dColliderCount",
+      "offset": 16508,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "replay3dColliderFlags",
+      "offset": 16512,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "inputSequence",
+      "type": "int",
+      "count": 1,
+      "offset": 16516
+    },
+    {
+      "name": "inputSeconds",
+      "type": "double",
+      "count": 1,
+      "offset": 16520
+    },
+    {
+      "name": "inputFrame",
+      "type": "int",
+      "count": 1,
+      "offset": 16528
+    },
+    {
+      "name": "inputTick",
+      "type": "int",
+      "count": 1,
+      "offset": 16532
+    },
+    {
+      "name": "inputState",
+      "type": "int",
+      "count": 1,
+      "offset": 16536
+    },
+    {
+      "name": "inputFlags",
+      "type": "int",
+      "count": 1,
+      "offset": 16540
+    },
+    {
+      "name": "inputKeys",
+      "type": "byte",
+      "count": 32,
+      "offset": 16544
+    },
+    {
+      "name": "inputMouse",
+      "type": "int",
+      "count": 1,
+      "offset": 16576
+    },
+    {
+      "name": "inputLegacy",
+      "type": "int",
+      "count": 8,
+      "offset": 16580
+    },
+    {
+      "name": "inputPadButtons",
+      "type": "int",
+      "count": 4,
+      "offset": 16612
+    },
+    {
+      "name": "inputPadAxes",
+      "type": "float",
+      "count": 24,
+      "offset": 16628
+    },
+    {
+      "name": "inputSprint",
+      "type": "float",
+      "count": 1,
+      "offset": 16724
+    },
+    {
+      "name": "inputFlash",
+      "type": "float",
+      "count": 1,
+      "offset": 16728
+    },
+    {
+      "name": "inputEventCount",
+      "type": "int",
+      "count": 1,
+      "offset": 16732
+    },
+    {
+      "name": "inputEvents",
+      "type": "byte",
+      "count": 192,
+      "offset": 16736
+    },
+    {
+      "name": "inputGameAxes",
+      "type": "float",
+      "count": 6,
+      "offset": 16928
+    }
+  ],
+  "commandSize": 192
+}

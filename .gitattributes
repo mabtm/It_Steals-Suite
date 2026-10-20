@@ -1,0 +1,15 @@
+# Preserve the exact supplied bytes, including source and replay fixture hashes.
+* -text
+*.png binary
+*.gif binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.xz binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.draw binary
+*.isrun binary
+*.isinput binary
+*.isaudio binary

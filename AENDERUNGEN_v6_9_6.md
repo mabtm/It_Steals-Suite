@@ -1,0 +1,9 @@
+# 6.9.6
+
+- Hide & Seek und Outside verwenden die gemeinsame Classic-Routenpipeline. Der zusätzliche Stützpunkt-/Hindernisgraph ist entfernt. Zusammenhängende Bodenflächen werden weiterhin von darüberliegenden Dächern getrennt; die Auswertung selbst nutzt dieselbe Projektion, Korridorsuche, Funnel-Linie und Unity-Fallbackwahl wie die anderen Modi. Bereits erfasste vollständige Korridore bleiben in Replays erhalten.
+- Light Events beziehen sich auf den tatsächlichen Spieler der Aufnahme. Hide & Seek beobachtet jetzt den Treffer der Spielerlampe statt der Sicht des Monsters auf den Spieler. Kameraauslösung, Kamera-Stun und Timer-Sichtzustände sind direkt angebunden. Wiederholte Strahlen und Bestätigungen desselben Blitzes werden zusammengefasst. Reine Endgame-/Batteriezustände erzeugen keine Lichtkontakte. Beobachterdiagnose und verworfene Ereignisse sind unter Replay / Details gespeichert.
+- Zeitprofile integrieren echte Wegstücke durch Kurven statt der verkürzten Verbindung ihrer Enden. Gemessene Zeit/Strecke ersetzt nachträgliche Skalierung. Pausen nahe Kristallen werden nicht als vorgeschriebene Einsammelzeit übertragen, da die Spielmechanik dies nicht verlangt. Abdeckung wird nach Strecke gewichtet.
+- Ohne nutzbares Zeitprofil verwendet ein unterstützter Capture den geprüften Sprintweg pro Physikschritt und den realen Schrittzeitraum. Unnormalisierte Diagonaleingaben werden berücksichtigt. Ohne diese Daten bleibt der bezeichnete 8,1–10-u/s-Fallback erhalten.
+- Neue Karten/Replays: Format 10, ältere bleiben lesbar. ABORTED-Markierung, obligatorischer HUD-Status, Koordinaten, Deckkraft und Seed-Erzeugung bleiben erhalten. DLL und EXE gemeinsam austauschen und beide Hide-&-Seek-Level neu laden. Neue Aufnahmen für die neue Lichterfassung verwenden.
+
+Host-, Asset- und GUI-Prüfungen samt Grenzen stehen in PRUEFUNG.md. Ein Live-Spieltest war hier nicht verfügbar.

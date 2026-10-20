@@ -1,0 +1,10 @@
+version=7
+runs=0
+finished=0
+deaths=0
+resets=0
+timedResets=0
+totalSeconds=0
+resetSeconds=0
+furthest=0
+checksum=592fc8c3e3bddc92a5d1cde250b44769d144ba30acf2c0da0959962fcd3bb9f8

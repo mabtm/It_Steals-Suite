@@ -1,0 +1,1 @@
+PracticeSuite 7.6.0 / mab: actual ImGui draw output, host font, synthetic replay data. The image shows the labelled map-loading fallback; it is not a live Unity 3D screenshot. Speed controls and timeline are production UI. Regenerate with tests/render_ui.py 760-speed-keypoint.draw.

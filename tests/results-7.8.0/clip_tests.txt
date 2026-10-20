@@ -1,0 +1,1 @@
+Clip timing, palette/LZW, bounded streaming, cancellation, preserved files, independent clip markers and HUD placement: PASS

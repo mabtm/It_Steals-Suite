@@ -1,0 +1,50 @@
+[
+  {
+    "format": 2,
+    "videoFrames": "27",
+    "fps": "60/1",
+    "audio": "pcm_f32le",
+    "audioRate": "48000",
+    "pcmExact": true,
+    "bytes": 2937710,
+    "duration": "0.450000"
+  },
+  {
+    "format": 4,
+    "videoFrames": "27",
+    "fps": "60/1",
+    "audio": "pcm_f32le",
+    "audioRate": "48000",
+    "pcmExact": true,
+    "bytes": 989312,
+    "duration": "0.450000"
+  },
+  {
+    "format": 5,
+    "videoFrames": "27",
+    "fps": "60/1",
+    "audio": "pcm_f32le",
+    "audioRate": "48000",
+    "pcmExact": true,
+    "bytes": 1450253,
+    "duration": "0.450000"
+  },
+  {
+    "format": 6,
+    "videoFrames": "27",
+    "fps": "60/1",
+    "audio": "aac",
+    "audioRate": "48000",
+    "pcmExact": false,
+    "bytes": 41372,
+    "duration": "0.450000"
+  },
+  {
+    "preset": "size-limit",
+    "bytes": 77205,
+    "cap": 256000,
+    "audio": "aac",
+    "frames": "27",
+    "duration": "0.450000"
+  }
+]

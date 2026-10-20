@@ -1,0 +1,382 @@
+[
+  {
+    "path": "AENDERUNGEN_v7_6_0.md",
+    "state": "new",
+    "sha256": "a9a5bf10a377151df55ec7cae471958ee11a8d2d9f9bdf9500d4cf71059767db"
+  },
+  {
+    "path": "Mod/ItStealsHelper.csproj",
+    "state": "changed",
+    "sha256": "26048975a663dac7e1e508475523674425639a1c9a507c7394ba2affe8beeeaa"
+  },
+  {
+    "path": "Mod/ItStealsMod.cs",
+    "state": "changed",
+    "sha256": "0b5bd96d785c0c6a93a41ea4c6b32f2d3ce448641d6cbe5197abadfc13660e2e"
+  },
+  {
+    "path": "Mod/Replay3D.cs",
+    "state": "changed",
+    "sha256": "0ee1d2d84f56c0354da45e304df9066031d8b7c47da868b3e7b7806df8c211f1"
+  },
+  {
+    "path": "Mod/Replay3DOverlay.cs",
+    "state": "changed",
+    "sha256": "1051ccd17a0d12ef02f2159b653223424c19fc8d0df1f6769f4e7d9f18d66540"
+  },
+  {
+    "path": "Mod/ReplayCapture.cs",
+    "state": "changed",
+    "sha256": "fa79b56b5ff14fa38b5356aa48396c336512c5989d9ef8d8cf37327db383d4dc"
+  },
+  {
+    "path": "Mod/ReplayClipChannel.cs",
+    "state": "changed",
+    "sha256": "7b92e69bf071f6ecbd93467ec280ee31d73040acd3f18983cd45e489efbe0206"
+  },
+  {
+    "path": "Mod/ReplayFadeMaterial.cs",
+    "state": "changed",
+    "sha256": "8a1e8195fd89e62f7cad73b3e5776caf64edd662608f4aa4d56c70d51a9b0171"
+  },
+  {
+    "path": "Mod/ReplayGamePause.cs",
+    "state": "changed",
+    "sha256": "3b3b30cd454add5f61e0e4f76062eecca6c0f6193c21a32c7aedacc5399620d1"
+  },
+  {
+    "path": "Mod/ReplayInputCapture.cs",
+    "state": "changed",
+    "sha256": "4ba4e54eb3f086dc48cb734bd2891cab89a3fe63e736c1493efee0d1c8b98c68"
+  },
+  {
+    "path": "Mod/ReplayMotion.cs",
+    "state": "changed",
+    "sha256": "1d61f5f2537bc84c22b6c2f1136b97c65b272cb3f77812a9a8d453213904a3e8"
+  },
+  {
+    "path": "Mod/ReplayNativeGraphics.cs",
+    "state": "new",
+    "sha256": "e5cd514feee8a597595eac28f7e9fa6d200850272d082f33648a255dbd8e1471"
+  },
+  {
+    "path": "Mod/ReplaySceneVisibility.cs",
+    "state": "changed",
+    "sha256": "c8b88f3dafb82ba78fb12bbd11ae107e9846f4f85e70db6d8326dae50c411133"
+  },
+  {
+    "path": "Mod/ReplayVisualCapture.cs",
+    "state": "new",
+    "sha256": "e7c7127bd468edea87b9dbffd7a1562be6a2e626c48b6f75a8801a06f9b5e801"
+  },
+  {
+    "path": "Mod/ReplayVisualData.cs",
+    "state": "new",
+    "sha256": "3e81f1705439ef0ee490fd7b5dea2ef9404f0710cb2115a0a318f21493e42303"
+  },
+  {
+    "path": "Mod/RunStore.cs",
+    "state": "changed",
+    "sha256": "fb4fd270017b4c3126b09be7a7dfb3a780303f183cfd3d22cf09102b60c8002b"
+  },
+  {
+    "path": "Mod/SharedMemoryProtocol.cs",
+    "state": "changed",
+    "sha256": "0a8322fd83b319f0d4423ffeb8e049d4b1a58e3276fcdf001f38d9db26ded82b"
+  },
+  {
+    "path": "Mod/Verification.cs",
+    "state": "changed",
+    "sha256": "de8ab36288dd86146c82fcdb2e2d65e4ddc23ee8873e09293239a2ca94c33da2"
+  },
+  {
+    "path": "PRUEFUNG.md",
+    "state": "changed",
+    "sha256": "6f6775fed5dd3f1dab58063f164fb77d93cf07703062524bc84599443541c431"
+  },
+  {
+    "path": "README.md",
+    "state": "changed",
+    "sha256": "d5d4d476b772adf7c25b5bea569580bce2f94d704fa0b16600b1e87f7b80b766"
+  },
+  {
+    "path": "REPLAY_FORMAT.md",
+    "state": "changed",
+    "sha256": "fb6705af786dc52383cda3b8dfc522af78773edc52b120d9418acd3b5ec179d9"
+  },
+  {
+    "path": "Trainer/ClipCamera.h",
+    "state": "changed",
+    "sha256": "c59d39c7d470c53b0438bd6de4dd5d527a5652b5d28b032a54d6db00dd5f3e19"
+  },
+  {
+    "path": "Trainer/ClipModel.h",
+    "state": "changed",
+    "sha256": "51d0e1fcb66ebd98943cde94c259b6c28d62ffeecabc88848bbbe5f2f27d80e7"
+  },
+  {
+    "path": "Trainer/ClipProject.h",
+    "state": "changed",
+    "sha256": "fbf7cbb68e3fca7df73f616af238c1ae00a37d6c2d8ad26c6be80e9dede0992f"
+  },
+  {
+    "path": "Trainer/ClipRuntime.h",
+    "state": "changed",
+    "sha256": "01f49d54f3d60ea60bbaccc3c828b6374ad048466705285cd4a88437e64eb419"
+  },
+  {
+    "path": "Trainer/ClipTiming.h",
+    "state": "new",
+    "sha256": "aeaa07cb9aed4f85c341313ffe011d324cd3f8dedb3c449051954063fa16e244"
+  },
+  {
+    "path": "Trainer/ClipUI.h",
+    "state": "changed",
+    "sha256": "507c317fae2cf2e77be17fd9b8b49903da7736a845dfa2d3615b528d497532cd"
+  },
+  {
+    "path": "Trainer/HudEditor.h",
+    "state": "changed",
+    "sha256": "2639258200d0d1f4eb25fcee9e8de8c1fd052488b6ebd139748a8c132e17ba9d"
+  },
+  {
+    "path": "Trainer/ItStealsTrainer.vcxproj",
+    "state": "changed",
+    "sha256": "07b9515152e8770cbc87dbbd93a20a1d9ad4f86503b3fe887eaf23712c9b01fc"
+  },
+  {
+    "path": "Trainer/PngSequence.h",
+    "state": "changed",
+    "sha256": "7f90258465626b035a8ca15b3479adeabed615c3eda564fa8e85ec8441690909"
+  },
+  {
+    "path": "Trainer/PracticeMapData.h",
+    "state": "changed",
+    "sha256": "cbedf5e34d66e7dc9d8488e19eee9c4cd6e130101bfb62baed56276b6ab19729"
+  },
+  {
+    "path": "Trainer/Replay3DControls.h",
+    "state": "changed",
+    "sha256": "3b71bb8547ad5697b4da77007f2135b50d8c731cdfb58a461655a1b8c41a3523"
+  },
+  {
+    "path": "Trainer/Replay3DViewUI.h",
+    "state": "changed",
+    "sha256": "c1b3a10e8c2c747f7de047f61f48758ba07277dc3a54891d8573bcf0b466bee1"
+  },
+  {
+    "path": "Trainer/ReplayMotion.h",
+    "state": "changed",
+    "sha256": "85fafde18c799f967ab081cd1ea3d747c23ba3a67161767b5630f9f9cf12ae5b"
+  },
+  {
+    "path": "Trainer/SharedProtocol.h",
+    "state": "changed",
+    "sha256": "49b63f30bf6a126479416a7b1fe964ac73840c62b9da875b5a82effae1a3c59d"
+  },
+  {
+    "path": "Trainer/SuiteBranding.h",
+    "state": "changed",
+    "sha256": "15689da0d23712e8e78c072e3655acbdb07651a9a25b0501355d97162ca8dfd7"
+  },
+  {
+    "path": "bin/ItStealsHelper.dll",
+    "state": "changed",
+    "sha256": "8f263b7395e67d7b658b7512ebbe2e6b8fd31577597f9fcaafd351cc30ca7050"
+  },
+  {
+    "path": "bin/ItStealsTrainer.exe",
+    "state": "changed",
+    "sha256": "52f2893236a2e0ba8af316aa9719f881ad744675e64bc947e2f40fb981973112"
+  },
+  {
+    "path": "generate-layout.py",
+    "state": "changed",
+    "sha256": "e5f2a7d6d961b831f5654740014375738ba842995587d0f12c25db88960ee43e"
+  },
+  {
+    "path": "protocol-layout.json",
+    "state": "changed",
+    "sha256": "e388a0a9389197bb0c873cf237e68b9ed4fc45f5760e9c98f0d0425547d1e701"
+  },
+  {
+    "path": "tests/README.md",
+    "state": "changed",
+    "sha256": "9d198b5b4c7a46a24e571ae7b9c2d9b42cd4cc65f323c6407ef625201d903814"
+  },
+  {
+    "path": "tests/clip_speed_tests.cpp",
+    "state": "new",
+    "sha256": "b654dceebe35ed9d7baf6341d59d93b05eb9fc3001ee94ca2ce2fdf443c0616b"
+  },
+  {
+    "path": "tests/clip_studio_cases.inl",
+    "state": "changed",
+    "sha256": "8ed779c1fd03353cbc182d4926fb499f375a2f3d83aa8413328cd17aeb6d5769"
+  },
+  {
+    "path": "tests/native_tests.cpp",
+    "state": "changed",
+    "sha256": "a29d10b3996875e8711b42a60bc265df4262f93d238b4ad7cb945cb0218226b6"
+  },
+  {
+    "path": "tests/previews-7.6.0/760-speed-keypoint.draw",
+    "state": "new",
+    "sha256": "17efb3b50d65e00fa208a12c38e3822fbecf302f7d0fbca87c105775d7cb6a8c"
+  },
+  {
+    "path": "tests/previews-7.6.0/Clip_Studio_Speed_Keypoints_v7_6_0.png",
+    "state": "new",
+    "sha256": "00ad7a9170b1f74335378a53c1ad1af1dded6a4bc39f1e6e0d2b66738b900639"
+  },
+  {
+    "path": "tests/previews-7.6.0/README.md",
+    "state": "new",
+    "sha256": "ef6b89828a5e6c63014b346c278f10f0bc6e1c70f1266ca287742786b18aaf02"
+  },
+  {
+    "path": "tests/replay_motion_tests.cpp",
+    "state": "changed",
+    "sha256": "5455ca6600fdb1c1a90d734778a322468bd3b65bfc5170c5845f7b339ef46ff3"
+  },
+  {
+    "path": "tests/replay_motion_tests.cs",
+    "state": "changed",
+    "sha256": "4a9dac9766ef42d7ee1e869f72799049caf85e45b8c714e92e8126a06a1e3572"
+  },
+  {
+    "path": "tests/results-7.6.0/asset-inventory.json",
+    "state": "new",
+    "sha256": "bbdab0efdb9c3444813f32e724aded9b58dff08dbdf44c95dc4af8b8ccfa2aaf"
+  },
+  {
+    "path": "tests/results-7.6.0/asset-inventory.log",
+    "state": "new",
+    "sha256": "719699969a78e947239b3d474ded5c4ab89b8c83ff1721f029a7121421a1aa33"
+  },
+  {
+    "path": "tests/results-7.6.0/clip-camera.log",
+    "state": "new",
+    "sha256": "58a327e63f9bace7e338f8c7343bf7d412b16675bbd21c634da2458d0ba75ab3"
+  },
+  {
+    "path": "tests/results-7.6.0/clip-channel.log",
+    "state": "new",
+    "sha256": "6042eca55f003af77bfe7f64f4a4e22cff060c09703f6cde980f3dd640c2ce46"
+  },
+  {
+    "path": "tests/results-7.6.0/clip-speed.log",
+    "state": "new",
+    "sha256": "a6515486e97e95d6865856c9021b4d9e81f1d4472136c9a86a27e0c9d50c848d"
+  },
+  {
+    "path": "tests/results-7.6.0/clip-timeline.log",
+    "state": "new",
+    "sha256": "5ab446d1d3d016cfae5080ba26636cc52e1aebf3286e72db18722a73aa30f92c"
+  },
+  {
+    "path": "tests/results-7.6.0/clip.log",
+    "state": "new",
+    "sha256": "e1bbdea39a8771796cd02bda9e42be9b4e4d8d0d1d664215308740bb7f607234"
+  },
+  {
+    "path": "tests/results-7.6.0/codec.log",
+    "state": "new",
+    "sha256": "e20a6fdd44f05e56461a487351add8ca99b3209fb08bd118d945b6c2be42915c"
+  },
+  {
+    "path": "tests/results-7.6.0/helper-build.log",
+    "state": "new",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tests/results-7.6.0/independent-package.log",
+    "state": "new",
+    "sha256": "28c0b498e57c7387253cdd7455eef26c45f6d81ce42430a01e4fb93f22e286c0"
+  },
+  {
+    "path": "tests/results-7.6.0/layout.log",
+    "state": "new",
+    "sha256": "f106e937509e5d148dd7a278f73bf1f82e4b63470bf8981cabe99536409caaa9"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-data/input-map.isrun",
+    "state": "new",
+    "sha256": "ad70b88ca4f4ad2ea3e5fab93478f0cbc3385b31570868f01af712d70ac00646"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-data/input-v1.isinput",
+    "state": "new",
+    "sha256": "5789120ff5cd4635e50ab3ed07f8f163cc8e794e843fe887e8dca94aa0480c97"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-data/input-v2.isinput",
+    "state": "new",
+    "sha256": "fe5cbdca67c3b15ef1afdcd63e8afe1022d366108a659f63fbaa4fcea7559985"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-data/input-v3.isinput",
+    "state": "new",
+    "sha256": "668a6e49671f7392bc275e7ce5fcfc985771fd912962d389304d12e1b67f4a92"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-data/input-wire.isinput",
+    "state": "new",
+    "sha256": "e8eb9940bbf0c89699f248e26e40cda3bea808b8f42e42ca5162311d5afc9a58"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-data/review-wire.bin",
+    "state": "new",
+    "sha256": "6b23e18d16fc3f13fef0a8363b09b13ba5926d04060b6bd8e88656f42e98b216"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-replay-build.log",
+    "state": "new",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tests/results-7.6.0/managed-replay.log",
+    "state": "new",
+    "sha256": "e5a9e079e7016b6c26a47406f5a33382e4908d97448a3987371489474e0b8e46"
+  },
+  {
+    "path": "tests/results-7.6.0/native.log",
+    "state": "new",
+    "sha256": "505a83f45f414e3ac45bff73deefac24ca0f14e9b64bf14fe51f3c11a5ff667b"
+  },
+  {
+    "path": "tests/results-7.6.0/renderer.log",
+    "state": "new",
+    "sha256": "b9713aa656f6441ff646822106ca421b5979b88148e84d48096fee31b82fa265"
+  },
+  {
+    "path": "tests/results-7.6.0/replay-motion.log",
+    "state": "new",
+    "sha256": "63eda7f369a8745bcf1b607a47d98c237a38214af8862c089722f5e926a74624"
+  },
+  {
+    "path": "tests/results-7.6.0/settings.log",
+    "state": "new",
+    "sha256": "e572a093ac2eec1bfbacadc39130a172db52e08a2581f54d5e68865c7e0d256f"
+  },
+  {
+    "path": "tests/results-7.6.0/trainer-build.log",
+    "state": "new",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tests/results-7.6.0/ui-build.log",
+    "state": "new",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tests/results-7.6.0/ui.log",
+    "state": "new",
+    "sha256": "ef601992a9e4f89e350cd054b71326bc1aa9c8f725c4f1caa4d3978d776e37f1"
+  },
+  {
+    "path": "tests/results-7.6.0/variable-speed-png.log",
+    "state": "new",
+    "sha256": "dcdfc6179f41c19a74e87015f1efee25cf89887635c67d012eb4c177450c3e96"
+  }
+]

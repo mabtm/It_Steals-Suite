@@ -1,0 +1,2 @@
+PNG: all RGBA pixels/alpha, frame count and manifest exact: PASS
+Minimal FFmpeg 8.1.3 / independent decode: every RGB/alpha value, 7/7 frames exact: PASS

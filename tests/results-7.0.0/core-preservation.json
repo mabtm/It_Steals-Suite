@@ -1,0 +1,71 @@
+{
+  "baseline": "ItStealsSuite_v6_9_9.zip",
+  "baseline_sha256": "82c02623e363186b5baf3222f1947bc1ddd036e18561b4c5e5fe837e5231f196",
+  "files": [
+    {
+      "path": "Trainer/PracticeRouting.h",
+      "sha256": "ed9725ab76ebff175b040dd3048413b571be58ad48277ded674d5dd9f997861c",
+      "unchanged": true
+    },
+    {
+      "path": "Trainer/RoutePlayback.h",
+      "sha256": "ee8013f58a9dab37b699e791ee17f30f3eaa74bec646b6495d7bd94038bf36a5",
+      "unchanged": true
+    },
+    {
+      "path": "Trainer/MovementTelemetry.h",
+      "sha256": "215922f2edf9d60ccdb6002767e089a114986e181d3d7181e1c265655896ef4b",
+      "unchanged": true
+    },
+    {
+      "path": "Trainer/RecordedTiming.h",
+      "sha256": "a20e8397f14e76f258f6c14a39ebd736b4271d0f4ef6f15d343af393a3bb6307",
+      "unchanged": true
+    },
+    {
+      "path": "Trainer/RouteTravelTime.h",
+      "sha256": "528e05491a2acd3d757f816b2e4d67a2d6a34f3db6753e1449685a0302dd5e9c",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/SceneGeometry.cs",
+      "sha256": "18429a858fe24711f013446058dc16ec4840904f46f70fa1bb78a0b6c6fabdf9",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/UnityNavigationCapture.cs",
+      "sha256": "d4b591c6605e108828cda30d43cf242fa100ec1727022d147a54b5bc7683a7e9",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/PlayerWallLeg.cs",
+      "sha256": "8f1a485fef10a3c4227fdf3ce8f98d1f9b7068d0e911c9dbc4019dc84f407c73",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/MovementCapture.cs",
+      "sha256": "58e9420fa0eb4d533f8248927f81a7111167cbd7ae493f1a890c87815db3ba8b",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/MovementLearning.cs",
+      "sha256": "cc32e737ba23c953c92481c027d6fc091e5b87d917c68ea0503509353d92db52",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/ReplayCapture.cs",
+      "sha256": "6652a070b8990bf6b3805e4e3a746edc300fe9620bf9c20661c811af198d4037",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/FreeCam.cs",
+      "sha256": "38fd9a575c52aae4d47ab6668c2d6d29205c39f5399bbe7091cf5b8cd03cb7d3",
+      "unchanged": true
+    },
+    {
+      "path": "Mod/HitboxDrawer.cs",
+      "sha256": "fc78e16b1c7ad4487aaec5d77b51673e86d3480ab325ad2d139904331ab0aab6",
+      "unchanged": true
+    }
+  ]
+}

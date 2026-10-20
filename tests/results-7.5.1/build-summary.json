@@ -1,0 +1,62 @@
+{
+  "version": "7.5.1",
+  "author": "mab",
+  "mainProtocol": 21,
+  "frameProtocol": 2,
+  "settingsFormat": 18,
+  "clipProjectFormat": 2,
+  "inputFormats": [
+    1,
+    2,
+    3
+  ],
+  "gameAssemblySha256": "ead3f5f861ad7988ad5fdb6f188bb3f77639927dd496b73066860d6c853f0dd8",
+  "builds": {
+    "trainerWindowsX64": {
+      "exitCode": 0,
+      "compiler": "MinGW-w64 GCC 13 POSIX / C++20 / warnings as errors"
+    },
+    "helper": {
+      "exitCode": 0,
+      "compiler": "Mono C# / actual game, Unity, MelonLoader and Harmony references / warnings as errors"
+    }
+  },
+  "tests": {
+    "ui-tests.log": {
+      "passed": true
+    },
+    "camera.log": {
+      "passed": true
+    },
+    "camera-sanitizer-final.log": {
+      "passed": true
+    },
+    "clips.log": {
+      "passed": true
+    },
+    "native.log": {
+      "passed": true
+    },
+    "settings.log": {
+      "passed": true
+    },
+    "clip-channel.log": {
+      "passed": true
+    },
+    "independent-output.log": {
+      "passed": true
+    }
+  },
+  "liveWindowsUnityTest": false,
+  "preview": {
+    "synthetic": true,
+    "nativeDrawing": true,
+    "gifFrames": 60,
+    "gifFps": 20
+  },
+  "binaries": {
+    "ItStealsTrainer.exe": "5fdcfbb15c97406d136268b4709dccd570610a8bcf8ba5c0267196e52d8c3510",
+    "ItStealsHelper.dll": "99859b596d6c40f411bf16a379c54c08d3bd45c7caf8578a493925c7f7a1c057",
+    "PracticeSuiteEncoder.exe": "2ae6a3376a34816252386e6d7dbc35d781af6e8cf485d9be7749cf396cd09759"
+  }
+}

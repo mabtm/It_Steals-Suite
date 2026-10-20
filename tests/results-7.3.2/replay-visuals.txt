@@ -1,0 +1,5 @@
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
+Replay visibility adapter: actual collider bindings, reverse ray, 20 Hz budget, animated alpha, mixed ceiling/wall slots, unrelated overlap/floor protection, camera modes and complete cleanup: PASS
+Production replay visual adapters: sources, actual shapes/states, independent orbit and wheel zoom, near-plane clipped outlined player wire, 10000 continuous gradient steps, bounded GL geometry, shader fallback, ceiling/wall visibility and toggles: PASS
+replay-visuals PASS

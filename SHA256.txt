@@ -1,0 +1,4 @@
+PracticeSuite 7.11.4 / mab
+7f3271b24e23329d5ef059960ebe1a19e6e9ac98c3a438e4b354fb23bbe49760  bin/ItStealsHelper.dll
+710fe62eb60d22793a88f6c53fd0a4c194a3c865bb1b7e0947c6770f19dd46cf  bin/ItStealsTrainer.exe
+3ad27ac545b7602bf34f231cba25929144ed8b011fda137e7227e132376f6bd4  bin/PracticeSuiteEncoder.exe

@@ -1,0 +1,1 @@
+PASS: headless ImGui test build with warnings as errors.

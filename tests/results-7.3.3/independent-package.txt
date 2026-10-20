@@ -1,0 +1,1 @@
+Python zipfile / json / hashlib: all exported ZIP entries, CRC, JSON manifest and SHA256 list verified. PASS

@@ -1,0 +1,12 @@
+version=7
+runs=2
+finished=2
+deaths=0
+resets=0
+timedResets=0
+totalSeconds=135
+resetSeconds=0
+furthest=0
+pb.3=12.345678
+pb.8=90
+checksum=1697ede2555b9831ae7e0f5c8bf980c1a2619f2c800055b2d2d06a17a8a6a29e

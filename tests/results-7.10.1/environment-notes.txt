@@ -1,0 +1,5 @@
+All product tests/builds use local original SDK references and portable host tooling.
+The initial UI invocation lacked restored historical motion/audio fixtures; the complete rerun uses the original 7.9 fixtures plus current managed geometry fixtures.
+Replay experience test needs its experience/output arguments; harness corrected.
+LeakSanitizer cannot enumerate /proc tasks on this host. ASan/UBSan runs use detect_leaks=0, halt_on_error=1; this is no leak-check claim.
+The previously persisted 7.10 full archive was truncated. It is reconstructed from the hash-verified 7.9 baseline, 7.10 source overlay, update binaries and all 1161 original SHA256SUMS entries.

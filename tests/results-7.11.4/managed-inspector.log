@@ -1,0 +1,12 @@
+cant resolve internal call to "UnityEngine.Object::GetName" (tested without signature also)
+Inspector: actual SDK compile, collider-free mesh/sprite math, affine distance, thin bounds, layer dedup/order/budgets, safe private/inherited field reads, getter/ToString isolation, culture, independent opt-in/restriction gates, bounded text and C# cross-language fixtures: PASS
+
+Your mono runtime and class libraries are out of sync.
+The out of sync library is: /workspace/scratch/ef104db600fd/private-7114/game/It Steals_Data/Managed/UnityEngine.CoreModule.dll
+
+When you update one from git you need to update, compile and install
+the other too.
+Do not report this as a bug unless you're sure you have updated correctly:
+you probably have a broken mono install.
+If you see other errors or faults after this message they are probably related
+and you need to fix your mono install first.
