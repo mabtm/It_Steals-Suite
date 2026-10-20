@@ -1,0 +1,45 @@
+# Editor and intermediate build files
+.vs/
+.vscode/
+.idea/
+**/obj/
+/Mod/bin/
+/Trainer/x64/
+/Trainer/Debug/
+/Trainer/Release/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+*.pdb
+*.obj
+*.ilk
+*.exp
+__pycache__/
+*.py[cod]
+
+# Credentials and local settings
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+*.pem
+*.dmp
+/credentials.json
+/secrets.json
+/local.settings.json
+
+# Original game and loader dependencies are supplied locally at build/runtime.
+/It Steals_Data/
+/GameManaged/
+/Managed/
+/Mods/
+**/Assembly-CSharp*.dll
+**/UnityEngine*.dll
+**/MelonLoader.dll
+**/0Harmony.dll
+
+# The three supplied bin/ release files, existing test fixtures, previews,
+# third-party encoder sources and notices are intentionally versioned.
