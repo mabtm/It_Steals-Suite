@@ -3,12 +3,17 @@
 #include <iostream>
 #include <random>
 using namespace suite_clip;
-static bool Near(float a, float b) {
+
+static bool Near(float a, float b)
+{
     return std::abs(a - b) < .0001f;
 }
-int main() {
+
+int main()
+{
     CameraTrack growing;
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; i++)
+    {
         CameraKey key;
         key.seconds = 255 - i;
         assert(growing.Put(key) == 0);
@@ -55,7 +60,8 @@ int main() {
     assert(track.LayersAt(std::nextafter(2., 1.), Route) == Route);
     assert(track.LayersAt(2, Route) == (Colliders | Route));
     assert(track.LayersAt(4, Route) == Colliders && track.LayersAt(6, Route) == 0);
-    for (double t : {7., 0., 5., 2., 1., 4., 3., 6.}) {
+    for (double t : {7., 0., 5., 2., 1., 4., 3., 6.})
+    {
         auto expected = at(t);
         assert(expected.pose);
         expected.pose->Validate();
@@ -71,15 +77,18 @@ int main() {
     assert(!EvaluateCamera(track, 1.5, absent).pose && EvaluateCamera(track, 2, absent).pose);
     // Independent scalar reference for inherited flags, including reverse seeks.
     std::mt19937 rng(752);
-    for (int iteration = 0; iteration < 10000; iteration++) {
+    for (int iteration = 0; iteration < 10000; iteration++)
+    {
         uint32_t defaults = rng() & AllLayers;
-        for (auto &key : track.keys) {
+        for (auto &key : track.keys)
+        {
             key.layerMask = rng() & AllLayers;
             key.layers = rng() & key.layerMask;
         }
         double t = (rng() % 1000) / 100.;
         uint32_t expected = 0;
-        for (uint32_t bit = 1; bit <= Fullbright; bit <<= 1) {
+        for (uint32_t bit = 1; bit <= Fullbright; bit <<= 1)
+        {
             bool set = defaults & bit;
             for (const auto &key : track.keys)
                 if (key.seconds <= t && (key.layerMask & bit))
@@ -89,22 +98,27 @@ int main() {
         }
         assert(track.LayersAt(t, defaults) == expected);
     }
-    for (int id = 0; id < 4; id++) {
+    for (int id = 0; id < 4; id++)
+    {
         auto bad = track;
         if (id == 0)
             bad.keys[0].mode = 3;
         if (id == 1)
             bad.keys[0].layerMask = 64;
-        if (id == 2) {
+        if (id == 2)
+        {
             bad.keys[0].layerMask = 0;
             bad.keys[0].layers = 1;
         }
         if (id == 3)
             bad.keys[0].follow.radius = 0;
         bool rejected = false;
-        try {
+        try
+        {
             bad.Validate(10);
-        } catch (...) {
+        }
+        catch (...)
+        {
             rejected = true;
         }
         assert(rejected);

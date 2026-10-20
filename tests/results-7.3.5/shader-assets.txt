@@ -1,3 +1,0 @@
-RUN python3
-Supplied Standard shader: 22 vertex / 28 fragment alpha variants, zero alpha+instancing variants; actual wall/floor/prop/radar layers: PASS
-shader-assets PASS

@@ -1,7 +1,0 @@
-RUN g++
-RUN /workspace/scratch/ef104db600fd/checks/search-tests
-Disconnected/missing navigation: every seed accounted for, independent Top 10 on both goals/modes, 1/4 workers, explicit spawn filters and estimated path markings; established routes preserved: PASS
-Bounded two-catalog distance cache: unchanged request/epoch/selection reuse with identical ranking; points, mesh, radius, height, hash, navigation status, scene invalidate; LRU eviction: PASS
-Custom goals/filters, independent match counters, catalog ownership, large direct C# packet and research TSV: PASS
-One million unique random seeds, inverse permutation, independent vectors / C# agreement, broad coverage and streaming decode/fuzz, managed wire, random seed ownership, 64-bit counts, independent route ranking, parallel determinism, bounded backpressure, context guards and exact-DP cancellation: PASS
-search PASS

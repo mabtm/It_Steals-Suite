@@ -1,1 +1,0 @@
-Fullbright production shader scope: triplanar/textured/solid unlit, alpha fallback, original textures/UVs/property blocks/static batches, zero stable-frame work, late materials, shader/queue restoration, newer writers, activation rollback and scene ownership: PASS

@@ -7,12 +7,18 @@
 #include <set>
 #include <tuple>
 #include "ReplayCoverage.h"
-namespace practice {
+
+namespace practice
+{
 inline constexpr size_t MotionCapacity = 128 * 1024 * 1024;
-struct ReplayQuaternion {
+
+struct ReplayQuaternion
+{
     float x = 0, y = 0, z = 0, w = 1;
 };
-struct ReplayViewFrame {
+
+struct ReplayViewFrame
+{
     double seconds = 0;
     uint32_t frame = 0, tick = 0, state = 0, keys = 0, reads = 0;
     float horizontal = 0, vertical = 0, mouseX = 0, mouseY = 0, joystickX = 0, joystickY = 0;
@@ -23,19 +29,25 @@ struct ReplayViewFrame {
     float lampIntensity = 0, lampRange = 0, lampAngle = 0;
     uint32_t lampType = 0;
 };
-struct ReplayPhysicsFrame {
+
+struct ReplayPhysicsFrame
+{
     double seconds = 0;
     uint32_t frame = 0, tick = 0, state = 0;
     float horizontal = 0, vertical = 0;
     Vec3 position;
     ReplayQuaternion rotation;
 };
-struct ReplayInputEvent {
+
+struct ReplayInputEvent
+{
     double seconds = 0;
     uint32_t frame = 0, tick = 0, keys = 0, down = 0, up = 0, actions = 0, state = 0;
 };
 struct RecordingCheck;
-struct ReplayMotion {
+
+struct ReplayMotion
+{
     int64_t id = 0;
     int scene = 0, seed = 0, inputFormat = 1;
     double seconds = 0;
@@ -56,7 +68,9 @@ struct ReplayMotion {
     std::vector<ReplayPhysicsFrame> ticks;
     std::vector<ReplayInputEvent> events;
     std::vector<uint8_t> bytes;
-    bool Matches(const MapData &d) const {
+
+    bool Matches(const MapData &d) const
+    {
         const auto *i = d.review && d.review->motion ? d.review->motion.get() : nullptr;
         return i && info && id == d.review->id && scene == d.scene && seed == d.seed && hash == d.hash &&
                std::abs(seconds - d.review->seconds) < .000001 && i->frames == info->frames &&
@@ -65,16 +79,22 @@ struct ReplayMotion {
                i->unity == info->unity;
     }
 };
-inline uint64_t ReplayHash(const std::vector<uint8_t> &bytes, size_t n) {
+
+inline uint64_t ReplayHash(const std::vector<uint8_t> &bytes, size_t n)
+{
     uint64_t h = 14695981039346656037ull;
-    for (size_t i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++)
+    {
         h ^= bytes[i];
         h *= 1099511628211ull;
     }
     return h;
 }
-inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> bytes, std::string &error) {
-    try {
+
+inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> bytes, std::string &error)
+{
+    try
+    {
         if (bytes.size() < 64 || bytes.size() > MotionCapacity)
             throw std::runtime_error("Input recording exceeds size limit");
         uint64_t sum = 0;
@@ -127,7 +147,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
         if (n != d->info->frames || bytes.size() < size_t(n) * 168 + 64)
             throw std::runtime_error("Input frame count mismatch");
         d->frames.reserve(n);
-        for (int k = 0; k < n; k++) {
+        for (int k = 0; k < n; k++)
+        {
             ReplayViewFrame f;
             stamp(f);
             f.state = r.Read<uint32_t>();
@@ -165,7 +186,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
         previous = 0;
         frame = tick = 0;
         d->ticks.reserve(n);
-        for (int k = 0; k < n; k++) {
+        for (int k = 0; k < n; k++)
+        {
             ReplayPhysicsFrame f;
             stamp(f);
             f.state = r.Read<uint32_t>();
@@ -183,7 +205,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
         frame = tick = 0;
         uint32_t keys = 0;
         d->events.reserve(n);
-        for (int k = 0; k < n; k++) {
+        for (int k = 0; k < n; k++)
+        {
             ReplayInputEvent e;
             stamp(e);
             e.keys = r.Read<uint32_t>();
@@ -200,7 +223,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
         }
         if (format >= 2)
             d->colliders = ReadReplayColliders(r, d->seconds, bytes.size());
-        if (format >= 3) {
+        if (format >= 3)
+        {
             d->deviceThrough = r.Read<double>();
             d->deviceDropped = r.Read<int32_t>();
             if (!std::isfinite(d->deviceThrough) || d->deviceThrough < 0 ||
@@ -212,7 +236,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
             previous = 0;
             frame = tick = 0;
             d->devices.reserve(n);
-            for (int k = 0; k < n; k++) {
+            for (int k = 0; k < n; k++)
+            {
                 suite_input::Frame f;
                 stamp(f);
                 f.state = r.Read<uint32_t>();
@@ -225,12 +250,14 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
                 f.mouse = r.Read<uint32_t>();
                 if (f.mouse & ~127u)
                     throw std::runtime_error("Invalid mouse buttons");
-                for (auto &joy : f.legacy) {
+                for (auto &joy : f.legacy)
+                {
                     joy = r.Read<uint32_t>();
                     if (joy & ~0xfffffu)
                         throw std::runtime_error("Invalid joystick buttons");
                 }
-                for (auto &p : f.pads) {
+                for (auto &p : f.pads)
+                {
                     p.buttons = r.Read<uint16_t>();
                     p.lt = r.Read<uint8_t>();
                     p.rt = r.Read<uint8_t>();
@@ -255,7 +282,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
                 throw std::runtime_error("Device span ends before samples");
         }
 
-        if (format >= 4) {
+        if (format >= 4)
+        {
             auto visualStart = r.Offset();
             int recorded = r.Read<uint8_t>();
             if (recorded > 1)
@@ -264,14 +292,16 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
             d->visualDropped = r.Count(INT_MAX);
             int assets = r.Count(4096);
             std::set<std::string> assetKeys;
-            for (int i = 0; i < assets; i++) {
+            for (int i = 0; i < assets; i++)
+            {
                 auto key = r.Text(1024);
                 if (key.empty() || !assetKeys.insert(key).second)
                     throw std::runtime_error("Duplicate visual asset");
             }
             int owners = r.Count(512);
             std::set<std::pair<int, int>> ownerKeys;
-            for (int i = 0; i < owners; i++) {
+            for (int i = 0; i < owners; i++)
+            {
                 int group = r.Read<int32_t>(), id = r.Read<int32_t>(), kind = r.Read<int32_t>();
                 auto root = r.Text(1024);
                 if (group < 0 || group > 3 || id < 0 || kind < 0 || kind > 4 ||
@@ -280,7 +310,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
                 int tracks = r.Count(8192 - d->visualTracks);
                 d->visualTracks += tracks;
                 std::set<std::tuple<int, int, std::string>> paths;
-                for (int j = 0; j < tracks; j++) {
+                for (int j = 0; j < tracks; j++)
+                {
                     int type = r.Read<int32_t>(), slot = r.Read<int32_t>();
                     auto path = r.Text(1024);
                     if (type < 1 || type > 4 || slot < 0 || slot > 31 ||
@@ -289,21 +320,26 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
                     int frames = r.Count(393216 - d->visualSamples);
                     d->visualSamples += frames;
                     double last = -1;
-                    for (int k = 0; k < frames; k++) {
+                    for (int k = 0; k < frames; k++)
+                    {
                         double t = r.Read<double>();
                         if (!std::isfinite(t) || t < 0 || t < last || t > d->seconds + .000001)
                             throw std::runtime_error("Invalid visual time");
                         last = t;
-                        if (type == 1) {
+                        if (type == 1)
+                        {
                             vec();
                             quat();
                             vec();
-                        } else {
+                        }
+                        else
+                        {
                             if (r.Read<uint32_t>() & ~31u)
                                 throw std::runtime_error("Invalid visual state");
                             for (int channel = 0; channel < 4; channel++)
                                 r.Coordinate();
-                            if (type == 4) {
+                            if (type == 4)
+                            {
                                 vec();
                                 quat();
                                 float intensity = r.Coordinate(), range = r.Coordinate(),
@@ -311,7 +347,9 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
                                 if (intensity < 0 || range < 0 || angle < 0 || angle > 179 || inner < 0 ||
                                     inner > 179)
                                     throw std::runtime_error("Invalid visual light");
-                            } else {
+                            }
+                            else
+                            {
                                 r.Count(assets);
                                 r.Count(assets);
                             }
@@ -324,30 +362,39 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
             if (!d->visualsRecorded && (owners || d->visualSamples))
                 throw std::runtime_error("Unexpected visual observations");
         }
-        if(format>=5)d->experience=ReadReplayExperience(r,d->seconds);
-        if(format>=6)d->coverage=ReadCoverage(r,d->seconds);
+        if (format >= 5)
+            d->experience = ReadReplayExperience(r, d->seconds);
+        if (format >= 6)
+            d->coverage = ReadCoverage(r, d->seconds);
         r.Read<uint64_t>();
         if (!r.Done())
             throw std::runtime_error("Trailing input data");
         d->bytes = std::move(bytes);
         error.clear();
         return d;
-    } catch (const std::exception &e) {
+    }
+    catch (const std::exception &e)
+    {
         error = e.what();
         return {};
     }
 }
-template <class T> inline const T *ReplayAt(const std::vector<T> &values, double seconds) {
+
+template <class T> inline const T *ReplayAt(const std::vector<T> &values, double seconds)
+{
     if (!std::isfinite(seconds))
         return nullptr;
     auto p = std::upper_bound(values.begin(), values.end(), seconds,
                               [](double t, const T &v) { return t < v.seconds; });
     return p == values.begin() ? nullptr : &*--p;
 }
-inline double ReplayFrameStep(const ReplayMotion &d, double seconds, bool forward) {
+
+inline double ReplayFrameStep(const ReplayMotion &d, double seconds, bool forward)
+{
     if (d.frames.empty() || !std::isfinite(seconds))
         return std::clamp(std::isfinite(seconds) ? seconds : 0., 0., d.seconds);
-    if (forward) {
+    if (forward)
+    {
         auto i = std::upper_bound(d.frames.begin(), d.frames.end(), seconds + 1e-7,
                                   [](double t, const auto &f) { return t < f.seconds; });
         return i == d.frames.end() ? d.seconds : i->seconds;
@@ -356,11 +403,15 @@ inline double ReplayFrameStep(const ReplayMotion &d, double seconds, bool forwar
                               [](const auto &f, double t) { return f.seconds < t; });
     return i == d.frames.begin() ? 0 : std::prev(i)->seconds;
 }
-inline const ReplayViewFrame *ReplayViewAt(const ReplayMotion &d, double seconds) {
+
+inline const ReplayViewFrame *ReplayViewAt(const ReplayMotion &d, double seconds)
+{
     auto f = ReplayAt(d.frames, seconds);
     return f && seconds - f->seconds <= .25 ? f : nullptr;
 }
-inline const ReplayInputEvent *ReplayInputAt(const ReplayMotion &d, double seconds) {
+
+inline const ReplayInputEvent *ReplayInputAt(const ReplayMotion &d, double seconds)
+{
     if (!std::isfinite(seconds) || seconds < 0 || seconds > d.seconds || d.events.empty() ||
         (d.events.size() >= 131072 && seconds > d.events.back().seconds))
         return nullptr;

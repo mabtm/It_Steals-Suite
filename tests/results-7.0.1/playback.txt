@@ -1,4 +1,0 @@
-RUN g++
-RUN /workspace/scratch/ef104db600fd/checks/playback-tests-final-701
-8.1–10 u/s travel range and 9 u/s playback, recorded-time and distance interpolation, short trails, gaps, start/end, repeated points, incomplete geometry, pause/restart/scrub, independent toggles and visible-route duration: PASS
-playback PASS

@@ -1,1 +1,0 @@
-All UI groups completed: recording check, exact gap seek/copy, 480/1920, 100/150 DPI, camera/speed/layers, HUD/minimap and finish screen.

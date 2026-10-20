@@ -1,1 +1,0 @@
-PracticeSuite 7.11.1 / mab. Echte produktive ImGui-Zeichenlisten mit bewusst synthetischer QA-Auswahl, keine Screenshots aus einem laufenden Spiel. Eigener Tab, kompakte Objektkarte, Details und Hover; kleines Fenster bei 150% DPI. Gerendert mit tests/render_ui.py aus dem vollständigen letzten UI-Test. Native Windows-Schriften/Rendering können geringfügig abweichen.

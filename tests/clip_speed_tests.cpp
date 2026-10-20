@@ -4,9 +4,12 @@
 #include <iostream>
 #include <random>
 using namespace suite_clip;
-static double Reference(Transition curve, double x, double a, double b) {
+
+static double Reference(Transition curve, double x, double a, double b)
+{
     double u = x;
-    switch (curve) {
+    switch (curve)
+    {
     case Transition::Cut:
         u = 0;
         break;
@@ -27,14 +30,18 @@ static double Reference(Transition curve, double x, double a, double b) {
     }
     return 1 / (a + (b - a) * u);
 }
-static double Simpson(Transition c, double a, double b) {
+
+static double Simpson(Transition c, double a, double b)
+{
     constexpr int n = 131072;
     double sum = Reference(c, 0, a, b) + Reference(c, 1, a, b);
     for (int i = 1; i < n; i++)
         sum += (i % 2 ? 4 : 2) * Reference(c, double(i) / n, a, b);
     return sum / (3 * n);
 }
-int main(int argc, char **argv) {
+
+int main(int argc, char **argv)
+{
     SpeedMap cut(10, 1, {{2, .5, Transition::Cut}, {6, 1, Transition::Cut}});
     assert(cut.Output(2) == 2 && cut.Output(6) == 10 && cut.Output(10) == 14);
     assert(cut.Rate(std::nextafter(2., 0.)) == 1 && cut.Rate(2) == .5 && cut.Rate(6) == 1);
@@ -55,11 +62,13 @@ int main(int argc, char **argv) {
     for (auto curve : {Transition::Cut, Transition::Linear, Transition::Smooth, Transition::EaseIn,
                        Transition::EaseOut, Transition::EaseInOut})
         for (auto range :
-             {std::pair{1., .1}, std::pair{.1, 8.}, std::pair{8., .1}, std::pair{.5, 1.}, std::pair{1., 1.}}) {
+             {std::pair{1., .1}, std::pair{.1, 8.}, std::pair{8., .1}, std::pair{.5, 1.}, std::pair{1., 1.}})
+        {
             SpeedMap ramp(4, 1, {{0, range.first, curve}, {4, range.second, Transition::Cut}});
             double exact = 4 * Simpson(curve, range.first, range.second);
             assert(std::abs(ramp.Output(4) - exact) < 2e-8);
-            for (int i = 0; i < 300; i++) {
+            for (int i = 0; i < 300; i++)
+            {
                 double t = double(rng() % 1000000) / 250000;
                 double output = ramp.Output(t);
                 assert(std::abs(ramp.Source(output) - t) < 1e-8);
@@ -93,16 +102,21 @@ int main(int argc, char **argv) {
     ConfigureSpeed(cache, track, 10, 1, false);
     assert(!cache);
     for (double invalid :
-         {0., -.1, 8.1, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()}) {
+         {0., -.1, 8.1, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()})
+    {
         bool rejected = false;
-        try {
+        try
+        {
             SpeedMap bad(10, 1, {{2, invalid, Transition::Cut}});
-        } catch (...) {
+        }
+        catch (...)
+        {
             rejected = true;
         }
         assert(rejected);
     }
-    if (argc > 1) {
+    if (argc > 1)
+    {
         std::filesystem::path dir = argv[1];
         std::filesystem::create_directories(dir);
         Options png;
@@ -117,7 +131,8 @@ int main(int argc, char **argv) {
         assert(png.Frames() == 6);
         PngSequence sequence(dir, png);
         std::vector<uint8_t> pixels(320 * 180 * 4, 255);
-        for (uint64_t frame = 0; frame < png.Frames(); frame++) {
+        for (uint64_t frame = 0; frame < png.Frames(); frame++)
+        {
             assert(std::abs(png.At(frame) - frame / 120.) < 1e-9);
             sequence.Write(pixels);
         }

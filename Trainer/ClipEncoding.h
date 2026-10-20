@@ -18,23 +18,28 @@
 #include <mfreadwrite.h>
 #include <windows.h>
 #endif
-namespace suite_clip {
-inline std::vector<uint8_t> NV12(const std::vector<uint8_t> &source, int width, int height) {
+namespace suite_clip
+{
+inline std::vector<uint8_t> NV12(const std::vector<uint8_t> &source, int width, int height)
+{
     if (width % 2 || height % 2 || source.size() != size_t(width) * height * 4)
         throw std::runtime_error("Invalid encoder frame dimensions");
     std::vector<uint8_t> dest(size_t(width) * height * 3 / 2);
     auto clamp = [](int v) { return uint8_t(std::clamp(v, 0, 255)); };
     for (int y = 0; y < height; y++)
-        for (int x = 0; x < width; x++) {
+        for (int x = 0; x < width; x++)
+        {
             auto p = source.data() + (size_t(y) * width + x) * 4;
             dest[size_t(y) * width + x] = clamp(((47 * p[2] + 157 * p[1] + 16 * p[0] + 128) >> 8) + 16);
         }
     size_t uv = size_t(width) * height;
     for (int y = 0; y < height; y += 2)
-        for (int x = 0; x < width; x += 2) {
+        for (int x = 0; x < width; x += 2)
+        {
             int r = 0, g = 0, b = 0;
             for (int j = 0; j < 2; j++)
-                for (int i = 0; i < 2; i++) {
+                for (int i = 0; i < 2; i++)
+                {
                     auto p = source.data() + (size_t(y + j) * width + x + i) * 4;
                     b += p[0];
                     g += p[1];
@@ -49,8 +54,10 @@ inline std::vector<uint8_t> NV12(const std::vector<uint8_t> &source, int width, 
     return dest;
 }
 #ifdef _WIN32
-inline void MediaCheck(HRESULT hr) {
-    if (FAILED(hr)) {
+inline void MediaCheck(HRESULT hr)
+{
+    if (FAILED(hr))
+    {
         std::ostringstream s;
         s << "Windows video encoder failed (0x" << std::hex << uint32_t(hr)
           << "). Check disk space and Windows Media Foundation / H.264 "
@@ -58,42 +65,62 @@ inline void MediaCheck(HRESULT hr) {
         throw std::runtime_error(s.str());
     }
 }
-template <class T> struct MediaPtr {
+
+template <class T> struct MediaPtr
+{
     T *p = nullptr;
-    ~MediaPtr() {
+
+    ~MediaPtr()
+    {
         if (p)
             p->Release();
     }
-    T **Out() {
-        if (p) {
+
+    T **Out()
+    {
+        if (p)
+        {
             p->Release();
             p = nullptr;
         }
         return &p;
     }
-    T *operator->() { return p; }
+
+    T *operator->()
+    {
+        return p;
+    }
 };
-struct MediaSession {
+
+struct MediaSession
+{
     bool com = false, mf = false;
-    MediaSession() {
+
+    MediaSession()
+    {
         MediaCheck(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
         com = true;
         HRESULT hr = MFStartup(MF_VERSION, MFSTARTUP_LITE);
-        if (FAILED(hr)) {
+        if (FAILED(hr))
+        {
             CoUninitialize();
             com = false;
             MediaCheck(hr);
         }
         mf = true;
     }
-    ~MediaSession() {
+
+    ~MediaSession()
+    {
         if (mf)
             MFShutdown();
         if (com)
             CoUninitialize();
     }
 };
-class Mp4Writer {
+
+class Mp4Writer
+{
     MediaSession session;
     MediaPtr<IMFByteStream> fileStream;
     MediaPtr<IMFSinkWriter> sink;
@@ -102,7 +129,8 @@ class Mp4Writer {
     uint64_t index = 0;
 
   public:
-    Mp4Writer(const std::filesystem::path &file, const Options &o) : options(o) {
+    Mp4Writer(const std::filesystem::path &file, const Options &o) : options(o)
+    {
         // The encoder owns a previously reserved empty file. Open it explicitly;
         // do not rely on URL-only sink writer overwrite behavior.
         MediaCheck(MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_FAIL_IF_NOT_EXIST, MF_FILEFLAGS_NONE,
@@ -138,7 +166,9 @@ class Mp4Writer {
         MediaCheck(sink->SetInputMediaType(stream, input.p, nullptr));
         MediaCheck(sink->BeginWriting());
     }
-    void Write(const std::vector<uint8_t> &bgra) {
+
+    void Write(const std::vector<uint8_t> &bgra)
+    {
         auto bytes = NV12(bgra, options.width, options.height);
         MediaPtr<IMFMediaBuffer> buffer;
         MediaCheck(MFCreateMemoryBuffer(DWORD(bytes.size()), buffer.Out()));
@@ -155,10 +185,15 @@ class Mp4Writer {
         MediaCheck(sink->WriteSample(stream, sample.p));
         index++;
     }
-    void Finish() { MediaCheck(sink->Finalize()); }
+
+    void Finish()
+    {
+        MediaCheck(sink->Finalize());
+    }
 };
 #endif
-class Encoder {
+class Encoder
+{
     std::thread thread;
     mutable std::mutex gate;
     std::condition_variable wake;
@@ -173,24 +208,44 @@ class Encoder {
     std::atomic<uint64_t> written{0};
 
   public:
-    ~Encoder() {
+    ~Encoder()
+    {
         Cancel();
         if (thread.joinable())
             thread.join();
     }
-    int State() const { return state.load(); }
-    uint64_t Written() const { return written.load(); }
-    std::string Error() const {
+
+    int State() const
+    {
+        return state.load();
+    }
+
+    uint64_t Written() const
+    {
+        return written.load();
+    }
+
+    std::string Error() const
+    {
         std::lock_guard l(gate);
         return error;
     }
-    std::filesystem::path Path() const {
+
+    std::filesystem::path Path() const
+    {
         std::lock_guard l(gate);
         return path;
     }
-    int Phase() const { return phase.load(); }
-    const char *PhaseName() const {
-        switch (phase.load()) {
+
+    int Phase() const
+    {
+        return phase.load();
+    }
+
+    const char *PhaseName() const
+    {
+        switch (phase.load())
+        {
         case 1:
             return "Rendering / encoding frames";
         case 2:
@@ -207,11 +262,14 @@ class Encoder {
             return "Finalizing video";
         }
     }
-    std::vector<uint8_t> AcquireFrame(size_t bytes) {
+
+    std::vector<uint8_t> AcquireFrame(size_t bytes)
+    {
         std::vector<uint8_t> result;
         {
             std::lock_guard l(gate);
-            if (!buffers.empty()) {
+            if (!buffers.empty())
+            {
                 result = std::move(buffers.back());
                 buffers.pop_back();
             }
@@ -219,11 +277,15 @@ class Encoder {
         result.resize(bytes);
         return result;
     }
-    bool Ready() const {
+
+    bool Ready() const
+    {
         std::lock_guard l(gate);
         return state == 1 && !abort && !finish && queue.size() < 2;
     }
-    bool Push(std::vector<uint8_t> bytes) {
+
+    bool Push(std::vector<uint8_t> bytes)
+    {
         std::lock_guard l(gate);
         if (state != 1 || abort || finish || queue.size() >= 2)
             return false;
@@ -231,25 +293,34 @@ class Encoder {
         wake.notify_one();
         return true;
     }
-    void Finish() {
+
+    void Finish()
+    {
         std::lock_guard l(gate);
         finish = true;
         wake.notify_one();
     }
-    void Cancel() {
+
+    void Cancel()
+    {
         std::lock_guard l(gate);
         abort = true;
         wake.notify_one();
     }
-    bool Start(const Options &options, const std::filesystem::path &destination, ExportSource source = {}) {
+
+    bool Start(const Options &options, const std::filesystem::path &destination, ExportSource source = {})
+    {
         if (state == 1)
             return false;
         if (thread.joinable())
             thread.join();
-        try {
+        try
+        {
             auto validated = options;
             validated.Validate(options.b);
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception &e)
+        {
             std::lock_guard l(gate);
             error = e.what();
             state = 3;
@@ -266,11 +337,14 @@ class Encoder {
             written = 0;
             state = 1;
         }
-        try {
+        try
+        {
             thread = std::thread([this, options, destination, source] {
-                struct FrameCleanup {
+                struct FrameCleanup
+                {
                     Encoder &owner;
-                    ~FrameCleanup() {
+                    ~FrameCleanup()
+                    {
                         std::lock_guard l(owner.gate);
                         owner.queue.clear();
                         owner.buffers.clear();
@@ -280,25 +354,32 @@ class Encoder {
                 auto temporary = destination;
                 temporary += std::wstring(L".partial") + Extension(options.format);
                 bool temporaryOwned = false;
-                struct WorkFiles {
+                struct WorkFiles
+                {
                     std::filesystem::path path;
-                    ~WorkFiles() {
-                        if (!path.empty()) {
+                    ~WorkFiles()
+                    {
+                        if (!path.empty())
+                        {
                             std::error_code ec;
                             std::filesystem::remove_all(path, ec);
                         }
                     }
                 } work;
 
-                try {
+                try
+                {
                     std::filesystem::create_directories(destination.parent_path());
                     if (std::filesystem::exists(destination) || std::filesystem::exists(temporary))
                         throw std::runtime_error("Export name already exists; choose a new filename");
-                    if (options.format == 3) {
+                    if (options.format == 3)
+                    {
                         if (!std::filesystem::create_directory(temporary))
                             throw std::runtime_error("Cannot reserve PNG sequence folder");
                         temporaryOwned = true;
-                    } else {
+                    }
+                    else
+                    {
 #ifdef _WIN32
                         HANDLE reservation = CreateFileW(temporary.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                                                          nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -315,10 +396,18 @@ class Encoder {
                         }
 #endif
                     }
-                    bool withAudio=options.AudioEnabled();
-                    if(withAudio&&(!source.audio.recorded||source.audioFile.empty()))throw std::runtime_error("Recorded audio is missing or unavailable");
-                    if(options.maxFileBytes||withAudio){auto folder=temporary;folder+=L".work";if(!std::filesystem::create_directory(folder))throw std::runtime_error("Cannot reserve temporary media folder");work.path=folder;}
-                    auto audioPath=work.path/L"audio.wav";
+                    bool withAudio = options.AudioEnabled();
+                    if (withAudio && (!source.audio.recorded || source.audioFile.empty()))
+                        throw std::runtime_error("Recorded audio is missing or unavailable");
+                    if (options.maxFileBytes || withAudio)
+                    {
+                        auto folder = temporary;
+                        folder += L".work";
+                        if (!std::filesystem::create_directory(folder))
+                            throw std::runtime_error("Cannot reserve temporary media folder");
+                        work.path = folder;
+                    }
+                    auto audioPath = work.path / L"audio.wav";
                     {
                         std::unique_ptr<GifWriter> gif;
                         std::unique_ptr<PngSequence> png;
@@ -328,10 +417,12 @@ class Encoder {
                         if (options.format == 0)
                             mp4 = std::make_unique<Mp4Writer>(temporary, options);
                         std::filesystem::path videoSource;
-                        if (ExternalFormat(options.format)) {
+                        if (ExternalFormat(options.format))
+                        {
                             auto streamOptions = options;
                             auto target = temporary;
-                            if (options.maxFileBytes) {
+                            if (options.maxFileBytes)
+                            {
                                 SizeBitrate(options);
                                 videoSource = work.path / L"source.avi";
                                 target = videoSource;
@@ -351,14 +442,16 @@ class Encoder {
                         if (options.format == 1)
                             gif = std::make_unique<GifWriter>(temporary, options.width, options.height,
                                                               options.fps);
-                        while (true) {
+                        while (true)
+                        {
                             std::vector<uint8_t> bytes;
                             {
                                 std::unique_lock l(gate);
                                 wake.wait(l, [&] { return abort || finish || !queue.empty(); });
                                 if (abort)
                                     break;
-                                if (queue.empty()) {
+                                if (queue.empty())
+                                {
                                     if (finish)
                                         break;
                                     continue;
@@ -373,7 +466,8 @@ class Encoder {
                             if (png)
                                 png->Write(bytes);
 #ifdef _WIN32
-                            if (mp4) {
+                            if (mp4)
+                            {
                                 mp4->Write(bytes);
                             }
                             if (lossless)
@@ -391,27 +485,37 @@ class Encoder {
                             std::lock_guard l(gate);
                             cancelled = abort;
                         }
-                        if (!cancelled) {
+                        if (!cancelled)
+                        {
                             if (written != options.Frames())
                                 throw std::runtime_error("Export ended before all frames were encoded");
-                            if(withAudio){phase=5;RenderRecordedAudio(audioPath,options,source,abort);}
+                            if (withAudio)
+                            {
+                                phase = 5;
+                                RenderRecordedAudio(audioPath, options, source, abort);
+                            }
                             if (gif)
                                 gif->Finish();
                             if (png)
                                 png->Finish();
 #ifdef _WIN32
-                            if (mp4) {
+                            if (mp4)
+                            {
                                 mp4->Finish();
                                 mp4.reset();
                             }
-                            if (lossless) {
+                            if (lossless)
+                            {
                                 lossless->Finish();
                                 lossless.reset();
-                                if (options.maxFileBytes) {
+                                if (options.maxFileBytes)
+                                {
                                     uint64_t bitrate = SizeBitrate(options);
                                     bool fits = false;
-                                    for (int attempt = 0; attempt < 3 && !fits; attempt++) {
-                                        for (int pass = 1; pass <= 2; pass++) {
+                                    for (int attempt = 0; attempt < 3 && !fits; attempt++)
+                                    {
+                                        for (int pass = 1; pass <= 2; pass++)
+                                        {
                                             phase = pass == 1 ? 2 : 3;
                                             auto args = BudgetCodecArguments(options, bitrate, pass);
                                             auto stats = work.path / L"rate";
@@ -420,8 +524,12 @@ class Encoder {
                                                 L"-filter_threads 1 "
                                                 L"-xerror -i " +
                                                 QuoteArgument(videoSource.wstring()) +
-                                                (withAudio&&pass==2?L" -i "+QuoteArgument(audioPath.wstring())+L" -map 0:v:0 -map 1:a:0 "+AudioCodecArguments(options.format):L" -map 0:v:0 -an ")+L"-passlogfile " +
-                                                QuoteArgument(stats.wstring()) + L" " +
+                                                (withAudio && pass == 2
+                                                     ? L" -i " + QuoteArgument(audioPath.wstring()) +
+                                                           L" -map 0:v:0 -map 1:a:0 " +
+                                                           AudioCodecArguments(options.format)
+                                                     : L" -map 0:v:0 -an ") +
+                                                L"-passlogfile " + QuoteArgument(stats.wstring()) + L" " +
                                                 std::wstring(args.begin(), args.end()) +
                                                 (pass == 1 ? L"NUL" : QuoteArgument(temporary.wstring()));
                                             auto diagnostic =
@@ -434,7 +542,8 @@ class Encoder {
                                         phase = 4;
                                         auto actual = std::filesystem::file_size(temporary);
                                         fits = actual > 128 && actual <= options.maxFileBytes;
-                                        if (!fits) {
+                                        if (!fits)
+                                        {
                                             bitrate = SmallerBitrate(bitrate, actual, options.maxFileBytes);
                                             if (bitrate < 24000)
                                                 break;
@@ -452,7 +561,8 @@ class Encoder {
                     }
                     {
                         std::lock_guard l(gate);
-                        if (abort) {
+                        if (abort)
+                        {
                             std::error_code ec;
                             std::filesystem::remove_all(temporary, ec);
                             state = 4;
@@ -460,13 +570,23 @@ class Encoder {
                         }
                     }
 #ifdef _WIN32
-                    if(withAudio&&!options.maxFileBytes){
-                        phase=6;auto video=work.path/(std::wstring(L"video")+Extension(options.format));std::filesystem::rename(temporary,video);
-                        std::wstring command=L"-hide_banner -nostdin -loglevel error -y -xerror -i "+QuoteArgument(video.wstring())+L" -i "+QuoteArgument(audioPath.wstring())+L" -map 0:v:0 -map 1:a:0 -c:v copy "+AudioCodecArguments(options.format)+(options.format==0||options.format==6?L"-movflags +faststart ":L"")+QuoteArgument(temporary.wstring());
-                        LosslessWriter mux(work.path/L"mux",options,abort,command,false);mux.Finish();
+                    if (withAudio && !options.maxFileBytes)
+                    {
+                        phase = 6;
+                        auto video = work.path / (std::wstring(L"video") + Extension(options.format));
+                        std::filesystem::rename(temporary, video);
+                        std::wstring command =
+                            L"-hide_banner -nostdin -loglevel error -y -xerror -i " +
+                            QuoteArgument(video.wstring()) + L" -i " + QuoteArgument(audioPath.wstring()) +
+                            L" -map 0:v:0 -map 1:a:0 -c:v copy " + AudioCodecArguments(options.format) +
+                            (options.format == 0 || options.format == 6 ? L"-movflags +faststart " : L"") +
+                            QuoteArgument(temporary.wstring());
+                        LosslessWriter mux(work.path / L"mux", options, abort, command, false);
+                        mux.Finish();
                     }
 #endif
-                    if(abort)throw std::runtime_error("Export cancelled");
+                    if (abort)
+                        throw std::runtime_error("Export cancelled");
                     if (options.maxFileBytes && std::filesystem::file_size(temporary) > options.maxFileBytes)
                         throw std::runtime_error("Encoded file exceeds the size limit; "
                                                  "output was not published");
@@ -479,16 +599,21 @@ class Encoder {
                         throw std::runtime_error("Destination exists");
                     std::filesystem::rename(temporary, destination);
 #endif
-                    try {
+                    try
+                    {
                         WriteExportReport(
                             destination, options, source,
                             std::chrono::duration<double>(std::chrono::steady_clock::now() - started)
                                 .count());
-                    } catch (...) { /* The completed video remains usable if diagnostics
-                                       cannot be written. */
+                    }
+                    catch (...)
+                    { /* The completed video remains usable if diagnostics
+                         cannot be written. */
                     }
                     state = 2;
-                } catch (const std::exception &e) {
+                }
+                catch (const std::exception &e)
+                {
                     std::error_code ec;
                     if (temporaryOwned)
                         std::filesystem::remove_all(temporary, ec);
@@ -498,7 +623,9 @@ class Encoder {
                 }
             });
             return true;
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception &e)
+        {
             std::lock_guard l(gate);
             error = e.what();
             state = 3;

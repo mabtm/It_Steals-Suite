@@ -1,2 +1,0 @@
-Historical compiled test programs excluded; sources/fixtures retained.
-

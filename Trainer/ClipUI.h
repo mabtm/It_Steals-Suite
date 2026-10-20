@@ -3,7 +3,9 @@
 #include "ClipGuides.h"
 #include "ClipProject.h"
 #include "ExportProfiles.h"
-namespace suite_clip {
+
+namespace suite_clip
+{
 inline bool open = false, requestOpen = false, playPreview = false, startRequested = false,
             testRequested = false, cancelRequested = false, dirty = false, backendAvailable = false,
             actualSize = false;
@@ -32,35 +34,57 @@ inline void (*openDirectory)() = nullptr;
 inline void (*saveProject)() = nullptr;
 inline void (*loadProject)() = nullptr;
 inline void (*profileIO)(int, bool, const char *) = nullptr;
-inline void Changed() {
+
+inline void Changed()
+{
     if (content.analysis && content.analysis->data && content.analysis->data->review)
-        try {
+        try
+        {
             ConfigureSpeed(options.timing, content.track, content.analysis->data->review->seconds,
                            options.rate, options.camera == 3 && options.speedKeys);
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception &e)
+        {
             options.timing.reset();
             error = e.what();
         }
     dirty = true;
     revision++;
 }
-inline void ChangedCamera() {
+
+inline void ChangedCamera()
+{
     cameraEpoch++;
     Changed();
 }
-inline bool EditingPoint() {
+
+inline bool EditingPoint()
+{
     return cameraEditing && selectedKey >= 0 && selectedKey < int(content.track.keys.size());
 }
-inline int EditorMode() { return EditingPoint() ? content.track.keys[selectedKey].mode : options.camera; }
-inline std::optional<CameraPose> CurrentCameraPose() { return CameraAt(options, content, previewAt); }
-inline void SeedCamera() {
-    if (auto pose = RecordedCamera(content, previewAt)) {
-        if (!content.orbit.ready) {
+
+inline int EditorMode()
+{
+    return EditingPoint() ? content.track.keys[selectedKey].mode : options.camera;
+}
+
+inline std::optional<CameraPose> CurrentCameraPose()
+{
+    return CameraAt(options, content, previewAt);
+}
+
+inline void SeedCamera()
+{
+    if (auto pose = RecordedCamera(content, previewAt))
+    {
+        if (!content.orbit.ready)
+        {
             content.orbit.yaw =
                 std::atan2(Forward(pose->rotation).x, Forward(pose->rotation).z) * 57.2957795f;
             content.orbit.ready = true;
         }
-        if (!content.freeReady) {
+        if (!content.freeReady)
+        {
             content.freePose = *pose;
             content.freeReady = true;
         }
@@ -69,24 +93,30 @@ inline void SeedCamera() {
         fly.Align(content.freePose);
     }
 }
-inline void SetCameraMode(int mode) {
+
+inline void SetCameraMode(int mode)
+{
     mode = std::clamp(mode, 0, 3);
     int before = EditorMode();
     if (mode == before)
         return;
     auto current = CurrentCameraPose();
-    if (mode == 1 && current && before != 0) {
-        if (auto focus = RecordedCamera(content, previewAt)) {
+    if (mode == 1 && current && before != 0)
+    {
+        if (auto focus = RecordedCamera(content, previewAt))
+        {
             content.orbit.Align(*current, focus->position);
             content.freePose.fov = current->fov;
         }
     }
-    if (mode == 2 && current) {
+    if (mode == 2 && current)
+    {
         content.freePose = *current;
         content.freeReady = true;
         fly.Align(*current);
     }
-    if (EditingPoint() && mode < 3) {
+    if (EditingPoint() && mode < 3)
+    {
         auto &key = content.track.keys[selectedKey];
         key.mode = mode;
         if (current)
@@ -94,7 +124,9 @@ inline void SetCameraMode(int mode) {
         if (mode == 1)
             key.follow = content.orbit;
         options.camera = 3;
-    } else {
+    }
+    else
+    {
         options.camera = mode;
         cameraEditing = false;
     }
@@ -102,7 +134,9 @@ inline void SetCameraMode(int mode) {
     error.clear();
     ChangedCamera();
 }
-inline void Seek(double at, bool pause = true) {
+
+inline void Seek(double at, bool pause = true)
+{
     previewAt = std::clamp(at, 0., content.analysis->data->review->seconds);
     if (pause)
         playPreview = false;
@@ -111,8 +145,14 @@ inline void Seek(double at, bool pause = true) {
     cameraDrag = cameraPanDrag = false;
     Changed();
 }
-inline std::string PointLabel(size_t index) { return ShotLabel(index); }
-inline void EditKey(size_t index) {
+
+inline std::string PointLabel(size_t index)
+{
+    return ShotLabel(index);
+}
+
+inline void EditKey(size_t index)
+{
     if (index >= content.track.keys.size())
         return;
     selectedKey = int(index);
@@ -120,7 +160,8 @@ inline void EditKey(size_t index) {
     options.camera = 3;
     auto &key = content.track.keys[index];
     content.orbit = key.follow;
-    if (auto pose = CurrentCameraPose()) {
+    if (auto pose = CurrentCameraPose())
+    {
         content.freePose = editorPose = *pose;
         content.freeReady = true;
         fly.Align(*pose);
@@ -128,19 +169,26 @@ inline void EditKey(size_t index) {
     cameraEditing = true;
     ChangedCamera();
 }
-inline void UpdateEditingKey() {
-    if (EditingPoint()) {
+
+inline void UpdateEditingKey()
+{
+    if (EditingPoint())
+    {
         auto &key = content.track.keys[selectedKey];
         if (key.mode == 2)
             key.pose = editorPose = content.freePose;
-        else if (key.mode == 1) {
+        else if (key.mode == 1)
+        {
             key.follow = content.orbit;
             key.pose.fov = content.freePose.fov;
         }
     }
 }
-inline void TogglePlayback() {
-    if (cameraEditing) {
+
+inline void TogglePlayback()
+{
+    if (cameraEditing)
+    {
         cameraEditing = false;
         options.camera = 3;
     }
@@ -150,12 +198,15 @@ inline void TogglePlayback() {
         previewAt = options.a;
     ChangedCamera();
 }
-inline void PauseViewer() {
+
+inline void PauseViewer()
+{
     if (!g_pShared || !content.analysis)
         return;
     const auto &r = *content.analysis->data->review;
     if (g_pShared->replay3dRunId == r.id && g_pShared->replay3dState >= 2 && g_pShared->replay3dState <= 3 &&
-        !HasPendingRequest()) {
+        !HasPendingRequest())
+    {
         suite_replay::playback.playing = false;
         suite_replay::Apply(g_commands, false, suite_replay::camera == 2);
         g_commands.replay3dRunId = r.id;
@@ -163,8 +214,10 @@ inline void PauseViewer() {
         g_commands.replay3dCmd = 3;
     }
 }
+
 inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
-                 std::shared_ptr<const practice::ReplayMotion> motion) {
+                 std::shared_ptr<const practice::ReplayMotion> motion)
+{
     if (!a || !a->data || !a->data->review || (g_pShared && g_pShared->timerState == 1) ||
         encoder.State() == 1)
         return;
@@ -190,16 +243,20 @@ inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
     options.fadeWalls = suite_replay::fadeWalls;
     options.simplified = suite_replay::simplified;
     options.fullbright = suite_replay::fullbright;
-    options.audio=content.motion&&content.motion->experience.audio.recorded&&!content.motion->audioFile.empty();
+    options.audio =
+        content.motion && content.motion->experience.audio.recorded && !content.motion->audioFile.empty();
     options.fullKeyboard = content.input.fullKeyboard;
     error.clear();
     if (loadProject)
         loadProject();
     auto marks = content.markers;
-    if (marks && marks->hasClipA && marks->hasClipB) {
+    if (marks && marks->hasClipA && marks->hasClipB)
+    {
         options.a = marks->clipA;
         options.b = marks->clipB;
-    } else if (marks && marks->LoopValid()) {
+    }
+    else if (marks && marks->LoopValid())
+    {
         options.a = marks->a;
         options.b = marks->b;
     }
@@ -221,7 +278,9 @@ inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
     SetOverlayInteractive(true);
     PauseViewer();
 }
-inline void Close() {
+
+inline void Close()
+{
     if (encoder.State() == 1)
         return;
     if (saveProject)
@@ -234,8 +293,10 @@ inline void Close() {
     started3d = false;
     SetOverlayInteractive(g_overlayVisible && !g_compactMode);
 }
+
 inline void Button(std::shared_ptr<const practice::MapAnalysis> a,
-                   std::shared_ptr<const practice::ReplayMotion> motion) {
+                   std::shared_ptr<const practice::ReplayMotion> motion)
+{
     ImGui::BeginDisabled(!a || !a->data || !a->data->review || a->data->review->seconds < .02 ||
                          encoder.State() == 1);
     if (suite_ui::Button("Export clip / GIF") || requestOpen)
@@ -244,17 +305,23 @@ inline void Button(std::shared_ptr<const practice::MapAnalysis> a,
     Help("Compose a clip, animate a camera track, then export MP4, GIF, RGB "
          "lossless MKV or a PNG sequence. New recordings include the original game mix.");
 }
-inline void Field(const char *text) {
+
+inline void Field(const char *text)
+{
     ImGui::TextUnformatted(text);
     ImGui::SetNextItemWidth(-1);
 }
-inline void SaveKey(bool replace) {
+
+inline void SaveKey(bool replace)
+{
     auto sampled = ResolveFrame(options, content, previewAt);
-    if (!sampled.pose) {
+    if (!sampled.pose)
+    {
         error = "No recorded camera pose at this time";
         return;
     }
-    try {
+    try
+    {
         sampled.pose->Validate();
         auto track = content.track;
         CameraKey key;
@@ -268,14 +335,16 @@ inline void SaveKey(bool replace) {
         if (replace && selectedKey >= 0 && selectedKey < int(track.keys.size()))
             existing = selectedKey;
         else
-            for (size_t i = 0; i < track.keys.size(); i++) {
+            for (size_t i = 0; i < track.keys.size(); i++)
+            {
                 double difference = std::abs(track.keys[i].seconds - previewAt);
                 if (difference < 1e-7)
                     existing = int(i);
                 else if (difference < .001)
                     throw std::runtime_error("Keypoints must be at least 0.001 seconds apart");
             }
-        if (existing >= 0) {
+        if (existing >= 0)
+        {
             auto old = track.keys[existing];
             key.seconds = old.seconds;
             key.name = old.name;
@@ -294,12 +363,17 @@ inline void SaveKey(bool replace) {
         error.clear();
         if (saveProject)
             saveProject();
-    } catch (const std::exception &e) {
+    }
+    catch (const std::exception &e)
+    {
         error = e.what();
     }
 }
-inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
-    if (busy) {
+
+inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy)
+{
+    if (busy)
+    {
         return false;
     }
     auto &io = ImGui::GetIO();
@@ -315,17 +389,21 @@ inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
         return io.MousePos.x >= r.x && io.MousePos.y >= r.y && io.MousePos.x <= r.x + r.w &&
                io.MousePos.y <= r.y + r.h;
     };
-    if (editLayout) {
+    if (editLayout)
+    {
         auto *d = ImGui::GetWindowDrawList();
         for (int block = 0; block < BlockCount; block++)
-            if (BlockEnabled(block, options, content)) {
+            if (BlockEnabled(block, options, content))
+            {
                 auto r = toScreen(OverlayBounds(block, options, content));
                 auto color =
                     block == selectedBlock ? IM_COL32(96, 238, 214, 255) : IM_COL32(140, 178, 185, 100);
                 d->AddRect({r.x, r.y}, {r.x + r.w, r.y + r.h}, color, 3, 0, 1.5f);
-                if (block == selectedBlock) {
+                if (block == selectedBlock)
+                {
                     d->AddRectFilled({r.x + r.w - 9, r.y + r.h - 9}, {r.x + r.w, r.y + r.h}, color);
-                    if (hovered && ImGui::IsMouseClicked(0) && hit(r)) {
+                    if (hovered && ImGui::IsMouseClicked(0) && hit(r))
+                    {
                         dragBlock = block;
                         resizeBlock = io.MousePos.x > r.x + r.w - 16 && io.MousePos.y > r.y + r.h - 16;
                     }
@@ -334,22 +412,26 @@ inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
         if (hovered && ImGui::IsMouseClicked(0) && dragBlock < 0)
             for (int block = BlockCount - 1; block >= 0; block--)
                 if (BlockEnabled(block, options, content) &&
-                    hit(toScreen(OverlayBounds(block, options, content)))) {
+                    hit(toScreen(OverlayBounds(block, options, content))))
+                {
                     selectedBlock = dragBlock = block;
                     resizeBlock = false;
                     break;
                 }
-        if (dragBlock >= 0) {
+        if (dragBlock >= 0)
+        {
             if (!ImGui::IsMouseDown(0))
                 dragBlock = -1;
-            else if (io.MouseDelta.x || io.MouseDelta.y) {
+            else if (io.MouseDelta.x || io.MouseDelta.y)
+            {
                 auto r = OverlayBounds(dragBlock, options, content);
                 auto &p = content.layout.blocks[dragBlock];
                 if (resizeBlock)
                     p.width = std::clamp(p.width + io.MouseDelta.x / size.x /
                                                        (dragBlock == Mouse ? content.input.mouseScale : 1),
                                          dragBlock == RunInfo ? .55f : .04f, 1.f);
-                else {
+                else
+                {
                     p.x = std::clamp(r.x / options.width + io.MouseDelta.x / size.x, 0.f,
                                      1 - r.w / options.width);
                     p.y = std::clamp(r.y / options.height + io.MouseDelta.y / size.y, 0.f,
@@ -359,27 +441,32 @@ inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
             }
         }
     }
-    if (options.scene3d && shownPoseReady) {
+    if (options.scene3d && shownPoseReady)
+    {
         bool startDrag = hovered && ImGui::IsMouseClicked(1);
         cameraDrag = ImGui::IsMouseDown(1) && (cameraDrag || startDrag);
         cameraPanDrag = ImGui::IsMouseDown(2) && (cameraPanDrag || (hovered && ImGui::IsMouseClicked(2)));
         bool wheel = hovered && io.MouseWheel != 0;
-        if (cameraDrag || cameraPanDrag || wheel) {
+        if (cameraDrag || cameraPanDrag || wheel)
+        {
             if (options.camera == 3 && !EditingPoint())
                 return changed;
-            if (EditorMode() == 0) {
+            if (EditorMode() == 0)
+            {
                 SetCameraMode(2);
                 cameraDrag = ImGui::IsMouseDown(1);
                 cameraPanDrag = ImGui::IsMouseDown(2);
             }
             auto before = CurrentCameraPose();
-            if (EditorMode() == 1) {
+            if (EditorMode() == 1)
+            {
                 content.orbit.ready = true;
                 if (cameraDrag && !startDrag)
                     content.orbit.Rotate(io.MouseDelta.x, io.MouseDelta.y);
                 if (wheel)
                     content.orbit.Zoom(io.MouseWheel);
-                if (cameraPanDrag && before) {
+                if (cameraPanDrag && before)
+                {
                     auto right = Right(before->rotation), forward = Forward(before->rotation);
                     Point up{forward.y * right.z - forward.z * right.y,
                              forward.z * right.x - forward.x * right.z,
@@ -388,8 +475,11 @@ inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
                         content.orbit.pan +
                         (right * (-io.MouseDelta.x) + up * io.MouseDelta.y) * (content.orbit.radius * .0018f);
                 }
-            } else {
-                if (!content.freeReady && before) {
+            }
+            else
+            {
+                if (!content.freeReady && before)
+                {
                     content.freePose = *before;
                     content.freeReady = true;
                     fly.Align(*before);
@@ -400,7 +490,8 @@ inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
                     fly.Travel(content.freePose, io.MouseWheel);
                 if (cameraPanDrag)
                     fly.Pan(content.freePose, io.MouseDelta.x, io.MouseDelta.y);
-                if (cameraDrag && !io.WantTextInput) {
+                if (cameraDrag && !io.WantTextInput)
+                {
                     auto held = [](ImGuiKey key) { return ImGui::IsKeyDown(key) ? 1.f : 0.f; };
                     fly.Move(content.freePose, held(ImGuiKey_D) - held(ImGuiKey_A),
                              held(ImGuiKey_E) - held(ImGuiKey_Q), held(ImGuiKey_W) - held(ImGuiKey_S),
@@ -409,7 +500,8 @@ inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
                 }
             }
             UpdateEditingKey();
-            if (auto after = CurrentCameraPose(); before && after) {
+            if (auto after = CurrentCameraPose(); before && after)
+            {
                 changed |=
                     before->position.x != after->position.x || before->position.y != after->position.y ||
                     before->position.z != after->position.z || before->rotation.x != after->rotation.x ||
@@ -420,7 +512,9 @@ inline bool PreviewInteraction(ImVec2 origin, ImVec2 size, bool busy) {
     }
     return changed;
 }
-inline bool ModeButton(const char *label, int mode, float width = 0) {
+
+inline bool ModeButton(const char *label, int mode, float width = 0)
+{
     bool selected = EditorMode() == mode;
     auto style = ImGui::GetStyle();
     ImGui::PushStyleColor(ImGuiCol_Button, selected ? ImVec4(g_headerCol.x * .30f, g_headerCol.y * .30f,
@@ -433,7 +527,9 @@ inline bool ModeButton(const char *label, int mode, float width = 0) {
         SetCameraMode(mode);
     return hit;
 }
-inline void CameraModes() {
+
+inline void CameraModes()
+{
     float gap = ImGui::GetStyle().ItemSpacing.x, w = (ImGui::GetContentRegionAvail().x - 2 * gap) / 3;
     ModeButton("Recorded", 0, w);
     ImGui::SameLine();
@@ -441,17 +537,21 @@ inline void CameraModes() {
     ImGui::SameLine();
     ModeButton("Free", 2, w);
 }
-inline void CameraPanel(bool &changed) {
+
+inline void CameraPanel(bool &changed)
+{
     bool can3d = content.motion && !content.motion->frames.empty() && g_pShared;
     ImGui::BeginDisabled(!can3d && !options.scene3d);
     changed |= suite_ui::Checkbox("3D scene", &options.scene3d);
     ImGui::EndDisabled();
-    if (!options.scene3d) {
+    if (!options.scene3d)
+    {
         ImGui::TextDisabled("Map composition");
         Help("Enable the recorded 3D scene to compose a camera shot.");
         return;
     }
-    if (suite_ui::Checkbox("Simplified graphics", &options.simplified)) {
+    if (suite_ui::Checkbox("Simplified graphics", &options.simplified))
+    {
         ChangedCamera();
         changed = true;
     }
@@ -468,36 +568,44 @@ inline void CameraPanel(bool &changed) {
          "run validity stays unchanged.");
     bool timeline = options.camera == 3;
     ImGui::BeginDisabled(content.track.keys.empty());
-    if (suite_ui::Checkbox("Use keypoints", &timeline)) {
+    if (suite_ui::Checkbox("Use keypoints", &timeline))
+    {
         if (timeline)
             SetCameraMode(3);
-        else {
+        else
+        {
             cameraEditing = false;
             SetCameraMode(2);
         }
     }
     ImGui::EndDisabled();
-    if (EditingPoint()) {
+    if (EditingPoint())
+    {
         ImGui::TextColored(g_headerCol, "SHOT %s / %.6f s", PointLabel(selectedKey).c_str(), previewAt);
         CameraModes();
         Help("Mode and camera edits are saved on this output point. The timeline "
              "remains enabled for preview "
              "and export.");
-        if (suite_ui::Button("Done editing")) {
+        if (suite_ui::Button("Done editing"))
+        {
             cameraEditing = false;
             cameraDrag = cameraPanDrag = false;
             changed = true;
         }
-    } else if (options.camera == 3) {
+    }
+    else if (options.camera == 3)
+    {
         auto frame = ResolveFrame(options, content, previewAt);
         ImGui::TextColored(g_headerCol, "TIMELINE / %s", ShotModeNames[frame.options.camera]);
         ImGui::TextDisabled("Select a point to edit its camera");
-    } else
+    }
+    else
         CameraModes();
     Help("Free: hold RMB to look; WASD moves, Q/E lowers/raises, Shift moves "
          "faster. Wheel travels, MMB pans. "
          "Follow: RMB orbits, wheel zooms.");
-    if (selectedKey >= 0 && selectedKey < int(content.track.keys.size())) {
+    if (selectedKey >= 0 && selectedKey < int(content.track.keys.size()))
+    {
         auto &speedKey = content.track.keys[selectedKey];
         changed |= suite_ui::Checkbox("Playback speed at this point", &speedKey.speedOverride);
         Help("Absolute replay speed from this point. Cut holds it until the next "
@@ -507,44 +615,53 @@ inline void CameraPanel(bool &changed) {
              "inherit the preceding speed.");
         if (speedKey.speedOverride && !options.speedKeys)
             ImGui::TextDisabled("Speed points disabled in Output");
-        if (speedKey.speedOverride) {
+        if (speedKey.speedOverride)
+        {
             float rate = float(speedKey.playbackSpeed);
             ImGui::SetNextItemWidth(-1);
             if (ImGui::SliderFloat("##PointPlaybackSpeed", &rate, .1f, 8, "%.2fx",
-                                   ImGuiSliderFlags_Logarithmic)) {
+                                   ImGuiSliderFlags_Logarithmic))
+            {
                 speedKey.playbackSpeed = rate;
                 changed = true;
             }
-            for (double preset : {.1, .5, 1., 2.}) {
+            for (double preset : {.1, .5, 1., 2.})
+            {
                 if (preset != .1)
                     ImGui::SameLine();
                 char label[16];
                 std::snprintf(label, sizeof(label), "%.1fx", preset);
-                if (suite_ui::Button(label)) {
+                if (suite_ui::Button(label))
+                {
                     speedKey.playbackSpeed = preset;
                     changed = true;
                 }
             }
             int speedCurve = int(speedKey.speedCurve);
             Field("Speed to next speed point");
-            if (ImGui::Combo("##PointSpeedCurve", &speedCurve, TransitionNames, 6)) {
+            if (ImGui::Combo("##PointSpeedCurve", &speedCurve, TransitionNames, 6))
+            {
                 speedKey.speedCurve = Transition(speedCurve);
                 changed = true;
             }
         }
     }
-    if (ImGui::TreeNode("Scene layers")) {
+    if (ImGui::TreeNode("Scene layers"))
+    {
         bool point = EditingPoint();
         ImGui::TextDisabled(point ? "At this point / inherited until changed" : "Default layers");
         auto effective = ResolveFrame(options, content, previewAt).options;
         auto layer = [&](const char *label, uint32_t bit, bool Options::*field) {
             bool value = point ? effective.*field : options.*field;
-            if (suite_ui::Checkbox(label, &value)) {
-                if (point) {
+            if (suite_ui::Checkbox(label, &value))
+            {
+                if (point)
+                {
                     auto &key = content.track.keys[selectedKey];
                     key.layerMask |= bit;
                     key.layers = (key.layers & ~bit) | (value ? bit : 0u);
-                } else
+                }
+                else
                     options.*field = value;
                 changed = true;
             }
@@ -558,33 +675,40 @@ inline void CameraPanel(bool &changed) {
         Help("These are replay drawing layers. Run data and validity stay "
              "unchanged. Wall fading retains its "
              "existing limitations.");
-        if (point && content.track.keys[selectedKey].layerMask &&
-            suite_ui::Button("Inherit previous layers")) {
+        if (point && content.track.keys[selectedKey].layerMask && suite_ui::Button("Inherit previous layers"))
+        {
             content.track.keys[selectedKey].layerMask = content.track.keys[selectedKey].layers = 0;
             changed = true;
         }
         ImGui::TreePop();
     }
     int mode = EditorMode();
-    if (mode == 2) {
+    if (mode == 2)
+    {
         Field("Fly speed");
         ImGui::SliderFloat("##FlySpeed", &fly.speed, 1, 50, "%.1f u/s");
-        if (ImGui::TreeNode("Camera position")) {
+        if (ImGui::TreeNode("Camera position"))
+        {
             auto before = content.freePose;
             bool edit = ImGui::DragFloat3("Position", &content.freePose.position.x, .05f, 0, 0, "%.3f");
             float angles[2] = {fly.yaw, fly.pitch};
-            if (ImGui::DragFloat2("Yaw / pitch", angles, .2f, 0, 0, "%.2f")) {
+            if (ImGui::DragFloat2("Yaw / pitch", angles, .2f, 0, 0, "%.2f"))
+            {
                 fly.yaw = std::remainder(angles[0], 360.f);
                 fly.pitch = std::clamp(angles[1], -89.f, 89.f);
                 content.freePose.rotation = Angles(fly.yaw, fly.pitch);
                 edit = true;
             }
-            if (edit) {
-                try {
+            if (edit)
+            {
+                try
+                {
                     content.freePose.Validate();
                     UpdateEditingKey();
                     changed = true;
-                } catch (const std::exception &e) {
+                }
+                catch (const std::exception &e)
+                {
                     content.freePose = before;
                     fly.Align(before);
                     error = e.what();
@@ -593,9 +717,12 @@ inline void CameraPanel(bool &changed) {
             ImGui::TreePop();
         }
     }
-    if (mode == 1 || mode == 2) {
-        if (suite_ui::Button("Center on player")) {
-            if (auto focus = RecordedCamera(content, previewAt)) {
+    if (mode == 1 || mode == 2)
+    {
+        if (suite_ui::Button("Center on player"))
+        {
+            if (auto focus = RecordedCamera(content, previewAt))
+            {
                 Orbit centered;
                 centered.yaw =
                     std::atan2(Forward(focus->rotation).x, Forward(focus->rotation).z) * 57.2957795f;
@@ -609,7 +736,8 @@ inline void CameraPanel(bool &changed) {
             }
         }
         Field("Lens");
-        if (ImGui::SliderFloat("##ClipFov", &content.freePose.fov, 20, 120, "%.0f deg")) {
+        if (ImGui::SliderFloat("##ClipFov", &content.freePose.fov, 20, 120, "%.0f deg"))
+        {
             UpdateEditingKey();
             changed = true;
         }
@@ -633,7 +761,8 @@ inline void CameraPanel(bool &changed) {
                                            2 * ImGui::GetStyle().WindowPadding.y + 4 * suite_ui::Unit(),
                                        96 * suite_ui::Unit(), 180 * suite_ui::Unit());
     ImGui::BeginChild("Camera keypoints", {0, pointListHeight}, true);
-    for (size_t i = 0; i < content.track.keys.size(); i++) {
+    for (size_t i = 0; i < content.track.keys.size(); i++)
+    {
         ImGui::PushID(int(i));
         const auto &key = content.track.keys[i];
         char time[48];
@@ -647,26 +776,29 @@ inline void CameraPanel(bool &changed) {
         ImGui::PopID();
     }
     ImGui::EndChild();
-    if (selectedKey >= 0 && selectedKey < int(content.track.keys.size())) {
+    if (selectedKey >= 0 && selectedKey < int(content.track.keys.size()))
+    {
         auto &key = content.track.keys[selectedKey];
         char name[81];
         std::snprintf(name, sizeof(name), "%s", key.name.c_str());
         Field("Shot name");
-        if (ImGui::InputText("##CameraKeyName", name, sizeof(name))) {
+        if (ImGui::InputText("##CameraKeyName", name, sizeof(name)))
+        {
             key.name = name;
             changed = true;
         }
         double time = key.seconds;
         Field("Exact time in recording (s)");
         if (ImGui::InputDouble("##CameraKeyTime", &time,
-                               std::max(.000001, options.Advance(time, 1. / options.fps) - time), 1,
-                               "%.6f")) {
+                               std::max(.000001, options.Advance(time, 1. / options.fps) - time), 1, "%.6f"))
+        {
             bool duplicate = false;
             for (size_t i = 0; i < content.track.keys.size(); i++)
                 if (int(i) != selectedKey && std::abs(content.track.keys[i].seconds - time) < .001)
                     duplicate = true;
             if (!duplicate && std::isfinite(time) && time >= 0 &&
-                time <= content.analysis->data->review->seconds) {
+                time <= content.analysis->data->review->seconds)
+            {
                 auto track = content.track;
                 auto copy = key;
                 copy.seconds = time;
@@ -676,14 +808,16 @@ inline void CameraPanel(bool &changed) {
                 content.track = std::move(track);
                 EditKey(index);
                 changed = true;
-            } else
+            }
+            else
                 error = "Choose a time inside the recording, at least 0.001 seconds "
                         "from another point";
         }
         auto &current = content.track.keys[selectedKey];
         int transition = int(current.next);
         Field("Transition to next point");
-        if (ImGui::Combo("##CameraTransition", &transition, TransitionNames, 6)) {
+        if (ImGui::Combo("##CameraTransition", &transition, TransitionNames, 6))
+        {
             current.next = Transition(transition);
             changed = true;
         }
@@ -692,21 +826,25 @@ inline void CameraPanel(bool &changed) {
              "position, orientation and lens, including transitions between "
              "different modes. Scene layers "
              "switch exactly at their point.");
-        if (suite_ui::Button(EditingPoint() ? "Update selected" : "Edit selected")) {
+        if (suite_ui::Button(EditingPoint() ? "Update selected" : "Edit selected"))
+        {
             if (EditingPoint())
                 SaveKey(true);
             else
                 EditKey(size_t(selectedKey));
         }
         SameLineIfFits("Remove point");
-        if (suite_ui::Button("Remove point")) {
+        if (suite_ui::Button("Remove point"))
+        {
             auto pose = CurrentCameraPose();
             content.track.keys.erase(content.track.keys.begin() + selectedKey);
             selectedKey = -1;
             cameraEditing = false;
-            if (content.track.keys.empty()) {
+            if (content.track.keys.empty())
+            {
                 options.camera = 2;
-                if (pose) {
+                if (pose)
+                {
                     content.freePose = *pose;
                     content.freeReady = true;
                     fly.Align(*pose);
@@ -722,7 +860,9 @@ inline void CameraPanel(bool &changed) {
          "are excluded from the exported "
          "video.");
 }
-inline void OverlaysPanel(bool &changed) {
+
+inline void OverlaysPanel(bool &changed)
+{
     ImGui::TextColored(g_headerCol, "COMPOSITION");
     changed |= suite_ui::Checkbox("Input overlay", &options.inputs);
     changed |= suite_ui::Checkbox("Run time", &options.time);
@@ -731,7 +871,8 @@ inline void OverlaysPanel(bool &changed) {
     ImGui::SameLine();
     changed |= suite_ui::Checkbox("Seed", &options.seed);
     changed |= suite_ui::Checkbox("Replay annotations", &options.events);
-    if (options.inputs) {
+    if (options.inputs)
+    {
         changed |= suite_ui::Checkbox("Keyboard", &content.input.keyboard);
         ImGui::SameLine();
         changed |= suite_ui::Checkbox("Mouse", &content.input.mouse);
@@ -751,11 +892,13 @@ inline void OverlaysPanel(bool &changed) {
     changed |= ImGui::SliderFloat("Width", &p.width, selectedBlock == RunInfo ? .55f : .04f, 1, "%.3f");
     changed |=
         ImGui::SliderFloat("Layer opacity", &p.opacity, selectedBlock == RunInfo ? .45f : 0, 1, "%.2f");
-    if (suite_ui::Button("Reset layout")) {
+    if (suite_ui::Button("Reset layout"))
+    {
         content.layout = {};
         changed = true;
     }
-    if (selectedBlock != RunInfo && options.inputs) {
+    if (selectedBlock != RunInfo && options.inputs)
+    {
         ImGui::Separator();
         ImGui::TextColored(g_headerCol, "INPUT APPEARANCE");
         auto before = content.input;
@@ -766,29 +909,37 @@ inline void OverlaysPanel(bool &changed) {
              "independent.");
     }
 }
-inline void OutputPanel(bool &changed) {
+
+inline void OutputPanel(bool &changed)
+{
     Field("Start (s)");
     changed |= ImGui::InputDouble("##ClipStart", &options.a, .1, 1, "%.3f");
-    if (suite_ui::Button("Start here")) {
+    if (suite_ui::Button("Start here"))
+    {
         options.a = previewAt;
         changed = true;
     }
     Field("End (s)");
     changed |= ImGui::InputDouble("##ClipEnd", &options.b, .1, 1, "%.3f");
-    if (suite_ui::Button("End here")) {
+    if (suite_ui::Button("End here"))
+    {
         options.b = previewAt;
         changed = true;
     }
-    if (content.markers && !content.markers->markers.empty() && ImGui::TreeNode("Use a marker")) {
-        for (const auto &marker : content.markers->markers) {
+    if (content.markers && !content.markers->markers.empty() && ImGui::TreeNode("Use a marker"))
+    {
+        for (const auto &marker : content.markers->markers)
+        {
             ImGui::PushID(marker.id);
             ImGui::TextUnformatted(marker.name.c_str());
-            if (suite_ui::Button("Start")) {
+            if (suite_ui::Button("Start"))
+            {
                 options.a = marker.seconds;
                 changed = true;
             }
             ImGui::SameLine();
-            if (suite_ui::Button("End")) {
+            if (suite_ui::Button("End"))
+            {
                 options.b = marker.seconds;
                 changed = true;
             }
@@ -799,7 +950,8 @@ inline void OutputPanel(bool &changed) {
     ImGui::Separator();
     int preset = options.preset;
     Field("Export preset");
-    if (ImGui::Combo("##ExportPreset", &preset, ExportPresetNames, 10)) {
+    if (ImGui::Combo("##ExportPreset", &preset, ExportPresetNames, 10))
+    {
         ApplyExportPreset(options, preset);
         changed = true;
     }
@@ -807,13 +959,20 @@ inline void OutputPanel(bool &changed) {
     const char *formats[] = {"MP4 / Windows H.264", "GIF / animation",        "MKV / FFV1 lossless",
                              "PNG sequence / RGBA", "AVI / UtVideo lossless", "MOV / ProRes HQ",
                              "MP4 / x264"};
-    bool audioAvailable=content.motion&&content.motion->experience.audio.recorded&&!content.motion->audioFile.empty();
-    ImGui::BeginDisabled(!audioAvailable);changed|=suite_ui::Checkbox("Recorded game audio",&options.audio);ImGui::EndDisabled();
-    Help("The original game mix from the recorded listening perspective. Free cameras keep this mix. Speed changes also change audio pitch. GIF and PNG are silent. Lossless video formats keep float PCM audio; MP4 uses AAC.");
-    if(audioAvailable&&options.audio)changed|=ImGui::SliderFloat("Audio volume",&options.audioVolume,0,1,"%.2f");
-    if(!audioAvailable)ImGui::TextDisabled("Audio unavailable / legacy or missing recording");
+    bool audioAvailable =
+        content.motion && content.motion->experience.audio.recorded && !content.motion->audioFile.empty();
+    ImGui::BeginDisabled(!audioAvailable);
+    changed |= suite_ui::Checkbox("Recorded game audio", &options.audio);
+    ImGui::EndDisabled();
+    Help(
+        "The original game mix from the recorded listening perspective. Free cameras keep this mix. Speed changes also change audio pitch. GIF and PNG are silent. Lossless video formats keep float PCM audio; MP4 uses AAC.");
+    if (audioAvailable && options.audio)
+        changed |= ImGui::SliderFloat("Audio volume", &options.audioVolume, 0, 1, "%.2f");
+    if (!audioAvailable)
+        ImGui::TextDisabled("Audio unavailable / legacy or missing recording");
     Field("Format");
-    if (ImGui::Combo("##ClipFormat", &options.format, formats, 7)) {
+    if (ImGui::Combo("##ClipFormat", &options.format, formats, 7))
+    {
         options.preset = 9;
         options.fps = options.format == 1 ? 20 : 60;
         if (options.format != 3)
@@ -822,19 +981,23 @@ inline void OutputPanel(bool &changed) {
             options.maxFileBytes = 0;
         changed = true;
     }
-    if (options.format == 3) {
+    if (options.format == 3)
+    {
         changed |= suite_ui::Checkbox("Transparent overlays only", &options.transparent);
         Help("Straight-alpha RGBA PNG frames and an exact source-time manifest.");
     }
-    if (options.format == 6) {
+    if (options.format == 6)
+    {
         const char *qualities[] = {"Fast / veryfast", "Balanced / medium", "Quality / slow"};
         Field("Compression effort");
-        if (ImGui::Combo("##ExportQuality", &options.quality, qualities, 3)) {
+        if (ImGui::Combo("##ExportQuality", &options.quality, qualities, 3))
+        {
             options.preset = 9;
             changed = true;
         }
         bool limit = options.maxFileBytes != 0;
-        if (suite_ui::Checkbox("Maximum file size", &limit)) {
+        if (suite_ui::Checkbox("Maximum file size", &limit))
+        {
             options.maxFileBytes = limit ? 25000000 : 0;
             options.preset = 9;
             changed = true;
@@ -844,13 +1007,15 @@ inline void OutputPanel(bool &changed) {
              "before publication; the video is never cut short to meet the limit. "
              "Temporary storage is "
              "additional.");
-        if (limit) {
+        if (limit)
+        {
             static int unit = 0;
             const char *units[] = {"MB", "GB"};
             double amount = double(options.maxFileBytes) / (unit ? 1000000000. : 1000000.);
             ImGui::SetNextItemWidth(-90 * suite_ui::Unit());
             if (ImGui::InputDouble("##MaxClipSize", &amount, 1, 10, "%.2f") && std::isfinite(amount) &&
-                amount > 0 && amount <= 100000) {
+                amount > 0 && amount <= 100000)
+            {
                 options.maxFileBytes =
                     uint64_t(std::clamp(amount * (unit ? 1000000000. : 1000000.), 256000., 100000000000.));
                 options.preset = 9;
@@ -859,22 +1024,29 @@ inline void OutputPanel(bool &changed) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(-1);
             ImGui::Combo("##ClipSizeUnit", &unit, units, 2);
-            if (options.b > options.a) {
-                try {
+            if (options.b > options.a)
+            {
+                try
+                {
                     ImGui::TextDisabled("Video budget: %.2f Mbit/s", double(SizeBitrate(options)) / 1000000.);
-                } catch (const std::exception &e) {
+                }
+                catch (const std::exception &e)
+                {
                     ImGui::TextWrapped("%s", e.what());
                 }
             }
         }
-    } else if (options.format == 2 || options.format == 4) {
+    }
+    else if (options.format == 2 || options.format == 4)
+    {
         ImGui::TextWrapped("Lossless RGB / alpha. File size depends on the scene; "
                            "use Size Limit for a capped MP4.");
     }
     const char *sizes[] = {"640 x 360", "1280 x 720", "1920 x 1080", "2560 x 1440"};
     int res = options.width == 2560 ? 3 : options.width == 1920 ? 2 : options.width == 1280 ? 1 : 0;
     Field("Resolution");
-    if (ImGui::Combo("##ClipResolution", &res, sizes, 4)) {
+    if (ImGui::Combo("##ClipResolution", &res, sizes, 4))
+    {
         options.width = res == 3 ? 2560 : res == 2 ? 1920 : res == 1 ? 1280 : 640;
         options.height = options.width * 9 / 16;
         options.preset = 9;
@@ -890,7 +1062,8 @@ inline void OutputPanel(bool &changed) {
                      : options.fps == 60 ? 1
                                          : 0);
     Field("Frame rate");
-    if (ImGui::Combo("##ClipFps", &fps, gif ? gifFps : videoFps, 3)) {
+    if (ImGui::Combo("##ClipFps", &fps, gif ? gifFps : videoFps, 3))
+    {
         options.fps = gif ? (fps == 2 ? 25 : fps == 1 ? 20 : 10) : (fps == 2 ? 120 : fps == 1 ? 60 : 30);
         options.preset = 9;
         changed = true;
@@ -902,7 +1075,8 @@ inline void OutputPanel(bool &changed) {
     ImGui::Separator();
     Field("Default playback speed");
     float rate = float(options.rate);
-    if (ImGui::SliderFloat("##ClipRate", &rate, .1f, 4, "%.2fx")) {
+    if (ImGui::SliderFloat("##ClipRate", &rate, .1f, 4, "%.2fx"))
+    {
         options.rate = rate;
         changed = true;
     }
@@ -911,14 +1085,16 @@ inline void OutputPanel(bool &changed) {
     changed |= suite_ui::Checkbox("Apply speed keypoints", &options.speedKeys);
     Help("Camera keypoints remain active independently. Turn this off to use a "
          "constant playback speed.");
-    if (suite_ui::Button("Normal speed (1x)")) {
+    if (suite_ui::Button("Normal speed (1x)"))
+    {
         options.rate = 1;
         options.speedKeys = false;
         changed = true;
     }
     if (freeDiskGiB >= 0)
         ImGui::TextDisabled("Available disk space: %.1f GiB", freeDiskGiB);
-    if (options.b > options.a && options.rate > 0) {
+    if (options.b > options.a && options.rate > 0)
+    {
         auto frames = options.Frames();
         double raw = double(options.width) * options.height * 4 * double(frames) / 1073741824.;
         ImGui::TextDisabled("%.2f s output / %llu frames", options.OutputDuration(),
@@ -927,7 +1103,8 @@ inline void OutputPanel(bool &changed) {
             ImGui::TextWrapped(options.format == 3 ? "PNG disk estimate: %.2f GiB (stored RGBA)"
                                                    : "Raw frame volume: %.2f GiB / compressed size varies",
                                raw);
-        if (options.maxFileBytes) {
+        if (options.maxFileBytes)
+        {
             ImGui::TextDisabled("Temporary lossless cache required");
             Help("The scene renders once to UtVideo, then both compression passes read that cache. "
                  "Cache size varies and is separate from the MP4 file limit. MB / GB use decimal units. "
@@ -937,7 +1114,8 @@ inline void OutputPanel(bool &changed) {
         }
     }
     ImGui::Separator();
-    if (ImGui::TreeNode("Export profiles")) {
+    if (ImGui::TreeNode("Export profiles"))
+    {
         const char *slots[] = {"Profile 1", "Profile 2", "Profile 3"};
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##ClipProfile", &profileSlot, slots, 3);
@@ -946,7 +1124,8 @@ inline void OutputPanel(bool &changed) {
         if (suite_ui::Button("Save profile"))
             profileIO(profileSlot, false, profileName);
         SameLineIfFits("Load profile");
-        if (suite_ui::Button("Load profile")) {
+        if (suite_ui::Button("Load profile"))
+        {
             profileIO(profileSlot, true, profileName);
             changed = true;
         }
@@ -957,21 +1136,29 @@ inline void OutputPanel(bool &changed) {
         ImGui::TreePop();
     }
 }
+
 inline int narrowPage = 0;
-inline void ClipRangeHere(bool start) {
+
+inline void ClipRangeHere(bool start)
+{
     double duration = content.analysis->data->review->seconds;
     if (duration < .02)
         return;
-    if (start) {
+    if (start)
+    {
         options.a = std::clamp(previewAt, 0., duration - .02);
         options.b = std::max(options.a + .02, std::isfinite(options.b) ? options.b : duration);
-    } else {
+    }
+    else
+    {
         options.b = std::clamp(previewAt, .02, duration);
         options.a = std::min(options.b - .02, std::isfinite(options.a) ? options.a : 0.);
     }
     Changed();
 }
-inline void TimeRail(bool busy) {
+
+inline void TimeRail(bool busy)
+{
     double duration = content.analysis->data->review->seconds;
     float unit = suite_ui::Unit();
     auto *d = ImGui::GetWindowDrawList();
@@ -992,7 +1179,8 @@ inline void TimeRail(bool busy) {
     d->AddRectFilled({xAt(a), y - 4 * unit}, {xAt(b), y + 4 * unit}, suite_input::Fade(accent, .45f),
                      4 * unit);
     int ticks = std::clamp(int(width / (110 * unit)), 2, 8);
-    for (int i = 0; i <= ticks; i++) {
+    for (int i = 0; i <= ticks; i++)
+    {
         double t = duration * i / ticks;
         auto value = FormatRunTime(t);
         auto font = ImGui::GetFont();
@@ -1003,14 +1191,16 @@ inline void TimeRail(bool busy) {
     }
     int nearest = -1;
     float distance = 10 * unit;
-    for (size_t i = 0; i < content.track.keys.size(); i++) {
+    for (size_t i = 0; i < content.track.keys.size(); i++)
+    {
         const auto &key = content.track.keys[i];
         float x = xAt(key.seconds), ky = lo.y + 59 * unit;
         ImU32 color = selectedKey == int(i) ? IM_COL32(255, 190, 108, 255) : accent;
         d->AddQuadFilled({x, ky - 5 * unit}, {x + 5 * unit, ky}, {x, ky + 5 * unit}, {x - 5 * unit, ky},
                          color);
         if (std::abs(ImGui::GetIO().MousePos.x - x) < distance &&
-            std::abs(ImGui::GetIO().MousePos.y - ky) < 15 * unit) {
+            std::abs(ImGui::GetIO().MousePos.y - ky) < 15 * unit)
+        {
             nearest = int(i);
             distance = std::abs(ImGui::GetIO().MousePos.x - x);
         }
@@ -1021,24 +1211,32 @@ inline void TimeRail(bool busy) {
     static bool pointClick = false;
     if (!ImGui::IsMouseDown(0))
         pointClick = false;
-    if (!busy && hovered && nearest >= 0) {
+    if (!busy && hovered && nearest >= 0)
+    {
         auto &key = content.track.keys[nearest];
         ImGui::SetTooltip("Shot %s / %s / %s", PointLabel(nearest).c_str(), key.name.c_str(),
                           TransitionNames[int(key.next)]);
-        if (ImGui::IsMouseClicked(0)) {
+        if (ImGui::IsMouseClicked(0))
+        {
             pointClick = true;
             EditKey(size_t(nearest));
         }
-    } else if (!busy && held && ImGui::IsMouseDown(0) && !pointClick)
+    }
+    else if (!busy && held && ImGui::IsMouseDown(0) && !pointClick)
         Seek(std::clamp(double((ImGui::GetIO().MousePos.x - lo.x) / width) * duration, 0., duration));
 }
-inline std::string WindowTitle() {
+
+inline std::string WindowTitle()
+{
     return std::string("Clip Studio / PracticeSuite ") + suite_brand::Version + " / mab";
 }
-inline void Render() {
+
+inline void Render()
+{
     if (!open || !content.analysis)
         return;
-    if (g_pShared && g_pShared->timerState == 1) {
+    if (g_pShared && g_pShared->timerState == 1)
+    {
         cancelRequested = true;
         open = false;
         return;
@@ -1055,7 +1253,8 @@ inline void Render() {
                              ImGuiCond_Appearing);
     ImGui::SetNextWindowSizeConstraints({std::min(600.f, display.x - 24), std::min(300.f, display.y - 24)},
                                         {display.x, display.y});
-    if (focusWindow) {
+    if (focusWindow)
+    {
         ImGui::SetNextWindowFocus();
         focusWindow = false;
     }
@@ -1064,7 +1263,8 @@ inline void Render() {
     ImGui::Begin(WindowTitle().c_str(), nullptr,
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
     bool narrow = ImGui::GetContentRegionAvail().x < 850 * unit;
-    if (!narrow) {
+    if (!narrow)
+    {
         auto p = ImGui::GetCursorScreenPos();
         ImGui::GetWindowDrawList()->AddText(suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont(),
                                             22 * unit, p, ImGui::ColorConvertFloat4ToU32(g_headerCol),
@@ -1073,7 +1273,9 @@ inline void Render() {
         ImGui::SameLine();
         ImGui::TextDisabled("REPLAY   /   Seed %d   /   %.2f s output", content.analysis->data->seed,
                             std::max(0., options.OutputDuration()));
-    } else {
+    }
+    else
+    {
         float w = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) / 2;
         bool page = narrowPage == 0;
         ImGui::PushStyleColor(ImGuiCol_Button, page ? ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)
@@ -1089,7 +1291,8 @@ inline void Render() {
     ImGui::BeginChild("Clip body", {0, -footer}, false);
     float controls = std::min(390 * unit, ImGui::GetContentRegionAvail().x * .34f);
     bool changed = false;
-    if (!narrow || narrowPage == 0) {
+    if (!narrow || narrowPage == 0)
+    {
         float previewWidth =
             narrow ? 0 : std::max(120.f, ImGui::GetContentRegionAvail().x - controls - 14 * unit);
         ImGui::BeginChild("Clip preview", {previewWidth, 0}, true, ImGuiWindowFlags_HorizontalScrollbar);
@@ -1109,7 +1312,8 @@ inline void Render() {
         previewPixelWidth = std::max(320.f, size.x);
         auto *d = ImGui::GetWindowDrawList();
         d->AddRectFilled(origin, {origin.x + size.x, origin.y + size.y}, IM_COL32(8, 15, 22, 255), 8 * unit);
-        if (options.transparent) {
+        if (options.transparent)
+        {
             float tile = 20 * unit;
             for (float y = 0; y < size.y; y += tile)
                 for (float x = 0; x < size.x; x += tile)
@@ -1121,7 +1325,8 @@ inline void Render() {
         }
         bool direct = (!options.scene3d || options.transparent) && options.format != 1;
         bool imageReady = previewImage && previewRun == run.id;
-        if (imageReady && !direct) {
+        if (imageReady && !direct)
+        {
             ImGui::Image(previewImage, size);
             if (showCameraPath && shownPoseReady)
                 WorldCameraGuides(d, guideCache, shownPose, origin, size);
@@ -1135,7 +1340,9 @@ inline void Render() {
                              IM_COL32(10, 18, 25, 220), 5);
             d->AddText({origin.x + 18, origin.y + size.y - 30},
                        updating ? IM_COL32(255, 195, 108, 255) : IM_COL32(130, 238, 217, 255), caption);
-        } else {
+        }
+        else
+        {
             auto previewOptions = options;
             previewOptions.scene3d = false;
             ComposeViewport(d, previewOptions, content, previewAt, origin, size);
@@ -1171,19 +1378,24 @@ inline void Render() {
         if (!narrow)
             ImGui::SameLine();
     }
-    if (!narrow || narrowPage == 1) {
+    if (!narrow || narrowPage == 1)
+    {
         ImGui::BeginChild("Clip settings", {0, 0}, false);
         ImGui::BeginDisabled(busy);
-        if (ImGui::BeginTabBar("Clip workspace")) {
-            if (ImGui::BeginTabItem("Camera")) {
+        if (ImGui::BeginTabBar("Clip workspace"))
+        {
+            if (ImGui::BeginTabItem("Camera"))
+            {
                 CameraPanel(changed);
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Overlays")) {
+            if (ImGui::BeginTabItem("Overlays"))
+            {
                 OverlaysPanel(changed);
                 ImGui::EndTabItem();
             }
-            if (ImGui::BeginTabItem("Output")) {
+            if (ImGui::BeginTabItem("Output"))
+            {
                 OutputPanel(changed);
                 ImGui::EndTabItem();
             }
@@ -1194,16 +1406,20 @@ inline void Render() {
     }
     ImGui::EndChild();
     std::string invalid;
-    try {
+    try
+    {
         options.Validate(run.seconds);
         content.track.Validate(run.seconds);
         content.layout.Validate();
         if (options.scene3d && options.camera == 3 && content.track.keys.empty())
             throw std::runtime_error("Capture at least one camera shot first");
-    } catch (const std::exception &e) {
+    }
+    catch (const std::exception &e)
+    {
         invalid = e.what();
     }
-    if (busy) {
+    if (busy)
+    {
         char count[80];
         std::snprintf(count, sizeof(count), "%llu / %llu frames",
                       static_cast<unsigned long long>(encoder.Written()),
@@ -1213,9 +1429,12 @@ inline void Render() {
         SameLineIfFits("Cancel export");
         if (suite_ui::Button("Cancel export"))
             cancelRequested = true;
-    } else {
+    }
+    else
+    {
         ImGui::BeginDisabled(!invalid.empty() || !backendAvailable);
-        if (suite_ui::Button(narrow ? "Export" : "Export clip")) {
+        if (suite_ui::Button(narrow ? "Export" : "Export clip"))
+        {
             startRequested = true;
             testRequested = false;
             playPreview = false;
@@ -1223,7 +1442,8 @@ inline void Render() {
             Changed();
         }
         SameLineIfFits(narrow ? "3 s test" : "3 s test export");
-        if (suite_ui::Button(narrow ? "3 s test" : "3 s test export")) {
+        if (suite_ui::Button(narrow ? "3 s test" : "3 s test export"))
+        {
             startRequested = testRequested = true;
             playPreview = false;
             error.clear();
@@ -1233,22 +1453,30 @@ inline void Render() {
         SameLineIfFits("Close");
         if (suite_ui::Button("Close") || ImGui::IsKeyPressed(ImGuiKey_Escape))
             Close();
-        if (encoder.State() == 2 && openDirectory) {
+        if (encoder.State() == 2 && openDirectory)
+        {
             SameLineIfFits("Open export folder");
             if (suite_ui::Button("Open export folder"))
                 openDirectory();
         }
     }
-    if (!invalid.empty()) {
+    if (!invalid.empty())
+    {
         ImGui::TextColored(g_accentCol, "Check clip settings");
         Help(invalid.c_str());
-    } else if (!error.empty()) {
+    }
+    else if (!error.empty())
+    {
         ImGui::TextColored(g_accentCol, "Preview / project details");
         Help(error.c_str());
-    } else if (encoder.State() == 3) {
+    }
+    else if (encoder.State() == 3)
+    {
         ImGui::TextColored(g_accentCol, "Export failed / details");
         Help(encoder.Error().c_str());
-    } else {
+    }
+    else
+    {
         ImGui::TextDisabled("%s", busy                   ? status.c_str()
                                   : encoder.State() == 2 ? "Export complete"
                                   : encoder.State() == 4 ? "Export cancelled"
@@ -1260,7 +1488,8 @@ inline void Render() {
              "files are larger. Best Quality uses lossless UtVideo / AVI and requires a compatible decoder.");
     }
     if (!busy && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-        !ImGui::GetIO().WantTextInput) {
+        !ImGui::GetIO().WantTextInput)
+    {
         if (ImGui::IsKeyPressed(ImGuiKey_K) && options.scene3d)
             SaveKey(false);
         if (ImGui::IsKeyPressed(ImGuiKey_Space))
@@ -1272,7 +1501,8 @@ inline void Render() {
     }
     ImGui::End();
     ImGui::PopStyleVar(2);
-    if (pathOverview) {
+    if (pathOverview)
+    {
         guideCache.Bind(content, revision);
         if (auto selected = CameraPathOverview(guideCache, content, previewAt, pathOverview);
             selected && !busy)
@@ -1282,5 +1512,13 @@ inline void Render() {
         Changed();
 }
 } // namespace suite_clip
-inline void RequestClipFrom3D() { suite_clip::requestOpen = true; }
-inline bool ClipInputRequested() { return suite_clip::open; }
+
+inline void RequestClipFrom3D()
+{
+    suite_clip::requestOpen = true;
+}
+
+inline bool ClipInputRequested()
+{
+    return suite_clip::open;
+}

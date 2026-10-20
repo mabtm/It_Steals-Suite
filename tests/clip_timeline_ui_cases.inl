@@ -1,4 +1,5 @@
-void Workshop752Cases(const std::string &output) {
+void Workshop752Cases(const std::string &output)
+{
     using namespace suite_clip;
     auto savedData = data;
     auto &io = ImGui::GetIO();
@@ -26,7 +27,8 @@ void Workshop752Cases(const std::string &output) {
     auto motion = std::make_shared<practice::ReplayMotion>();
     motion->id = 752;
     motion->seconds = motion->deviceThrough = 12;
-    for (int i = 0; i <= 720; i++) {
+    for (int i = 0; i <= 720; i++)
+    {
         practice::ReplayViewFrame frame;
         frame.seconds = i / 60.;
         frame.camera = {float(-15 + i * .04), 1.7f, float(-15 + i * .035)};
@@ -87,7 +89,8 @@ void Workshop752Cases(const std::string &output) {
     for (int i = 0; i < 3; i++)
         panelFrame();
     auto *panel = ImGui::FindWindowByName("752 camera QA");
-    for (int mode : {0, 1, 2}) {
+    for (int mode : {0, 1, 2})
+    {
         ImGui::ActivateItemByID(panel->GetID(ShotModeNames[mode]));
         panelFrame();
         assert(options.camera == 3 && content.track.keys[1].mode == mode && cameraEditing);
@@ -199,7 +202,8 @@ void Workshop752Cases(const std::string &output) {
     project.options = options;
     project.content = content;
     auto decoded = DecodeProject(EncodeProject(project), 752, 12, map->hash);
-    for (size_t i = 0; i < 3; i++) {
+    for (size_t i = 0; i < 3; i++)
+    {
         assert(decoded.content.track.keys[i].mode == content.track.keys[i].mode);
         assert(decoded.content.track.keys[i].layerMask == content.track.keys[i].layerMask);
         assert(decoded.content.track.keys[i].layers == content.track.keys[i].layers);
@@ -211,7 +215,8 @@ void Workshop752Cases(const std::string &output) {
                after.follow.radius == before.follow.radius &&
                distance(after.follow.pan, before.follow.pan) < .00001);
     }
-    for (int version : {1, 2}) {
+    for (int version : {1, 2})
+    {
         auto legacy = DecodeProject(LegacyProjectBytes(project, version), 752, 12, map->hash);
         assert(legacy.options.camera == 3);
         for (auto key : legacy.content.track.keys)
@@ -219,7 +224,8 @@ void Workshop752Cases(const std::string &output) {
     }
     guideCache.Bind(content, revision + 1);
     assert(guideCache.anchors.size() == 3 && guideCache.lines.size() <= 1030);
-    for (const auto &anchor : guideCache.anchors) {
+    for (const auto &anchor : guideCache.anchors)
+    {
         auto expected = CameraAt(options, content, anchor.seconds);
         assert(expected && distance(expected->position, anchor.pose.position) < .00001);
     }
@@ -240,12 +246,15 @@ void Workshop752Cases(const std::string &output) {
     input.mouse = 0;
     int start = draw->VtxBuffer.Size;
     suite_input::Module(draw, 1, {0, 0}, {170, 140}, &input, prefs, {}, 0, ImGui::GetFont(), colors);
-    for (float expected : {64.f, 106.f}) {
+    for (float expected : {64.f, 106.f})
+    {
         float lo = FLT_MAX, hi = -FLT_MAX;
         auto target = suite_input::Fade(colors.ink, prefs.contentOpacity);
-        for (int i = start; i < draw->VtxBuffer.Size; i++) {
+        for (int i = start; i < draw->VtxBuffer.Size; i++)
+        {
             auto v = draw->VtxBuffer[i];
-            if (v.col == target && v.pos.y < 66 && std::abs(v.pos.x - expected) < 18) {
+            if (v.col == target && v.pos.y < 66 && std::abs(v.pos.x - expected) < 18)
+            {
                 lo = std::min(lo, v.pos.x);
                 hi = std::max(hi, v.pos.x);
             }
@@ -265,12 +274,14 @@ void Workshop752Cases(const std::string &output) {
     backendAvailable = false;
     previewImage = {};
     io.AddMousePosEvent(-1000, -1000);
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 5; i++)
+    {
         ImGui::NewFrame();
         suite_ui::BeginFrame(true, false);
         Render();
         if (i == 0)
-            for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++) {
+            for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++)
+            {
                 auto *bar = GImGui->TabBars.TryGetMapData(j);
                 if (bar && bar->Tabs.Size == 3 &&
                     std::string(ImGui::TabBarGetTabName(bar, &bar->Tabs[0])) == "Camera")

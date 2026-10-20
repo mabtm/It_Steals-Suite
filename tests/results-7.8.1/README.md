@@ -1,1 +1,0 @@
-Current host tests for 7.8.1. Synthetic PCM/recordings are fixtures; no original game assets are bundled. Unity adapter/scope tests use contract doubles. Earlier version folders contain historical results. See PRUEFUNG.md.

@@ -4,14 +4,22 @@
 #include <iostream>
 #include <limits>
 using namespace suite_clip;
-static bool Near(float a, float b, float eps = .0001f) { return std::abs(a - b) < eps; }
-static void Wait(Encoder &e) {
+
+static bool Near(float a, float b, float eps = .0001f)
+{
+    return std::abs(a - b) < eps;
+}
+
+static void Wait(Encoder &e)
+{
     auto end = std::chrono::steady_clock::now() + std::chrono::seconds(10);
     while (e.State() == 1 && std::chrono::steady_clock::now() < end)
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     assert(e.State() != 1);
 }
-int main(int argc, char **argv) {
+
+int main(int argc, char **argv)
+{
     assert(argc == 2);
     std::filesystem::path folder = argv[1];
     std::filesystem::create_directories(folder);
@@ -33,11 +41,13 @@ int main(int argc, char **argv) {
     auto f = Forward(half.rotation);
     assert(std::abs(f.x) < .03 && f.z > .9);
     assert(Near(track.At(4.999).position.x, 11) && Near(track.At(5).position.x, 20));
-    for (auto transition :
-         {Transition::Linear, Transition::Smooth, Transition::EaseIn, Transition::EaseOut, Transition::EaseInOut}) {
+    for (auto transition : {Transition::Linear, Transition::Smooth, Transition::EaseIn, Transition::EaseOut,
+                            Transition::EaseInOut})
+    {
         track.keys[0].next = transition;
         float previous = -1;
-        for (int i = 0; i <= 1000; i++) {
+        for (int i = 0; i <= 1000; i++)
+        {
             auto pose = track.At(1 + i * .002);
             assert(pose.position.x >= previous - .00001f);
             previous = pose.position.x;
@@ -49,7 +59,8 @@ int main(int argc, char **argv) {
            Near(Curve(Transition::EaseInOut, .5), .5));
     track.keys[0].next = Transition::Linear;
     auto expected = track.At(2.234);
-    for (double seek : {4., 1., 7., 2.234, 0., 2.234}) {
+    for (double seek : {4., 1., 7., 2.234, 0., 2.234})
+    {
         auto pose = track.At(seek);
         if (seek == 2.234)
             assert(Near(pose.position.x, expected.position.x) && Near(pose.rotation.w, expected.rotation.w));
@@ -59,7 +70,8 @@ int main(int argc, char **argv) {
     replace.name = "Replacement";
     assert(track.Put(replace) == 0 && track.keys.size() == 3);
     track.Validate(10);
-    for (int caseId = 0; caseId < 5; caseId++) {
+    for (int caseId = 0; caseId < 5; caseId++)
+    {
         auto bad = track;
         if (caseId == 0)
             bad.keys[1].seconds = bad.keys[0].seconds;
@@ -72,9 +84,12 @@ int main(int argc, char **argv) {
         if (caseId == 4)
             bad.keys[0].next = Transition(6);
         bool rejected = false;
-        try {
+        try
+        {
             bad.Validate(10);
-        } catch (...) {
+        }
+        catch (...)
+        {
             rejected = true;
         }
         assert(rejected);
@@ -99,7 +114,8 @@ int main(int argc, char **argv) {
     options.format = 3;
     options.transparent = true;
     options.Validate(1);
-    for (int fps : {30, 60, 120}) {
+    for (int fps : {30, 60, 120})
+    {
         auto video = options;
         video.fps = fps;
         video.b = double(fps + 7) / fps;
@@ -110,7 +126,8 @@ int main(int argc, char **argv) {
     auto output = options;
     output.width = 2560;
     output.height = 1440;
-    for (float available : {300.f, 800.f, 1200.f, 2600.f}) {
+    for (float available : {300.f, 800.f, 1200.f, 2600.f})
+    {
         auto fit = PreviewOptions(output, available, false);
         assert(fit.width <= output.width && fit.width <= 1280 && fit.height % 2 == 0);
         assert(fit.fps == output.fps && fit.rate == output.rate && fit.a == output.a && fit.b == output.b);
@@ -118,13 +135,15 @@ int main(int argc, char **argv) {
     }
     assert(PreviewOptions(output, 300, true).width == 2560);
     for (int fps : {30, 60})
-        for (double rate : {.5, 1., 2.}) {
+        for (double rate : {.5, 1., 2.})
+        {
             auto clock = output;
             clock.a = 1.125;
             clock.b = 3.125;
             clock.rate = rate;
             clock.fps = fps;
-            for (uint64_t i = 0; i < clock.Frames(); i++) {
+            for (uint64_t i = 0; i < clock.Frames(); i++)
+            {
                 assert(std::abs(clock.At(i) - (clock.a + double(i) * rate / fps)) < 1e-12);
                 if (i)
                     assert(clock.At(i) > clock.At(i - 1) && clock.Stamp(i) > clock.Stamp(i - 1));
@@ -136,7 +155,8 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < raw.size(); i++)
         raw[i] = uint8_t(i * 29 + i / 7);
     assert(encoder.Start(options, folder / "rgba.frames"));
-    for (uint64_t i = 0; i < options.Frames(); i++) {
+    for (uint64_t i = 0; i < options.Frames(); i++)
+    {
         while (!encoder.Ready() && encoder.State() == 1)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         assert(encoder.Push(raw));
@@ -159,8 +179,8 @@ int main(int argc, char **argv) {
     assert(encoder.State() == 3 && std::filesystem::exists(folder / "keep.frames" / "keep.txt"));
     std::vector<uint8_t> alpha = {25, 50, 100, 128, 9, 8, 7, 0, 13, 27, 42, 255};
     StraightAlpha(alpha);
-    assert(alpha[0] == 50 && alpha[1] == 100 && alpha[2] == 199 && alpha[4] == 0 && alpha[5] == 0 && alpha[6] == 0 &&
-           alpha[8] == 13);
+    assert(alpha[0] == 50 && alpha[1] == 100 && alpha[2] == 199 && alpha[4] == 0 && alpha[5] == 0 &&
+           alpha[6] == 0 && alpha[8] == 13);
     suite_input::Preferences input;
     input.customKeys = true;
     input.ShowKey(255, true);
@@ -173,13 +193,15 @@ int main(int argc, char **argv) {
     suite_input::Preferences decoded;
     std::istringstream lines(encoded.str());
     std::string line;
-    while (std::getline(lines, line)) {
+    while (std::getline(lines, line))
+    {
         auto p = line.find('=');
         decoded.Decode(line.substr(6, p - 6), std::stod(line.substr(p + 1)));
     }
     decoded.Validate();
     assert(decoded.ShowKey(255) && decoded.ShowKey('W') && decoded.opacity == 0 && decoded.mouseScale == 2 &&
            !decoded.background && decoded.customKeys);
-    std::cout << "Camera endpoints/cuts/shortest quaternion path, 5 monotonic curves, frame-independent seek, key "
-                 "replacement and bounds; lossless RGBA sequence, cancel/preserve, alpha and input preferences: PASS\n";
+    std::cout
+        << "Camera endpoints/cuts/shortest quaternion path, 5 monotonic curves, frame-independent seek, key "
+           "replacement and bounds; lossless RGBA sequence, cancel/preserve, alpha and input preferences: PASS\n";
 }

@@ -1,1 +1,0 @@
-Production audio worker: asynchronous original PCM, private sample gain, focus/run mute cancellation, bounded pending bursts, interrupted buffer lifetime, device/prepare/write failures, event-driven waits and idempotent shutdown: PASS

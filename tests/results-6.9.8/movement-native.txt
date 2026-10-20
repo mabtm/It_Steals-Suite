@@ -1,5 +1,0 @@
-RUN g++
-RUN /workspace/scratch/ef104db600fd/checks/movement-native-tests
-20,000 learned forecasts: 62.9567 ms (sanitizers; host CPU)
-C#/C++ v11 wire parity, v10 preservation, independent live/frozen profiles, five classes, uncertainty, physics/input gates, subdivision-invariant starting distance, NaN/context checks and 2000 route fuzz cases: PASS
-movement-native PASS

@@ -1,1 +1,0 @@
-Inspector: actual SDK compile, safe private/inherited field reads, getter/ToString isolation, culture, independent opt-in/restriction gates, bounded text and C# cross-language fixtures: PASS

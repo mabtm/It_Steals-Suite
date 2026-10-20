@@ -1,6 +1,8 @@
 #pragma once
 #include "ClipModel.h"
-namespace suite_clip {
+
+namespace suite_clip
+{
 inline constexpr const char *ExportPresetNames[] = {
     "Share",         "Best Quality",        "Archive",  "Editing Master", "Size Limit",
     "Quick Preview", "Transparent Overlay", "GIF Loop", "Windows MP4",    "Custom"};
@@ -20,7 +22,9 @@ inline constexpr const char *ExportPresetDescriptions[] = {
     "MP4 / Windows Media Foundation; hardware acceleration depends on the "
     "installed encoder.",
     "Your current format, quality, size and frame rate."};
-inline void ApplyExportPreset(Options &o, int preset) {
+
+inline void ApplyExportPreset(Options &o, int preset)
+{
     if (preset < 0 || preset > 9)
         throw std::runtime_error("Unknown export preset");
     o.preset = preset;
@@ -32,7 +36,8 @@ inline void ApplyExportPreset(Options &o, int preset) {
     o.height = 1080;
     o.fps = 60;
     o.quality = 1;
-    switch (preset) {
+    switch (preset)
+    {
     case 0:
         o.format = 6;
         break;

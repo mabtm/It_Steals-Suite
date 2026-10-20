@@ -1,4 +1,0 @@
-One 384 x 157 startup blur: 2.31541 ms (host/sanitizers)
-100,000 bounded motion lookups: 1.14626 ms (host/sanitizers)
-Design model: bounded page selection / stable top-result identity, new-search reset / reduced motion; finite timeline clamping, exact event time and 4096 observations in <=2048 screen bins: PASS
-Appearance v14: all colors/fonts/flags roundtrip, v13 preservation, hostile numeric inputs; bounded startup blur with stable colors/monotonic edges. Experience: finite volume, all audio policy gates, bounded/reversible/reduced motion, 2.6-second hidden/active-run lifecycle, quiet gain-scaled original PCM envelopes: PASS

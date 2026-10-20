@@ -1,4 +1,0 @@
-RUN g++
-RUN /workspace/scratch/ef104db600fd/checks/native-tests
-Focus, keys, config migration, heading transforms, bounded trail, malformed snapshots and geometry: PASS (10,000 fuzz cases)
-native PASS

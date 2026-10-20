@@ -1,2 +1,0 @@
-RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/x86_64-w64-mingw32-g++-posix
-trainer PASS

@@ -1,1 +1,0 @@
-Real ImGui recording-check draw output with synthetic replay data, 480/1920 pixels at 100/150% DPI. Text wraps at narrow widths and the normal scrollbar exposes the remaining rows. These are host UI renders, not a live Unity/GPU screenshot or benchmark.

@@ -5,8 +5,10 @@ using UnityEngine.Rendering;
 
 // Visual-only actor proxies: no AI, colliders, rigidbodies, audio or animation
 // controllers are cloned. Static scene meshes and all their batch ranges stay.
-public sealed class ReplayNativeGraphics {
-    private sealed class Proxy {
+public sealed class ReplayNativeGraphics
+{
+    private sealed class Proxy
+    {
         public ReplayVisualOwner Owner;
         public Transform Source, Root;
         public bool Visible = true;
@@ -18,9 +20,11 @@ public sealed class ReplayNativeGraphics {
         public readonly Dictionary<string, Light> Lights =
             new Dictionary<string, Light>(StringComparer.Ordinal);
     }
-    private sealed class Binding {
+
+    private sealed class Binding
+    {
         public ReplayVisualTrack Track;
-        public readonly List<ReplayAnimationTrack> Cuts=new List<ReplayAnimationTrack>();
+        public readonly List<ReplayAnimationTrack> Cuts = new List<ReplayAnimationTrack>();
         public Transform Pose;
         public Renderer Renderer;
         public Light Light;
@@ -31,8 +35,15 @@ public sealed class ReplayNativeGraphics {
         public int Index = -2;
         public ReplayVisualFrame LastPose;
     }
-    private sealed class Morph {public ReplayAnimationTrack Track;public SkinnedMeshRenderer Renderer;public readonly List<ReplayAnimationTrack> Cuts=new List<ReplayAnimationTrack>();}
-    private readonly List<Morph> morphs=new List<Morph>();
+
+    private sealed class Morph
+    {
+        public ReplayAnimationTrack Track;
+        public SkinnedMeshRenderer Renderer;
+        public readonly List<ReplayAnimationTrack> Cuts = new List<ReplayAnimationTrack>();
+    }
+
+    private readonly List<Morph> morphs = new List<Morph>();
     private readonly List<Binding> bindings = new List<Binding>();
     private readonly List<Proxy> proxies = new List<Proxy>();
     private readonly List<Transform> billboards = new List<Transform>();
@@ -54,7 +65,9 @@ public sealed class ReplayNativeGraphics {
     private double last = -1;
     private bool monstersVisible = true;
     private readonly List<Action> renderUpdates = new List<Action>();
-    private void RenderUpdate(Component component) {
+
+    private void RenderUpdate(Component component)
+    {
         if (component == null)
             return;
         var method = component.GetType().GetMethod("Update", System.Reflection.BindingFlags.Instance |
@@ -62,12 +75,20 @@ public sealed class ReplayNativeGraphics {
         if (method != null)
             renderUpdates.Add((Action)Delegate.CreateDelegate(typeof(Action), component, method));
     }
-    public void BindView(Camera view) { RenderUpdate(view.GetComponent<VolumetricLightRenderer>()); }
-    public void PrepareRender() {
+
+    public void BindView(Camera view)
+    {
+        RenderUpdate(view.GetComponent<VolumetricLightRenderer>());
+    }
+
+    public void PrepareRender()
+    {
         foreach (var update in renderUpdates)
             update();
     }
-    public string Status {
+
+    public string Status
+    {
         get {
             return "original assets / " + bindings.Count + " visual tracks" +
                    (motion.Visuals.Recorded ? (motion.Visuals.Dropped > 0 ? " / capture reduced" : "")
@@ -75,10 +96,16 @@ public sealed class ReplayNativeGraphics {
                    (missing > 0 ? " / unresolved " + missing : "");
         }
     }
-    private static string Key(string path, int slot) { return path + "#" + slot; }
+
+    private static string Key(string path, int slot)
+    {
+        return path + "#" + slot;
+    }
+
     public ReplayNativeGraphics(GameObject parent, MouseLook mouse, PracticeMapData layout,
                                 ReplayMotionData input, ReplayRestoreScope scope,
-                                Dictionary<Light, bool> originalLights) {
+                                Dictionary<Light, bool> originalLights)
+    {
         root = parent;
         player = mouse;
         map = layout;
@@ -89,7 +116,8 @@ public sealed class ReplayNativeGraphics {
         foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>(true))
             if (t.gameObject.scene.handle == scene)
                 world[ReplayVisualCapture.Path(t)] = t;
-        foreach (var t in Resources.FindObjectsOfTypeAll<Texture>()) {
+        foreach (var t in Resources.FindObjectsOfTypeAll<Texture>())
+        {
             string key = ReplayVisualCapture.TextureKey(t);
             Texture previous;
             if (!textures.TryGetValue(key, out previous))
@@ -97,7 +125,8 @@ public sealed class ReplayNativeGraphics {
             else if (previous != t)
                 textures[key] = null; // Never guess between ambiguous assets.
         }
-        foreach (var s in Resources.FindObjectsOfTypeAll<Sprite>()) {
+        foreach (var s in Resources.FindObjectsOfTypeAll<Sprite>())
+        {
             string key = ReplayVisualCapture.SpriteKey(s);
             Sprite previous;
             if (!sprites.TryGetValue(key, out previous))
@@ -105,13 +134,15 @@ public sealed class ReplayNativeGraphics {
             else if (previous != s)
                 sprites[key] = null;
         }
-        foreach (var pair in originalLights) {
+        foreach (var pair in originalLights)
+        {
             if (pair.Key == null || ReplayVisualCapture.Dynamic(pair.Key.transform))
                 continue;
             CopyLight(pair.Key, pair.Value);
         }
         var owners = new List<ReplayVisualOwner>(input.Visuals.Owners);
-        if (!input.Visuals.Recorded) {
+        if (!input.Visuals.Recorded)
+        {
             owners.Add(new ReplayVisualOwner { Group = 1 });
             foreach (var actor in layout.Review.Monsters)
                 owners.Add(new ReplayVisualOwner { Group = 2, Id = actor.Id, Kind = actor.Kind });
@@ -119,14 +150,17 @@ public sealed class ReplayNativeGraphics {
                 owners.Add(new ReplayVisualOwner { Group = 3, Id = id });
         }
         var used = new HashSet<Transform>();
-        foreach (var owner in owners) {
-            if (owner.Group == 0) {
+        foreach (var owner in owners)
+        {
+            if (owner.Group == 0)
+            {
                 foreach (var track in owner.Tracks)
                     BindWorld(track);
                 continue;
             }
             var source = Source(owner, used);
-            if (source == null) {
+            if (source == null)
+            {
                 missing += owner.Tracks.Count;
                 continue;
             }
@@ -134,7 +168,8 @@ public sealed class ReplayNativeGraphics {
             proxies.Add(proxy);
             CopyTransform(proxy, source);
             CopyRenderers(proxy);
-            foreach (var light in source.GetComponentsInChildren<Light>(true)) {
+            foreach (var light in source.GetComponentsInChildren<Light>(true))
+            {
                 bool on;
                 enabledLights.TryGetValue(light, out on);
                 var copy = CopyLight(light, on);
@@ -148,41 +183,50 @@ public sealed class ReplayNativeGraphics {
             foreach (var track in owner.Tracks)
                 BindProxy(proxy, track);
         }
-        if (lamp == null && mouse.playerFlashlight != null) {
+        if (lamp == null && mouse.playerFlashlight != null)
+        {
             bool on;
             enabledLights.TryGetValue(mouse.playerFlashlight, out on);
             lamp = CopyLight(mouse.playerFlashlight, on);
         }
         BindAnimationHistory();
-        bindings.Sort((a, b) => {
-            if (a.Pose == null)
-                return b.Pose == null ? 0 : 1;
-            if (b.Pose == null)
-                return -1;
-            return Depth(a.Pose).CompareTo(Depth(b.Pose));
-        });
+        bindings.Sort((a, b) =>
+                      {
+                          if (a.Pose == null)
+                              return b.Pose == null ? 0 : 1;
+                          if (b.Pose == null)
+                              return -1;
+                          return Depth(a.Pose).CompareTo(Depth(b.Pose));
+                      });
         foreach (var b in UnityEngine.Object.FindObjectsOfType<Billboard>(true))
             if (b.gameObject.scene.handle == scene && !ReplayVisualCapture.Dynamic(b.transform) &&
-                !ReplayVisualCapture.Point(b.transform)) {
+                !ReplayVisualCapture.Point(b.transform))
+            {
                 var t = b.transform;
                 var q = t.localRotation;
-                restore.Add(() => {
-                    if (t != null)
-                        t.localRotation = q;
-                });
+                restore.Add(() =>
+                            {
+                                if (t != null)
+                                    t.localRotation = q;
+                            });
                 billboards.Add(t);
             }
     }
-    private static int Depth(Transform t) {
+
+    private static int Depth(Transform t)
+    {
         int depth = 0;
         for (; t != null; t = t.parent)
             depth++;
         return depth;
     }
-    private Transform Source(ReplayVisualOwner owner, HashSet<Transform> used) {
+
+    private Transform Source(ReplayVisualOwner owner, HashSet<Transform> used)
+    {
         if (owner.Group == 1)
             return PlayerContext.Body(player);
-        if (owner.Group == 3) {
+        if (owner.Group == 3)
+        {
             if (player.gemsList != null)
                 foreach (var gem in player.gemsList)
                     if (gem != null &&
@@ -205,22 +249,26 @@ public sealed class ReplayNativeGraphics {
                 candidates.Add(c.agent != null ? c.agent.transform : c.transform);
         Transform exact;
         if (owner.Root.Length > 0 && world.TryGetValue(owner.Root, out exact) && candidates.Contains(exact) &&
-            !used.Contains(exact)) {
+            !used.Contains(exact))
+        {
             used.Add(exact);
             return exact;
         }
         Vector3 first = Vector3.zero;
         foreach (var actor in map.Review.Monsters)
-            if (actor.Id == owner.Id && actor.Trace.Count > 0) {
+            if (actor.Id == owner.Id && actor.Trace.Count > 0)
+            {
                 first = actor.Trace[0].Position;
                 break;
             }
         Transform best = null;
         float distance = float.MaxValue;
         foreach (var t in candidates)
-            if (t != null && !used.Contains(t)) {
+            if (t != null && !used.Contains(t))
+            {
                 float d = (t.position - first).sqrMagnitude;
-                if (d < distance) {
+                if (d < distance)
+                {
                     best = t;
                     distance = d;
                 }
@@ -231,19 +279,24 @@ public sealed class ReplayNativeGraphics {
             used.Add(best);
         return best;
     }
-    private Transform CopyTransform(Proxy proxy, Transform source) {
+
+    private Transform CopyTransform(Proxy proxy, Transform source)
+    {
         Transform copy;
         if (proxy.Copies.TryGetValue(source, out copy))
             return copy;
         var obj = new GameObject(source.name + " / replay visual");
         obj.layer = source.gameObject.layer;
         copy = obj.transform;
-        if (source == proxy.Source) {
+        if (source == proxy.Source)
+        {
             copy.SetParent(root.transform, false);
             copy.SetPositionAndRotation(source.position, source.rotation);
             copy.localScale = source.lossyScale;
             proxy.Root = copy;
-        } else {
+        }
+        else
+        {
             copy.SetParent(CopyTransform(proxy, source.parent), false);
             copy.localPosition = source.localPosition;
             copy.localRotation = source.localRotation;
@@ -253,8 +306,11 @@ public sealed class ReplayNativeGraphics {
         proxy.Paths.Add(ReplayVisualCapture.Path(source, proxy.Source), copy);
         return copy;
     }
-    private void CopyRenderers(Proxy proxy) {
-        foreach (var source in proxy.Source.GetComponentsInChildren<Renderer>(true)) {
+
+    private void CopyRenderers(Proxy proxy)
+    {
+        foreach (var source in proxy.Source.GetComponentsInChildren<Renderer>(true))
+        {
             if (source.isPartOfStaticBatch)
                 continue; // Never duplicate a combined static mesh.
             var skin = source as SkinnedMeshRenderer;
@@ -264,7 +320,8 @@ public sealed class ReplayNativeGraphics {
                 continue;
             Transform t = CopyTransform(proxy, source.transform);
             Renderer copy;
-            if (skin != null) {
+            if (skin != null)
+            {
                 var s = t.gameObject.AddComponent<SkinnedMeshRenderer>();
                 s.sharedMesh = skin.sharedMesh;
                 s.localBounds = skin.localBounds;
@@ -284,7 +341,9 @@ public sealed class ReplayNativeGraphics {
                     for (int i = 0; i < s.sharedMesh.blendShapeCount; i++)
                         s.SetBlendShapeWeight(i, skin.GetBlendShapeWeight(i));
                 copy = s;
-            } else if (sprite != null) {
+            }
+            else if (sprite != null)
+            {
                 var s = t.gameObject.AddComponent<SpriteRenderer>();
                 s.sprite = sprite.sprite;
                 s.color = sprite.color;
@@ -295,7 +354,9 @@ public sealed class ReplayNativeGraphics {
                 s.maskInteraction = sprite.maskInteraction;
                 s.spriteSortPoint = sprite.spriteSortPoint;
                 copy = s;
-            } else {
+            }
+            else
+            {
                 var filter = source.GetComponent<MeshFilter>();
                 if (filter == null || filter.sharedMesh == null)
                     continue;
@@ -315,7 +376,8 @@ public sealed class ReplayNativeGraphics {
             var block = new MaterialPropertyBlock();
             source.GetPropertyBlock(block);
             copy.SetPropertyBlock(block);
-            for (int material = 0; material < source.sharedMaterials.Length; material++) {
+            for (int material = 0; material < source.sharedMaterials.Length; material++)
+            {
                 source.GetPropertyBlock(block, material);
                 if (!block.isEmpty)
                     copy.SetPropertyBlock(block, material);
@@ -326,12 +388,15 @@ public sealed class ReplayNativeGraphics {
                 billboards.Add(t);
         }
     }
-    private Light CopyLight(Light source, bool on) {
+
+    private Light CopyLight(Light source, bool on)
+    {
         Light found;
         if (lights.TryGetValue(source, out found))
             return found;
         var volume = source.GetComponent<VolumetricLight>();
-        if (volume != null && (motion.Visuals.Recorded || !ReplayVisualCapture.Dynamic(source.transform))) {
+        if (volume != null && (motion.Visuals.Recorded || !ReplayVisualCapture.Dynamic(source.transform)))
+        {
             // Retain the game's registered light/command-buffer pair. A plain
             // cloned Light cannot produce the original volumetric pass.
             var t = source.transform;
@@ -343,18 +408,20 @@ public sealed class ReplayNativeGraphics {
             var angle = source.spotAngle;
             var inner = source.innerSpotAngle;
             var type = source.type;
-            restore.Add(() => {
-                if (source != null) {
-                    t.localPosition = position;
-                    t.localRotation = rotation;
-                    source.color = color;
-                    source.intensity = intensity;
-                    source.range = range;
-                    source.spotAngle = angle;
-                    source.innerSpotAngle = inner;
-                    source.type = type;
-                }
-            });
+            restore.Add(() =>
+                        {
+                            if (source != null)
+                            {
+                                t.localPosition = position;
+                                t.localRotation = rotation;
+                                source.color = color;
+                                source.intensity = intensity;
+                                source.range = range;
+                                source.spotAngle = angle;
+                                source.innerSpotAngle = inner;
+                                source.type = type;
+                            }
+                        });
             lights.Add(source, source);
             source.enabled = on && source.gameObject.activeInHierarchy;
             RenderUpdate(volume);
@@ -389,35 +456,47 @@ public sealed class ReplayNativeGraphics {
         lights.Add(source, l);
         return l;
     }
-    private void BindWorld(ReplayVisualTrack track) {
+
+    private void BindWorld(ReplayVisualTrack track)
+    {
         Transform t;
-        if (!world.TryGetValue(track.Path, out t)) {
+        if (!world.TryGetValue(track.Path, out t))
+        {
             missing++;
             return;
         }
-        if (track.Kind == 1) {
+        if (track.Kind == 1)
+        {
             var position = t.position;
             var rotation = t.rotation;
             var scale = t.localScale;
-            restore.Add(() => {
-                if (t != null) {
-                    t.SetPositionAndRotation(position, rotation);
-                    t.localScale = scale;
-                }
-            });
+            restore.Add(() =>
+                        {
+                            if (t != null)
+                            {
+                                t.SetPositionAndRotation(position, rotation);
+                                t.localScale = scale;
+                            }
+                        });
             bindings.Add(new Binding { Track = track, Pose = t, World = true });
-        } else if (track.Kind == 4) {
+        }
+        else if (track.Kind == 4)
+        {
             var sources = t.GetComponents<Light>();
-            if (track.Slot >= sources.Length) {
+            if (track.Slot >= sources.Length)
+            {
                 missing++;
                 return;
             }
             bool on;
             enabledLights.TryGetValue(sources[track.Slot], out on);
             bindings.Add(new Binding { Track = track, Light = CopyLight(sources[track.Slot], on) });
-        } else {
+        }
+        else
+        {
             var sources = t.GetComponents<Renderer>();
-            if (track.Slot >= sources.Length) {
+            if (track.Slot >= sources.Length)
+            {
                 missing++;
                 return;
             }
@@ -429,41 +508,50 @@ public sealed class ReplayNativeGraphics {
             bool flipX = sprite != null && sprite.flipX, flipY = sprite != null && sprite.flipY;
             var original = new MaterialPropertyBlock();
             r.GetPropertyBlock(original, 0);
-            restore.Add(() => {
-                if (r != null) {
-                    r.enabled = enabled;
-                    r.SetPropertyBlock(original.isEmpty ? null : original, 0);
-                    if (sprite != null) {
-                        sprite.sprite = originalSprite;
-                        sprite.color = originalColor;
-                        sprite.flipX = flipX;
-                        sprite.flipY = flipY;
-                    }
-                }
-            });
+            restore.Add(() =>
+                        {
+                            if (r != null)
+                            {
+                                r.enabled = enabled;
+                                r.SetPropertyBlock(original.isEmpty ? null : original, 0);
+                                if (sprite != null)
+                                {
+                                    sprite.sprite = originalSprite;
+                                    sprite.color = originalColor;
+                                    sprite.flipX = flipX;
+                                    sprite.flipY = flipY;
+                                }
+                            }
+                        });
             var bind = new Binding { Track = track, Renderer = r };
             PrepareMaterial(bind);
             bindings.Add(bind);
         }
     }
-    private void BindProxy(Proxy proxy, ReplayVisualTrack track) {
+
+    private void BindProxy(Proxy proxy, ReplayVisualTrack track)
+    {
         var bind = new Binding { Track = track, World = track.Path.Length == 0, ObservedOnly = true,
                                  Monster = proxy.Owner.Group == 2 };
         if (track.Kind == 1)
             proxy.Paths.TryGetValue(track.Path, out bind.Pose);
         else if (track.Kind == 4)
             proxy.Lights.TryGetValue(Key(track.Path, track.Slot), out bind.Light);
-        else {
+        else
+        {
             proxy.Renderers.TryGetValue(Key(track.Path, track.Slot), out bind.Renderer);
             PrepareMaterial(bind);
         }
-        if (bind.Pose == null && bind.Renderer == null && bind.Light == null) {
+        if (bind.Pose == null && bind.Renderer == null && bind.Light == null)
+        {
             missing++;
             return;
         }
         bindings.Add(bind);
     }
-    private static void PrepareMaterial(Binding b) {
+
+    private static void PrepareMaterial(Binding b)
+    {
         if (b.Renderer == null)
             return;
         b.Block = new MaterialPropertyBlock();
@@ -474,32 +562,97 @@ public sealed class ReplayNativeGraphics {
         b.BaseTexture =
             m != null && m.HasProperty("_MainTex") ? ReplayVisualCapture.TextureKey(m.mainTexture) : "";
     }
-    private string Asset(int id) {
+
+    private string Asset(int id)
+    {
         return id > 0 && id <= motion.Visuals.Assets.Count ? motion.Visuals.Assets[id - 1] : "";
     }
-    private static bool Cut(List<ReplayAnimationTrack> cuts,double a,double b){foreach(var t in cuts)if(t.Break(a,b))return true;return false;}
-    private void BindAnimationHistory(){
-        foreach(var t in motion.Experience.Animations){
-            Proxy proxy=null;foreach(var p in proxies)if(p.Owner.Group==t.Group&&p.Owner.Id==t.Actor){proxy=p;break;}
-            Transform transform=null;if(t.Group==0)world.TryGetValue(t.Path,out transform);else if(proxy!=null)proxy.Paths.TryGetValue(t.Path,out transform);
-            if(t.Kind==1){
-                foreach(var b in bindings){if(b.Pose==null)continue;bool applies=false;
-                    if(t.Group==0){Transform parent;if(world.TryGetValue(t.Path,out parent))applies=b.Pose==parent||b.Pose.IsChildOf(parent);}
-                    else if(proxy!=null&&transform!=null)applies=b.Pose==transform||b.Pose.IsChildOf(transform);
-                    if(applies)b.Cuts.Add(t);
+
+    private static bool Cut(List<ReplayAnimationTrack> cuts, double a, double b)
+    {
+        foreach (var t in cuts)
+            if (t.Break(a, b))
+                return true;
+        return false;
+    }
+
+    private void BindAnimationHistory()
+    {
+        foreach (var t in motion.Experience.Animations)
+        {
+            Proxy proxy = null;
+            foreach (var p in proxies)
+                if (p.Owner.Group == t.Group && p.Owner.Id == t.Actor)
+                {
+                    proxy = p;
+                    break;
                 }
-            }else if(t.Kind==2&&transform!=null){var array=transform.GetComponents<SkinnedMeshRenderer>();if(t.Layer>=array.Length||array[t.Layer].sharedMesh==null||t.Slot>=array[t.Layer].sharedMesh.blendShapeCount){missing++;continue;}var renderer=array[t.Layer];
-                if(t.Group==0){int slot=t.Slot;float old=renderer.GetBlendShapeWeight(slot);restore.Add(()=>{if(renderer!=null)renderer.SetBlendShapeWeight(slot,old);});}
-                var m=new Morph{Track=t,Renderer=renderer};foreach(var a in motion.Experience.Animations)if(a.Kind==1&&a.Group==t.Group&&a.Actor==t.Actor&&(a.Path.Length==0||t.Path==a.Path||t.Path.StartsWith(a.Path+"/",StringComparison.Ordinal)))m.Cuts.Add(a);morphs.Add(m);
+            Transform transform = null;
+            if (t.Group == 0)
+                world.TryGetValue(t.Path, out transform);
+            else if (proxy != null)
+                proxy.Paths.TryGetValue(t.Path, out transform);
+            if (t.Kind == 1)
+            {
+                foreach (var b in bindings)
+                {
+                    if (b.Pose == null)
+                        continue;
+                    bool applies = false;
+                    if (t.Group == 0)
+                    {
+                        Transform parent;
+                        if (world.TryGetValue(t.Path, out parent))
+                            applies = b.Pose == parent || b.Pose.IsChildOf(parent);
+                    }
+                    else if (proxy != null && transform != null)
+                        applies = b.Pose == transform || b.Pose.IsChildOf(transform);
+                    if (applies)
+                        b.Cuts.Add(t);
+                }
+            }
+            else if (t.Kind == 2 && transform != null)
+            {
+                var array = transform.GetComponents<SkinnedMeshRenderer>();
+                if (t.Layer >= array.Length || array[t.Layer].sharedMesh == null ||
+                    t.Slot >= array[t.Layer].sharedMesh.blendShapeCount)
+                {
+                    missing++;
+                    continue;
+                }
+                var renderer = array[t.Layer];
+                if (t.Group == 0)
+                {
+                    int slot = t.Slot;
+                    float old = renderer.GetBlendShapeWeight(slot);
+                    restore.Add(() =>
+                                {
+                                    if (renderer != null)
+                                        renderer.SetBlendShapeWeight(slot, old);
+                                });
+                }
+                var m = new Morph { Track = t, Renderer = renderer };
+                foreach (var a in motion.Experience.Animations)
+                    if (a.Kind == 1 && a.Group == t.Group && a.Actor == t.Actor &&
+                        (a.Path.Length == 0 || t.Path == a.Path ||
+                         t.Path.StartsWith(a.Path + "/", StringComparison.Ordinal)))
+                        m.Cuts.Add(a);
+                morphs.Add(m);
             }
         }
     }
-    private static ReplayVisualFrame PoseAt(ReplayVisualTrack track, int index, double at,List<ReplayAnimationTrack> cuts) {
+
+    private static ReplayVisualFrame PoseAt(ReplayVisualTrack track, int index, double at,
+                                            List<ReplayAnimationTrack> cuts)
+    {
         var f = track.Frames[index];
-        if (index + 1 < track.Frames.Count) {
+        if (index + 1 < track.Frames.Count)
+        {
             var n = track.Frames[index + 1];
             double dt = n.Seconds - f.Seconds;
-            if (!Cut(cuts,f.Seconds,n.Seconds)&&dt > 0 && dt <= .25 && (n.Position - f.Position).magnitude <= Math.Max(4, dt * 40)) {
+            if (!Cut(cuts, f.Seconds, n.Seconds) && dt > 0 && dt <= .25 &&
+                (n.Position - f.Position).magnitude <= Math.Max(4, dt * 40))
+            {
                 float u = (float)((at - f.Seconds) / dt);
                 f.Position = Vector3.Lerp(f.Position, n.Position, u);
                 f.Rotation = Quaternion.Slerp(f.Rotation, n.Rotation, u);
@@ -508,19 +661,43 @@ public sealed class ReplayNativeGraphics {
         }
         return f;
     }
-    public void Face(Camera view) {
+
+    public void Face(Camera view)
+    {
         foreach (var b in billboards)
             if (b != null)
                 b.LookAt(view.transform.position);
     }
-    public void Apply(double at, ReplayViewFrame camera, Camera view, bool showMonsters) {
+
+    public void Apply(double at, ReplayViewFrame camera, Camera view, bool showMonsters)
+    {
         // Seeking and export evaluate absolute timestamps, without advancing AI.
-        if (last != at) {
-            foreach(var m in morphs){int i=m.Track.At(at);if(i<0||m.Renderer==null)continue;var f=m.Track.Frames[i];float weight=f.Weight;if(i+1<m.Track.Frames.Count){var n=m.Track.Frames[i+1];double dt=n.Seconds-f.Seconds;if(dt>0&&dt<=.25&&!Cut(m.Cuts,f.Seconds,n.Seconds))weight=Mathf.Lerp(f.Weight,n.Weight,(float)((at-f.Seconds)/dt));}if(Math.Abs(m.Renderer.GetBlendShapeWeight(m.Track.Slot)-weight)>.0001f)m.Renderer.SetBlendShapeWeight(m.Track.Slot,weight);}
-            foreach (var b in bindings) {
+        if (last != at)
+        {
+            foreach (var m in morphs)
+            {
+                int i = m.Track.At(at);
+                if (i < 0 || m.Renderer == null)
+                    continue;
+                var f = m.Track.Frames[i];
+                float weight = f.Weight;
+                if (i + 1 < m.Track.Frames.Count)
+                {
+                    var n = m.Track.Frames[i + 1];
+                    double dt = n.Seconds - f.Seconds;
+                    if (dt > 0 && dt <= .25 && !Cut(m.Cuts, f.Seconds, n.Seconds))
+                        weight = Mathf.Lerp(f.Weight, n.Weight, (float)((at - f.Seconds) / dt));
+                }
+                if (Math.Abs(m.Renderer.GetBlendShapeWeight(m.Track.Slot) - weight) > .0001f)
+                    m.Renderer.SetBlendShapeWeight(m.Track.Slot, weight);
+            }
+            foreach (var b in bindings)
+            {
                 int index = b.Track.At(at);
-                if (index < 0) {
-                    if (b.ObservedOnly) {
+                if (index < 0)
+                {
+                    if (b.ObservedOnly)
+                    {
                         if (b.Renderer != null)
                             b.Renderer.enabled = false;
                         if (b.Light != null)
@@ -530,12 +707,14 @@ public sealed class ReplayNativeGraphics {
                     continue;
                 }
                 var f = b.Track.Frames[index];
-                if (b.Pose != null) {
-                    f = PoseAt(b.Track, index, at,b.Cuts);
+                if (b.Pose != null)
+                {
+                    f = PoseAt(b.Track, index, at, b.Cuts);
                     bool move = !b.HasPose || f.Position != b.LastPose.Position,
                          turn = !b.HasPose || f.Rotation != b.LastPose.Rotation,
                          scale = !b.HasPose || f.Scale != b.LastPose.Scale;
-                    if (b.World) {
+                    if (b.World)
+                    {
                         b.Pose.SetPositionAndRotation(f.Position, f.Rotation);
                         {
                             var parent = b.Pose.parent;
@@ -544,7 +723,9 @@ public sealed class ReplayNativeGraphics {
                                                             s.y == 0 ? f.Scale.y : f.Scale.y / s.y,
                                                             s.z == 0 ? f.Scale.z : f.Scale.z / s.z);
                         }
-                    } else {
+                    }
+                    else
+                    {
                         if (move)
                             b.Pose.localPosition = f.Position;
                         if (turn)
@@ -554,8 +735,11 @@ public sealed class ReplayNativeGraphics {
                     }
                     b.LastPose = f;
                     b.HasPose = true;
-                } else if (index != b.Index) {
-                    if (b.Light != null) {
+                }
+                else if (index != b.Index)
+                {
+                    if (b.Light != null)
+                    {
                         b.Light.transform.SetPositionAndRotation(f.Position, f.Rotation);
                         b.LightOn = (f.Flags & 1) != 0;
                         b.Light.enabled = b.LightOn && (!b.Monster || showMonsters);
@@ -564,10 +748,13 @@ public sealed class ReplayNativeGraphics {
                         b.Light.range = f.Range;
                         b.Light.spotAngle = f.Angle;
                         b.Light.innerSpotAngle = f.InnerAngle;
-                    } else if (b.Renderer != null) {
+                    }
+                    else if (b.Renderer != null)
+                    {
                         b.Renderer.enabled = (f.Flags & 1) != 0;
                         var sprite = b.Renderer as SpriteRenderer;
-                        if (sprite != null) {
+                        if (sprite != null)
+                        {
                             Sprite asset;
                             if (f.Asset == 0)
                                 sprite.sprite = null;
@@ -576,7 +763,9 @@ public sealed class ReplayNativeGraphics {
                             sprite.color = f.Color;
                             sprite.flipX = (f.Flags & 2) != 0;
                             sprite.flipY = (f.Flags & 4) != 0;
-                        } else {
+                        }
+                        else
+                        {
                             bool before = b.ColorOverride;
                             bool color = (f.Flags & 8) != 0 && f.Color != b.BaseColor;
                             bool texture = (f.Flags & 16) != 0 && Asset(f.Texture) != b.BaseTexture;
@@ -584,7 +773,8 @@ public sealed class ReplayNativeGraphics {
                             b.Renderer.GetPropertyBlock(b.Block, 0);
                             b.ColorOverride = color;
                             b.CurrentColor = f.Color;
-                            if (texture) {
+                            if (texture)
+                            {
                                 Texture asset;
                                 if (f.Texture == 0)
                                     b.Block.SetTexture("_MainTex", null);
@@ -602,14 +792,17 @@ public sealed class ReplayNativeGraphics {
                 b.Index = index;
             }
             foreach (var p in proxies)
-                if (p.Owner.Group == 2 && (!motion.Visuals.Recorded || p.Owner.Tracks.Count == 0)) {
+                if (p.Owner.Group == 2 && (!motion.Visuals.Recorded || p.Owner.Tracks.Count == 0))
+                {
                     foreach (var actor in map.Review.Monsters)
-                        if (actor.Id == p.Owner.Id) {
+                        if (actor.Id == p.Owner.Id)
+                        {
                             int i = 0;
                             while (i < actor.Trace.Count && actor.Trace[i].Seconds <= at)
                                 i++;
                             i--;
-                            if (i < 0) {
+                            if (i < 0)
+                            {
                                 p.Visible = false;
                                 break;
                             }
@@ -626,11 +819,15 @@ public sealed class ReplayNativeGraphics {
                         }
                 }
             if (!motion.Visuals.Recorded)
-                foreach (var p in proxies) {
-                    if (p.Owner.Group == 1) {
+                foreach (var p in proxies)
+                {
+                    if (p.Owner.Group == 1)
+                    {
                         p.Root.position = camera.Body;
                         p.Root.rotation = camera.BodyRotation;
-                    } else if (p.Owner.Group == 3) {
+                    }
+                    else if (p.Owner.Group == 3)
+                    {
                         bool picked = false;
                         for (int i = 0; i < map.Review.Collected.Count; i++)
                             if (map.Review.Collected[i] == p.Owner.Id && map.Review.PickupSeconds[i] <= at)
@@ -639,23 +836,27 @@ public sealed class ReplayNativeGraphics {
                     }
                 }
             foreach (var p in proxies)
-                if (p.Owner.Group == 1) {
+                if (p.Owner.Group == 1)
+                {
                     p.Root.SetPositionAndRotation(camera.Body, camera.BodyRotation);
                 }
             last = at;
         }
         foreach (var b in bindings)
-            if (b.Renderer != null && b.ColorOverride) {
+            if (b.Renderer != null && b.ColorOverride)
+            {
                 var color = b.CurrentColor;
                 var material = b.Renderer.sharedMaterial;
-                if (material != null && material.HasProperty("_Color")) {
+                if (material != null && material.HasProperty("_Color"))
+                {
                     float baseline = Math.Abs(b.BaseColor.a) > .00001f ? b.BaseColor.a : 1;
                     color.a *= material.color.a / baseline;
                 }
                 b.Block.SetColor("_Color", color);
                 b.Renderer.SetPropertyBlock(b.Block, 0);
             }
-        if (monstersVisible != showMonsters) {
+        if (monstersVisible != showMonsters)
+        {
             foreach (var b in bindings)
                 if (b.Monster && b.Light != null)
                     b.Light.enabled = b.LightOn && showMonsters;
@@ -665,7 +866,8 @@ public sealed class ReplayNativeGraphics {
             if (p.Owner.Group == 2)
                 p.Root.gameObject.SetActive(showMonsters && p.Visible);
         Face(view);
-        if (lamp != null) {
+        if (lamp != null)
+        {
             lamp.transform.SetPositionAndRotation(camera.LampPosition, camera.LampRotation);
             lamp.color = new Color(camera.LampColor.x, camera.LampColor.y, camera.LampColor.z);
             lamp.type = (LightType)camera.LampType;

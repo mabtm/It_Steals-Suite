@@ -5,13 +5,18 @@
 #include <sstream>
 #include <string>
 #include <vector>
-namespace suite_input {
-struct Pad {
+
+namespace suite_input
+{
+struct Pad
+{
     uint16_t buttons = 0;
     uint8_t lt = 0, rt = 0;
     int16_t lx = 0, ly = 0, rx = 0, ry = 0;
 };
-struct Frame {
+
+struct Frame
+{
     double seconds = 0;
     uint32_t frame = 0, tick = 0, state = 0, flags = 0, mouse = 0, knownStates = 2047;
     bool legacyKeys = false;
@@ -19,17 +24,27 @@ struct Frame {
     std::array<uint32_t, 8> legacy{};
     std::array<Pad, 4> pads{};
     float sprint = 0, flash = 0, moveX = 0, moveY = 0, lookX = 0, lookY = 0, joyX = 0, joyY = 0;
-    bool Key(unsigned vk) const { return vk < 256 && (keys[vk / 64] & (uint64_t(1) << (vk % 64))); }
-    void Key(unsigned vk) {
+
+    bool Key(unsigned vk) const
+    {
+        return vk < 256 && (keys[vk / 64] & (uint64_t(1) << (vk % 64)));
+    }
+
+    void Key(unsigned vk)
+    {
         if (vk < 256)
             keys[vk / 64] |= uint64_t(1) << (vk % 64);
     }
 };
-struct Change {
+
+struct Change
+{
     double seconds = 0;
     uint32_t frame = 0, tick = 0, changed = 0, state = 0;
 };
-inline Frame Live(const GameData &d) {
+
+inline Frame Live(const GameData &d)
+{
     Frame f;
     f.seconds = d.inputSeconds;
     f.frame = uint32_t(d.inputFrame);
@@ -40,7 +55,8 @@ inline Frame Live(const GameData &d) {
     f.mouse = uint32_t(d.inputMouse);
     for (int i = 0; i < 8; i++)
         f.legacy[i] = uint32_t(d.inputLegacy[i]);
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
         auto &p = f.pads[i];
         p.buttons = uint16_t(d.inputPadButtons[i]);
         auto a = d.inputPadAxes + i * 6;
@@ -61,9 +77,12 @@ inline Frame Live(const GameData &d) {
     f.joyY = d.inputGameAxes[5];
     return f;
 }
-inline std::vector<Change> Changes(const GameData &d) {
+
+inline std::vector<Change> Changes(const GameData &d)
+{
     std::vector<Change> r;
-    for (int i = 0; i < std::clamp(d.inputEventCount, 0, 8); i++) {
+    for (int i = 0; i < std::clamp(d.inputEventCount, 0, 8); i++)
+    {
         Change c;
         std::memcpy(&c.seconds, d.inputEvents + i * 24, 8);
         std::memcpy(&c.frame, d.inputEvents + i * 24 + 8, 4);
@@ -75,12 +94,16 @@ inline std::vector<Change> Changes(const GameData &d) {
     }
     return r;
 }
+
 inline constexpr uint32_t VisibleChanges = 4 | 8 | 16 | 32 | 512 | 1024;
-inline std::string ChangeText(const Change &c) {
+
+inline std::string ChangeText(const Change &c)
+{
     std::string s;
     for (auto pair : {std::pair{4u, "Sprint"}, std::pair{512u, "Crouch"}, std::pair{8u, "Radar"},
                       std::pair{16u, "Light"}, std::pair{32u, "Flash"}, std::pair{1024u, "Clock"}})
-        if (c.changed & pair.first) {
+        if (c.changed & pair.first)
+        {
             if (!s.empty())
                 s += " / ";
             s += pair.second;
@@ -88,22 +111,33 @@ inline std::string ChangeText(const Change &c) {
         }
     return s;
 }
-struct Preferences {
+
+struct Preferences
+{
     bool enabled = false, keyboard = true, mouse = true, controller = true, states = true, events = true,
          fullKeyboard = false;
-    bool background = true, border = true, shadow = false, heading = false, customKeys = false, keyOutline = true,
-         animations = true;
+    bool background = true, border = true, shadow = false, heading = false, customKeys = false,
+         keyOutline = true, animations = true;
     int controllerIndex = -1, clock = 0, symbols = 0, mouseMask = 127, stateMask = 31;
     float x = .5f, y = 1, scale = 1, opacity = .86f, contentOpacity = 1, mouseScale = 1, keyFill = .18f;
     uint32_t keyMask[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     bool operator==(const Preferences &) const = default;
-    Preferences() {
+
+    Preferences()
+    {
         for (unsigned key : {87u, 65u, 83u, 68u, 16u, 17u, 82u, 32u, 18u})
             ShowKey(key, true);
     }
-    bool ShowKey(unsigned key) const { return key < 256 && (keyMask[key / 32] & (1u << (key % 32))); }
-    void ShowKey(unsigned key, bool value) {
-        if (key < 256) {
+
+    bool ShowKey(unsigned key) const
+    {
+        return key < 256 && (keyMask[key / 32] & (1u << (key % 32)));
+    }
+
+    void ShowKey(unsigned key, bool value)
+    {
+        if (key < 256)
+        {
             auto bit = 1u << (key % 32);
             if (value)
                 keyMask[key / 32] |= bit;
@@ -111,7 +145,9 @@ struct Preferences {
                 keyMask[key / 32] &= ~bit;
         }
     }
-    void Validate() {
+
+    void Validate()
+    {
         auto safe = [](float v, float lo, float hi, float def) {
             return std::isfinite(v) ? std::clamp(v, lo, hi) : def;
         };
@@ -128,23 +164,29 @@ struct Preferences {
         mouseMask &= 127;
         stateMask &= 31;
     }
-    void Encode(std::ostream &o) const {
+
+    void Encode(std::ostream &o) const
+    {
         for (auto p :
              {std::pair{"enabled", enabled}, std::pair{"keyboard", keyboard}, std::pair{"mouse", mouse},
               std::pair{"controller", controller}, std::pair{"states", states}, std::pair{"events", events},
-              std::pair{"fullKeyboard", fullKeyboard}, std::pair{"background", background}, std::pair{"border", border},
-              std::pair{"shadow", shadow}, std::pair{"heading", heading}, std::pair{"customKeys", customKeys},
-              std::pair{"keyOutline", keyOutline}, std::pair{"animations", animations}})
+              std::pair{"fullKeyboard", fullKeyboard}, std::pair{"background", background},
+              std::pair{"border", border}, std::pair{"shadow", shadow}, std::pair{"heading", heading},
+              std::pair{"customKeys", customKeys}, std::pair{"keyOutline", keyOutline},
+              std::pair{"animations", animations}})
             o << "input." << p.first << '=' << p.second << '\n';
-        o << "input.controllerIndex=" << controllerIndex << "\ninput.clock=" << clock << "\ninput.symbols=" << symbols
-          << "\ninput.x=" << x << "\ninput.y=" << y << "\ninput.scale=" << scale << "\ninput.opacity=" << opacity
+        o << "input.controllerIndex=" << controllerIndex << "\ninput.clock=" << clock
+          << "\ninput.symbols=" << symbols << "\ninput.x=" << x << "\ninput.y=" << y
+          << "\ninput.scale=" << scale << "\ninput.opacity=" << opacity
           << "\ninput.contentOpacity=" << contentOpacity << "\ninput.mouseScale=" << mouseScale
-          << "\ninput.keyFill=" << keyFill << "\ninput.mouseMask=" << mouseMask << "\ninput.stateMask=" << stateMask
-          << '\n';
+          << "\ninput.keyFill=" << keyFill << "\ninput.mouseMask=" << mouseMask
+          << "\ninput.stateMask=" << stateMask << '\n';
         for (int i = 0; i < 8; i++)
             o << "input.keys" << i << '=' << keyMask[i] << '\n';
     }
-    void Decode(const std::string &k, double v) {
+
+    void Decode(const std::string &k, double v)
+    {
         if (!std::isfinite(v))
             return;
         if (k == "animations")
@@ -203,5 +245,6 @@ struct Preferences {
             keyMask[k[4] - '0'] = uint32_t(std::clamp(v, 0., 4294967295.));
     }
 };
+
 inline Preferences preferences;
 } // namespace suite_input

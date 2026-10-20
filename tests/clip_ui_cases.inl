@@ -1,4 +1,5 @@
-void Workshop750Cases(const std::string &output) {
+void Workshop750Cases(const std::string &output)
+{
     using namespace suite_clip;
     auto savedData = data;
     auto savedInput = suite_input::preferences;
@@ -32,7 +33,8 @@ void Workshop750Cases(const std::string &output) {
     auto motion = std::make_shared<practice::ReplayMotion>();
     motion->id = 750;
     motion->seconds = motion->deviceThrough = 10;
-    for (int i = 0; i <= 600; i++) {
+    for (int i = 0; i <= 600; i++)
+    {
         practice::ReplayViewFrame f;
         f.seconds = i / 60.;
         f.camera = {float(i * .02), 1.7f, float(i * .01)};
@@ -107,10 +109,12 @@ void Workshop750Cases(const std::string &output) {
            decoded.content.layout.blocks[Mouse].opacity == .55f);
     StoreProject(folder / "run.isclip", project);
     assert(ReadProjectFile(folder / "run.isclip") == bytes);
-    for (int id = 0; id < 5; id++) {
+    for (int id = 0; id < 5; id++)
+    {
         auto corrupt = bytes;
         bool rejected = false;
-        try {
+        try
+        {
             if (id == 0)
                 corrupt[35] ^= 1;
             if (id == 1)
@@ -123,7 +127,9 @@ void Workshop750Cases(const std::string &output) {
                 DecodeProject(corrupt, 750, 10, "different assembly");
             else
                 DecodeProject(corrupt, 750, 10, map->hash);
-        } catch (...) {
+        }
+        catch (...)
+        {
             rejected = true;
         }
         assert(rejected);
@@ -133,9 +139,12 @@ void Workshop750Cases(const std::string &output) {
         future << "ISCLIP 99\nfuture data\n";
     }
     bool preserved = false;
-    try {
+    try
+    {
         StoreProject(folder / "future.isclip", project);
-    } catch (...) {
+    }
+    catch (...)
+    {
         preserved = true;
     }
     assert(preserved && ReadProjectFile(folder / "future.isclip").find("future data") != std::string::npos);
@@ -234,14 +243,17 @@ void Workshop750Cases(const std::string &output) {
     if (!output.empty())
         Dump(output + "/750-export-composition.draw");
     io.DisplaySize = {1920, 1080};
-    for (int tab = 0; tab < 3; tab++) {
-        for (int i = 0; i < 4; i++) {
+    for (int tab = 0; tab < 3; tab++)
+    {
+        for (int i = 0; i < 4; i++)
+        {
             ImGui::NewFrame();
             suite_ui::BeginFrame(true, false);
             Render();
             ImGui::Render();
             if (i == 0)
-                for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++) {
+                for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++)
+                {
                     auto *bar = GImGui->TabBars.TryGetMapData(j);
                     if (bar && bar->Tabs.Size == 3 &&
                         std::string(ImGui::TabBarGetTabName(bar, &bar->Tabs[0])) == "Camera")
@@ -252,7 +264,8 @@ void Workshop750Cases(const std::string &output) {
             Dump(output + "/750-workspace-" + std::to_string(tab) + ".draw");
     }
     for (auto view : {ImVec2(480, 360), ImVec2(1280, 720), ImVec2(1920, 1080)})
-        for (float dpi : {1.f, 1.5f}) {
+        for (float dpi : {1.f, 1.5f})
+        {
             io.DisplaySize = view;
             ApplyTheme(dpi);
             io.Fonts->Build();
@@ -260,7 +273,8 @@ void Workshop750Cases(const std::string &output) {
             auto *dialog = ImGui::FindWindowByName(suite_clip::WindowTitle().c_str());
             dialog->Pos = {16, 16};
             dialog->SizeFull = {view.x - 32, view.y - 32};
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 3; i++)
+            {
                 ImGui::NewFrame();
                 Render();
                 ImGui::Render();

@@ -1,1 +1,0 @@
-Reale ImGui-Zeichenausgabe von 6.9.7 mit synthetischen Testdaten. WIP-Karten, tatsächliche Collider-Controls, Replay und zwei gegenüberliegende HUD-Panels mit 0,25/1 Deckkraft. Keine live erfassten Spiel-/FPS-Bilder.

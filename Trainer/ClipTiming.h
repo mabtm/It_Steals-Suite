@@ -2,24 +2,33 @@
 #include "ClipCamera.h"
 #include <array>
 #include <memory>
-namespace suite_clip {
-struct SpeedPoint {
+
+namespace suite_clip
+{
+struct SpeedPoint
+{
     double seconds = 0, rate = 1;
     Transition curve = Transition::Cut;
     bool operator==(const SpeedPoint &) const = default;
 };
+
 // Speeds are defined in recorded/source time. Integrate dt/speed once, then
 // invert the monotone table for each output frame. No wall-clock frame drops.
-class SpeedMap {
-    struct Span {
+class SpeedMap
+{
+    struct Span
+    {
         double begin = 0, end = 0, first = 1, last = 1, output = 0;
         Transition curve = Transition::Cut;
         std::array<double, 129> integral{};
     };
+
     std::vector<Span> spans;
     double duration = 0, base = 1;
     std::vector<SpeedPoint> points;
-    static double Speed(const Span &s, double t) {
+
+    static double Speed(const Span &s, double t)
+    {
         double u = s.end > s.begin ? std::clamp((t - s.begin) / (s.end - s.begin), 0., 1.) : 0;
         // Double precision curves keep inversion accurate near slow endpoints.
         if (s.curve == Transition::Cut)
@@ -34,19 +43,25 @@ class SpeedMap {
             u = u * u * u * (u * (u * 6 - 15) + 10);
         return s.first + (s.last - s.first) * u;
     }
-    static double Integrate(const Span &s, double a, double b) {
+
+    static double Integrate(const Span &s, double a, double b)
+    {
         if (b <= a)
             return 0;
         if (s.curve == Transition::Cut || std::abs(s.first - s.last) < 1e-14)
             return (b - a) / s.first;
-        static constexpr double x[]{.1834346424956498, .5255324099163290, .7966664774136267, .9602898564975363};
-        static constexpr double w[]{.3626837833783620, .3137066458778873, .2223810344533745, .1012285362903763};
+        static constexpr double x[]{.1834346424956498, .5255324099163290, .7966664774136267,
+                                    .9602898564975363};
+        static constexpr double w[]{.3626837833783620, .3137066458778873, .2223810344533745,
+                                    .1012285362903763};
         double middle = (a + b) * .5, half = (b - a) * .5, total = 0;
         for (int i = 0; i < 4; i++)
             total += w[i] * (1 / Speed(s, middle - half * x[i]) + 1 / Speed(s, middle + half * x[i]));
         return total * half;
     }
-    const Span &At(double t) const {
+
+    const Span &At(double t) const
+    {
         auto p = std::upper_bound(spans.begin(), spans.end(), t,
                                   [](double time, const Span &s) { return time < s.begin; });
         return p == spans.begin() ? spans.front() : *std::prev(p);
@@ -54,11 +69,13 @@ class SpeedMap {
 
   public:
     SpeedMap(double length, double rate, std::vector<SpeedPoint> keys)
-        : duration(length), base(rate), points(std::move(keys)) {
+        : duration(length), base(rate), points(std::move(keys))
+    {
         if (!std::isfinite(length) || length <= 0 || !std::isfinite(rate) || rate < .1 || rate > 8)
             throw std::runtime_error("Invalid speed timeline");
         double previous = -1;
-        for (const auto &p : points) {
+        for (const auto &p : points)
+        {
             if (!std::isfinite(p.seconds) || p.seconds < 0 || p.seconds > length || p.seconds <= previous ||
                 !std::isfinite(p.rate) || p.rate < .1 || p.rate > 8 || int(p.curve) < 0 || int(p.curve) > 5)
                 throw std::runtime_error("Invalid speed keypoint");
@@ -82,14 +99,16 @@ class SpeedMap {
             output += s.integral.back();
             spans.push_back(s);
         };
-        for (const auto &p : points) {
+        for (const auto &p : points)
+        {
             add(p.seconds, p.rate);
             begin = p.seconds;
             first = p.rate;
             curve = p.curve;
         }
         add(length, first);
-        if (spans.empty()) {
+        if (spans.empty())
+        {
             Span s;
             s.begin = 0;
             s.end = length;
@@ -100,18 +119,28 @@ class SpeedMap {
             spans.push_back(s);
         }
     }
-    bool Matches(double length, double rate, const std::vector<SpeedPoint> &keys) const {
+
+    bool Matches(double length, double rate, const std::vector<SpeedPoint> &keys) const
+    {
         return duration == length && base == rate && points == keys;
     }
-    const std::vector<SpeedPoint> &Points() const { return points; }
-    double Rate(double t) const {
+
+    const std::vector<SpeedPoint> &Points() const
+    {
+        return points;
+    }
+
+    double Rate(double t) const
+    {
         if (!std::isfinite(t))
             return base;
         if (t >= duration && !points.empty() && points.back().seconds == duration)
             return points.back().rate;
         return Speed(At(std::clamp(t, 0., duration)), std::clamp(t, 0., duration));
     }
-    double Output(double source) const {
+
+    double Output(double source) const
+    {
         if (!std::isfinite(source))
             return 0;
         source = std::clamp(source, 0., duration);
@@ -120,7 +149,9 @@ class SpeedMap {
         double left = s.begin + (s.end - s.begin) * cell / 128;
         return s.output + s.integral[cell] + Integrate(s, left, source);
     }
-    double Source(double output) const {
+
+    double Source(double output) const
+    {
         if (!std::isfinite(output) || output <= 0)
             return 0;
         if (output >= Output(duration))
@@ -133,10 +164,12 @@ class SpeedMap {
             return s.begin;
         auto c = std::upper_bound(s.integral.begin(), s.integral.end(), local);
         int cell = std::clamp(int(c - s.integral.begin()) - 1, 0, 127);
-        double a = s.begin + (s.end - s.begin) * cell / 128, b = s.begin + (s.end - s.begin) * (cell + 1) / 128;
+        double a = s.begin + (s.end - s.begin) * cell / 128,
+               b = s.begin + (s.end - s.begin) * (cell + 1) / 128;
         // Fixed bisection is deterministic even at cuts or extreme speed ratios.
         double left = a;
-        for (int i = 0; i < 34; i++) {
+        for (int i = 0; i < 34; i++)
+        {
             double mid = (a + b) * .5;
             double value = s.integral[cell] + Integrate(s, left, mid);
             if (value < local)
@@ -147,17 +180,22 @@ class SpeedMap {
         return (a + b) * .5;
     }
 };
-inline std::vector<SpeedPoint> SpeedPoints(const CameraTrack &track) {
+
+inline std::vector<SpeedPoint> SpeedPoints(const CameraTrack &track)
+{
     std::vector<SpeedPoint> points;
     for (const auto &key : track.keys)
         if (key.speedOverride)
             points.push_back({key.seconds, key.playbackSpeed, key.speedCurve});
     return points;
 }
+
 inline void ConfigureSpeed(std::shared_ptr<const SpeedMap> &map, const CameraTrack &track, double duration,
-                           double base, bool enabled) {
+                           double base, bool enabled)
+{
     auto points = enabled ? SpeedPoints(track) : std::vector<SpeedPoint>{};
-    if (points.empty()) {
+    if (points.empty())
+    {
         map.reset();
         return;
     }

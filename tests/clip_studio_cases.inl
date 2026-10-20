@@ -1,5 +1,6 @@
 // Rebuild old-format fixtures without passing new fields to the legacy reader.
-std::string LegacyProjectBytes(const suite_clip::Project &p, int version) {
+std::string LegacyProjectBytes(const suite_clip::Project &p, int version)
+{
     using namespace suite_clip;
     auto bytes = EncodeProject(p);
     auto last = bytes.rfind('\n', bytes.size() - 2);
@@ -7,18 +8,22 @@ std::string LegacyProjectBytes(const suite_clip::Project &p, int version) {
     auto flagsStart = body.find('\n', body.find('\n', body.find('\n') + 1) + 1) + 1;
     auto flagsEnd = body.find('\n', flagsStart);
     auto flags = body.substr(flagsStart, flagsEnd - flagsStart);
-    for (int count = version < 4 ? 2 : version < 5 ? 1 : 0; count > 0; count--) {
+    for (int count = version < 4 ? 2 : version < 5 ? 1 : 0; count > 0; count--)
+    {
         auto lastFlag = flags.find_last_not_of(' ');
         auto flagBegin = flags.find_last_of(' ', lastFlag);
         flags.erase(flagBegin + 1);
     }
     body.replace(flagsStart, flagsEnd - flagsStart, flags);
     auto exportStart = body.find('\n', flagsStart) + 1;
-    auto audioStart=body.find('\n',exportStart)+1;
-    if(version<7)body.erase(audioStart,body.find('\n',audioStart)-audioStart+1);
-    if(version<6)body.erase(exportStart,body.find('\n',exportStart)-exportStart+1);
+    auto audioStart = body.find('\n', exportStart) + 1;
+    if (version < 7)
+        body.erase(audioStart, body.find('\n', audioStart) - audioStart + 1);
+    if (version < 6)
+        body.erase(exportStart, body.find('\n', exportStart) - exportStart + 1);
 
-    for (auto it = p.content.track.keys.rbegin(); it != p.content.track.keys.rend(); ++it) {
+    for (auto it = p.content.track.keys.rbegin(); it != p.content.track.keys.rend(); ++it)
+    {
         // The simpler row scan below matches each quoted key name and exact pose prefix.
         std::ostringstream row;
         row.imbue(std::locale::classic());
@@ -40,7 +45,9 @@ std::string LegacyProjectBytes(const suite_clip::Project &p, int version) {
     body.replace(7, 1, std::to_string(version));
     return body + std::to_string(ProjectChecksum(body)) + "\n";
 }
-void Workshop751Cases(const std::string &output) {
+
+void Workshop751Cases(const std::string &output)
+{
     using namespace suite_clip;
     auto saved = data;
     auto &io = ImGui::GetIO();
@@ -74,7 +81,8 @@ void Workshop751Cases(const std::string &output) {
     auto motion = std::make_shared<practice::ReplayMotion>();
     motion->id = 751;
     motion->seconds = motion->deviceThrough = 12;
-    for (int i = 0; i <= 720; i++) {
+    for (int i = 0; i <= 720; i++)
+    {
         double t = i / 60.;
         practice::ReplayViewFrame v;
         v.seconds = t;
@@ -87,7 +95,8 @@ void Workshop751Cases(const std::string &output) {
         f.frame = i;
         f.tick = unsigned(t * 50);
         f.flags = 256;
-        if (i < 300 || i % 36 < 16) {
+        if (i < 300 || i % 36 < 16)
+        {
             f.Key('W');
             f.Key(160);
             f.state |= 4;
@@ -96,11 +105,13 @@ void Workshop751Cases(const std::string &output) {
             f.Key('A');
         else if (i % 60 > 40)
             f.Key('D');
-        if (i % 120 >= 70 && i % 120 < 100) {
+        if (i % 120 >= 70 && i % 120 < 100)
+        {
             f.Key('R');
             f.state |= 8;
         }
-        if (i % 90 > 60) {
+        if (i % 90 > 60)
+        {
             f.Key(162);
             f.state |= 512;
         }
@@ -109,7 +120,8 @@ void Workshop751Cases(const std::string &output) {
         f.lookX = std::sin(t * 8) * 4;
         f.lookY = std::cos(t * 6) * 2;
         motion->devices.push_back(f);
-        if (i == 0 || f.state != motion->devices[i - 1].state) {
+        if (i == 0 || f.state != motion->devices[i - 1].state)
+        {
             practice::ReplayInputEvent e;
             e.seconds = t;
             e.frame = i;
@@ -124,7 +136,8 @@ void Workshop751Cases(const std::string &output) {
     previewAt = 2;
     // Rapid mode changes must use the canonical pose and keep the clock running.
     playPreview = true;
-    for (int n = 0; n < 50; n++) {
+    for (int n = 0; n < 50; n++)
+    {
         double at = 2 + n * .1;
         previewAt = at;
         auto expected = CameraAt(options, content, at);
@@ -154,7 +167,8 @@ void Workshop751Cases(const std::string &output) {
     legacySettings.replace(versionAt, 10, "version=17");
     assert(TrainerPreferences::Decode(legacySettings).input.states);
     playPreview = false;
-    for (int n = 0; n < 3; n++) {
+    for (int n = 0; n < 3; n++)
+    {
         previewAt = 1 + n * 4;
         SaveKey(false);
         assert(options.camera == 3 && content.track.keys.back().mode == 1);
@@ -192,7 +206,8 @@ void Workshop751Cases(const std::string &output) {
     assert(migrated.content.input.states && migrated.content.input.events &&
            migrated.content.track.keys.size() == 3);
     assert(EncodeProject(migrated).rfind("ISCLIP 7", 0) == 0);
-    for (int version : {2, 3}) {
+    for (int version : {2, 3})
+    {
         auto previous = DecodeProject(LegacyProjectBytes(project, version), 751, 12, map->hash);
         assert(previous.content.track.keys.size() == 3 && !previous.content.track.keys[0].speedOverride &&
                !previous.options.simplified);
@@ -230,10 +245,12 @@ void Workshop751Cases(const std::string &output) {
     modern.options.quality = 2;
     modern.options.preset = 4;
     modern.options.speedKeys = false;
-    modern.options.audio=true;modern.options.audioVolume=.65f;
-    auto oldV6=DecodeProject(LegacyProjectBytes(modern,6),751,12,map->hash);assert(!oldV6.options.audio&&oldV6.options.audioVolume==1);
+    modern.options.audio = true;
+    modern.options.audioVolume = .65f;
+    auto oldV6 = DecodeProject(LegacyProjectBytes(modern, 6), 751, 12, map->hash);
+    assert(!oldV6.options.audio && oldV6.options.audioVolume == 1);
     auto exported = DecodeProject(EncodeProject(modern), 751, 12, map->hash);
-    assert(exported.options.audio&&exported.options.audioVolume==.65f);
+    assert(exported.options.audio && exported.options.audioVolume == .65f);
     assert(exported.options.maxFileBytes == 8000000 && exported.options.quality == 2 &&
            !exported.options.speedKeys && !exported.options.timing &&
            exported.content.track.keys[0].speedOverride);
@@ -246,13 +263,15 @@ void Workshop751Cases(const std::string &output) {
     options.scene3d = true;
     EditKey(0);
     Changed();
-    for (int frame = 0; frame < 4; frame++) {
+    for (int frame = 0; frame < 4; frame++)
+    {
         ImGui::NewFrame();
         suite_ui::BeginFrame(true, false);
         Render();
         ImGui::Render();
         CheckHudRegions();
-        for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++) {
+        for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++)
+        {
             auto *bar = GImGui->TabBars.TryGetMapData(j);
             if (bar && bar->Tabs.Size == 3 &&
                 std::string(ImGui::TabBarGetTabName(bar, &bar->Tabs[0])) == "Camera")
@@ -277,7 +296,8 @@ void Workshop751Cases(const std::string &output) {
         OutputPanel(changed);
         ImGui::End();
         ImGui::Render();
-        if (changed) Changed();
+        if (changed)
+            Changed();
     };
     outputFrame();
     auto *timingPanel = ImGui::FindWindowByName("Export timing action QA");
@@ -286,10 +306,11 @@ void Workshop751Cases(const std::string &output) {
     outputFrame();
     outputFrame();
     assert(options.rate == 1 && !options.speedKeys && !options.timing &&
-           content.track.keys.size() == savedTrack.keys.size() &&
-           content.track.keys[1].speedOverride && content.track.keys[1].playbackSpeed == .1);
+           content.track.keys.size() == savedTrack.keys.size() && content.track.keys[1].speedOverride &&
+           content.track.keys[1].playbackSpeed == .1);
     options = savedOutput;
-    std::cout << "7.7.0 actual Output panel: Normal speed ignores speed keys, preserves camera/layers and recomputes preview timing: PASS\n";
+    std::cout
+        << "7.7.0 actual Output panel: Normal speed ignores speed keys, preserves camera/layers and recomputes preview timing: PASS\n";
     // A long held key must not glow forever; only the real release gets an afterglow.
     practice::ReplayMotion held;
     suite_input::Frame down;
@@ -343,15 +364,19 @@ void Workshop751Cases(const std::string &output) {
     editLayout = false;
     selectedBlock = Keyboard;
     // Force the new studio to its normal desktop size after the previous small-screen regression.
-    if (auto *w = ImGui::FindWindowByName(WindowTitle().c_str())) {
+    if (auto *w = ImGui::FindWindowByName(WindowTitle().c_str()))
+    {
         w->Pos = {12, 12};
         w->SizeFull = {1896, 1056};
     }
-    for (int tab = 0; tab < 3; tab++) {
+    for (int tab = 0; tab < 3; tab++)
+    {
         options.scene3d = tab == 0;
         options.format = 2;
-        if (tab == 2) ApplyExportPreset(options, 1);
-        for (int frame = 0; frame < 4; frame++) {
+        if (tab == 2)
+            ApplyExportPreset(options, 1);
+        for (int frame = 0; frame < 4; frame++)
+        {
             ImGui::NewFrame();
             suite_ui::BeginFrame(true, false);
             Render();
@@ -361,7 +386,8 @@ void Workshop751Cases(const std::string &output) {
             ImGui::Render();
             CheckHudRegions();
             if (frame == 0)
-                for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++) {
+                for (int j = 0; j < GImGui->TabBars.GetMapSize(); j++)
+                {
                     auto *bar = GImGui->TabBars.TryGetMapData(j);
                     if (bar && bar->Tabs.Size == 3 &&
                         std::string(ImGui::TabBarGetTabName(bar, &bar->Tabs[0])) == "Camera")
@@ -370,9 +396,11 @@ void Workshop751Cases(const std::string &output) {
         }
         if (!output.empty())
             Dump(output + "/751-studio-" + std::to_string(tab) + ".draw");
-        if (tab == 2 && !output.empty()) Dump(output + "/770-best-quality.draw");
+        if (tab == 2 && !output.empty())
+            Dump(output + "/770-best-quality.draw");
     }
-    if (!output.empty()) {
+    if (!output.empty())
+    {
         std::filesystem::create_directories(std::filesystem::path(output) / "input-animation");
         suite_input::Preferences p;
         p.controller = false;
@@ -380,7 +408,8 @@ void Workshop751Cases(const std::string &output) {
         p.background = true;
         p.opacity = .85;
         p.scale = 1;
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 60; i++)
+        {
             double t = 5 + i / 20.;
             auto input = suite_input::ReplayFrame(*motion, t);
             auto changes = suite_input::ReplayChanges(*motion, t);

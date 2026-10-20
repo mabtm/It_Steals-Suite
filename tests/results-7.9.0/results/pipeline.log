@@ -1,1 +1,0 @@
-Production frame window: 1/2/3/4/60/10000 frames, random out-of-order completion, exact 120 FPS source timestamps, bounded backpressure, slot reuse, stale-frame rejection and cancellation/reset: PASS

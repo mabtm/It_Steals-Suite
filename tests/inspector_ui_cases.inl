@@ -1,66 +1,480 @@
-void InspectorUICases(const std::string& output){
-    auto savedData=data;auto& io=ImGui::GetIO();auto savedSize=io.DisplaySize;bool savedSpeed=g_speedrunMode,savedPractice=g_practiceMode;
-    data.pid=1234;data.currentSceneIndex=5;data.sceneEpoch=711;data.replay3dState=0;data.timerState=0;data.seedKnown=1;data.seedKind=2;data.runSeed=-674714359;g_session=1;g_pShared=&data;g_speedrunMode=g_practiceMode=false;g_allOverlayEnabled=g_overlayVisible=true;g_compactMode=false;g_runReviewOpen=false;suite_run::presentation={};
-    auto folder=std::filesystem::path(output).parent_path()/"managed-data";
-    auto read=[&](const char* name){std::ifstream f(folder/name,std::ios::binary);assert(f);return std::vector<uint8_t>(std::istreambuf_iterator<char>(f),{});};
-    auto cat=read("inspector-catalog.bin"),detail=read("inspector-detail.bin");
-    inspector::Close();inspector_ui::Open();assert(inspector::open&&!inspector::pending&&lastInteractiveRequest&&suite_ui::navigation.Is(suite_ui::Page::Inspector));
-    inspector::worker.Submit(cat,true);inspector::worker.Submit(detail,false);
-    auto until=[&](auto f){auto end=std::chrono::steady_clock::now()+std::chrono::seconds(5);while(!f()){assert(std::chrono::steady_clock::now()<end);std::this_thread::sleep_for(std::chrono::milliseconds(1));}};
-    until([&]{return inspector::worker.Get()->detail&&inspector::worker.Get()->catalog;});
-    auto render=[&]{ImGui::NewFrame();suite_ui::BeginFrame(true,false);RenderMainWindow(0,0,0,0,0,0,0,0,0,0,0,false,false,"Hide & Seek",false,0);inspector_ui::RenderOverlay();inspector_ui::FinishFrame();ImGui::Render();assert(ImGui::GetDrawData()->TotalVtxCount>0);CheckHudRegions();if(inspector::pending&&inspector::pending->action==0)inspector::pending.reset();};
-    auto dump=[&](const std::string& name){if(!output.empty())Dump(output+"/7115-"+name+".draw");};
-    for(auto size:{ImVec2(1920,1080),ImVec2(480,360)})for(float dpi:{1.f,1.5f}){io.DisplaySize=size;ApplyTheme(dpi);io.Fonts->Build();io.Fonts->SetTexID(1);g_resetLayout=true;inspector_ui::expanded=false;inspector_ui::resetDetails=true;
-        inspector::worker.Submit(detail,false);until([&]{return inspector::Age(*inspector::worker.Get())<.2;});for(int i=0;i<3;i++){render();}assert(!(inspector::options&16));auto* main=ImGui::FindWindowByName("It Steals | Practice Suite");assert(main&&main->Size.x<io.DisplaySize.x&&main->Size.y<io.DisplaySize.y);dump("summary-"+std::to_string(int(size.x))+"-dpi-"+std::to_string(int(dpi*100)));g_resetLayout=false;
-        inspector_ui::expanded=true;inspector_ui::resetDetails=true;
-        for(int tab=0;tab<5;tab++){inspector_ui::tabRequest=tab;for(int i=0;i<4;i++)render();assert(inspector_ui::tabRequest==-1&&inspector::options&16);dump("details-"+std::to_string(tab)+"-"+std::to_string(int(size.x))+"-dpi-"+std::to_string(int(dpi*100)));}
-    }
-    io.DisplaySize={1920,1080};ApplyTheme(1);io.Fonts->Build();io.Fonts->SetTexID(1);g_resetLayout=true;inspector::worker.Submit(detail,false);until([&]{return inspector::Age(*inspector::worker.Get())<.2;});inspector_ui::tabRequest=3;for(int i=0;i<4;i++)render();g_resetLayout=false;
-    auto* body=ImGui::FindWindowByName("It Steals | Practice Suite/Workspace_89A40F41/Inspector workspace_8C1FB8F3");(void)body;
+void InspectorUICases(const std::string &output)
+{
+    auto savedData = data;
+    auto &io = ImGui::GetIO();
+    auto savedSize = io.DisplaySize;
+    bool savedSpeed = g_speedrunMode, savedPractice = g_practiceMode;
+    data.pid = 1234;
+    data.currentSceneIndex = 5;
+    data.sceneEpoch = 711;
+    data.replay3dState = 0;
+    data.timerState = 0;
+    data.seedKnown = 1;
+    data.seedKind = 2;
+    data.runSeed = -674714359;
+    g_session = 1;
+    g_pShared = &data;
+    g_speedrunMode = g_practiceMode = false;
+    g_allOverlayEnabled = g_overlayVisible = true;
+    g_compactMode = false;
+    g_runReviewOpen = false;
+    suite_run::presentation = {};
+    auto folder = std::filesystem::path(output).parent_path() / "managed-data";
+    auto read = [&](const char *name) {
+        std::ifstream f(folder / name, std::ios::binary);
+        assert(f);
+        return std::vector<uint8_t>(std::istreambuf_iterator<char>(f), {});
+    };
+    auto cat = read("inspector-catalog.bin"), detail = read("inspector-detail.bin");
+    inspector::Close();
+    inspector_ui::Open();
+    assert(inspector::open && !inspector::pending && lastInteractiveRequest &&
+           suite_ui::navigation.Is(suite_ui::Page::Inspector));
+    inspector::worker.Submit(cat, true);
+    inspector::worker.Submit(detail, false);
+    auto until = [&](auto f) {
+        auto end = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (!f())
+        {
+            assert(std::chrono::steady_clock::now() < end);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    };
+    until([&] { return inspector::worker.Get()->detail && inspector::worker.Get()->catalog; });
+    auto render = [&] {
+        ImGui::NewFrame();
+        suite_ui::BeginFrame(true, false);
+        RenderMainWindow("Hide & Seek", 0);
+        inspector_ui::RenderOverlay();
+        inspector_ui::FinishFrame();
+        ImGui::Render();
+        assert(ImGui::GetDrawData()->TotalVtxCount > 0);
+        CheckHudRegions();
+        if (inspector::pending && inspector::pending->action == 0)
+            inspector::pending.reset();
+    };
+    auto dump = [&](const std::string &name) {
+        if (!output.empty())
+            Dump(output + "/7115-" + name + ".draw");
+    };
+    for (auto size : {ImVec2(1920, 1080), ImVec2(480, 360)})
+        for (float dpi : {1.f, 1.5f})
+        {
+            io.DisplaySize = size;
+            ApplyTheme(dpi);
+            io.Fonts->Build();
+            io.Fonts->SetTexID(1);
+            g_resetLayout = true;
+            inspector_ui::expanded = false;
+            inspector_ui::resetDetails = true;
+            inspector::worker.Submit(detail, false);
+            until([&] { return inspector::Age(*inspector::worker.Get()) < .2; });
+            for (int i = 0; i < 3; i++)
+            {
+                render();
+            }
+            assert(!(inspector::options & 16));
+            auto *main = ImGui::FindWindowByName("It Steals | Practice Suite");
+            assert(main && main->Size.x < io.DisplaySize.x && main->Size.y < io.DisplaySize.y);
+            dump("summary-" + std::to_string(int(size.x)) + "-dpi-" + std::to_string(int(dpi * 100)));
+            g_resetLayout = false;
+            inspector_ui::expanded = true;
+            inspector_ui::resetDetails = true;
+            for (int tab = 0; tab < 5; tab++)
+            {
+                inspector_ui::tabRequest = tab;
+                for (int i = 0; i < 4; i++)
+                    render();
+                assert(inspector_ui::tabRequest == -1 && inspector::options & 16);
+                dump("details-" + std::to_string(tab) + "-" + std::to_string(int(size.x)) + "-dpi-" +
+                     std::to_string(int(dpi * 100)));
+            }
+        }
+    io.DisplaySize = {1920, 1080};
+    ApplyTheme(1);
+    io.Fonts->Build();
+    io.Fonts->SetTexID(1);
+    g_resetLayout = true;
+    inspector::worker.Submit(detail, false);
+    until([&] { return inspector::Age(*inspector::worker.Get()) < .2; });
+    inspector_ui::tabRequest = 3;
+    for (int i = 0; i < 4; i++)
+        render();
+    g_resetLayout = false;
+    auto *body =
+        ImGui::FindWindowByName("It Steals | Practice Suite/Workspace_89A40F41/Inspector workspace_8C1FB8F3");
+    (void)body;
     // Find the real production tab ID; activate its baseline button.
-    ImGuiID baselineId=0;for(auto* window:GImGui->Windows)if(window->Active&&std::string(window->Name).find("Inspector workspace")!=std::string::npos&&std::string(window->Name).find("Object summary")==std::string::npos){auto tabs=ImHashStr("Inspector tabs",0,window->ID);auto tab=ImHashStr("Compare",0,tabs);baselineId=ImHashStr("Capture baseline",0,tab);}
-    assert(baselineId);ImGui::ActivateItemByID(baselineId);render();assert(inspector::baseline&&inspector::baseline->selected==101);
-    inspector::worker.Submit(read("inspector-changed.bin"),false);until([&]{return inspector::worker.Get()->detail->header.revision==2;});render();assert(inspector_ui::differences.size()==1);dump("comparison");
+    ImGuiID baselineId = 0;
+    for (auto *window : GImGui->Windows)
+        if (window->Active && std::string(window->Name).find("Inspector workspace") != std::string::npos &&
+            std::string(window->Name).find("Object summary") == std::string::npos)
+        {
+            auto tabs = ImHashStr("Inspector tabs", 0, window->ID);
+            auto tab = ImHashStr("Compare", 0, tabs);
+            baselineId = ImHashStr("Capture baseline", 0, tab);
+        }
+    assert(baselineId);
+    ImGui::ActivateItemByID(baselineId);
+    render();
+    assert(inspector::baseline && inspector::baseline->selected == 101);
+    inspector::worker.Submit(read("inspector-changed.bin"), false);
+    until([&] { return inspector::worker.Get()->detail->header.revision == 2; });
+    render();
+    assert(inspector_ui::differences.size() == 1);
+    dump("comparison");
     // Picker is directly usable without the main menu. Native input supplies the
     // event-time click at A even though the latest cursor has already moved to B.
-    g_overlayVisible=false;inspector::pending.reset();inspector_ui::StartPick(3);assert(inspector::picking&&!g_overlayVisible&&lastInteractiveRequest&&!(inspector::options&16));
-    inspector::pointerProvider=[](inspector::Pointer& p){p=*inspector::NormalizePointer(960,540,0,0,1920,1080);return true;};
-    for(int i=0;i<3;i++){render();}inspector::nativeClick=*inspector::NormalizePointer(1440,270,0,0,1920,1080);render();assert(inspector::clickPointer&&inspector::pointer.x==.75f&&inspector::pointer.y==.75f);auto clickSerial=inspector::pointer.serial;
-    auto hover=read("inspector-hover.bin");auto seal=[&](auto& b){auto hash=inspector::Hash(b,b.size()-8);std::memcpy(b.data()+b.size()-8,&hash,8);};std::memcpy(hover.data()+52,&clickSerial,4);seal(hover);inspector::worker.SubmitHover(hover);until([&]{return inspector::worker.Get()->hover&&inspector::worker.Get()->hover->serial==clickSerial;});
-    render();assert(inspector::pending&&inspector::pending->action==3&&inspector::pending->object==101&&inspector::pending->key==clickSerial&&inspector::pending->x==.75f&&inspector::pending->y==.75f);dump("picker");
-    auto picked=detail;auto commit=inspector::pending->serial;std::memcpy(picked.data()+53,&commit,4);int action=3;std::memcpy(picked.data()+57,&action,4);seal(picked);inspector::worker.Submit(picked,false);until([&]{return inspector::worker.Get()->detail->ack==commit;});inspector::pending.reset();render();render();assert(!inspector::picking&&inspector::dock&&inspector::dockInteractive&&!g_overlayVisible&&lastInteractiveRequest);dump("object-card");
-    auto* card=ImGui::FindWindowByName("Inspector / object");assert(card&&card->Size.x<io.DisplaySize.x*.5f&&card->Size.y<io.DisplaySize.y*.5f);
-    auto fullbrightId=card->GetID("Fullbright");bool before=g_brightnessOn;ImGui::ActivateItemByID(fullbrightId);render();assert(g_brightnessOn!=before);g_brightnessOn=before;
-    auto savedInspectorStyle=inspector_fx::preferences;inspector_fx::preferences={};ImGui::ActivateItemByID(card->GetID("Style"));render();render();assert(!GImGui->OpenPopupStack.empty());auto* style=GImGui->OpenPopupStack.back().Window;assert(style);dump("style-popup");
-    inspector_fx::feedback.Reset();ImGui::ActivateItemByID(style->GetID("Inspector sounds"));render();assert(!inspector_fx::preferences.sounds);inspector_ui::Sound(suite_ui::Tone::InspectorSelect);assert(inspector_fx::feedback.Take(suite_ui::LifecycleNow(),true).tone==suite_ui::Tone::None);
-    ImGui::ActivateItemByID(style->GetID("Selection effects"));render();assert(!inspector_fx::preferences.effects&&!inspector_ui::Motion());io.AddKeyEvent(ImGuiKey_Escape,true);render();io.AddKeyEvent(ImGuiKey_Escape,false);render();inspector_fx::preferences=savedInspectorStyle;
-    ImGui::ActivateItemByID(card->GetID("Details"));for(int i=0;i<5;i++){render();}assert(g_overlayVisible&&!inspector::dockInteractive&&inspector_ui::expanded);
+    g_overlayVisible = false;
+    inspector::pending.reset();
+    inspector_ui::StartPick(3);
+    assert(inspector::picking && !g_overlayVisible && lastInteractiveRequest && !(inspector::options & 16));
+    inspector::pointerProvider = [](inspector::Pointer &p) {
+        p = *inspector::NormalizePointer(960, 540, 0, 0, 1920, 1080);
+        return true;
+    };
+    for (int i = 0; i < 3; i++)
+    {
+        render();
+    }
+    inspector::nativeClick = *inspector::NormalizePointer(1440, 270, 0, 0, 1920, 1080);
+    render();
+    assert(inspector::clickPointer && inspector::pointer.x == .75f && inspector::pointer.y == .75f);
+    auto clickSerial = inspector::pointer.serial;
+    auto hover = read("inspector-hover.bin");
+    auto seal = [&](auto &b) {
+        auto hash = inspector::Hash(b, b.size() - 8);
+        std::memcpy(b.data() + b.size() - 8, &hash, 8);
+    };
+    std::memcpy(hover.data() + 52, &clickSerial, 4);
+    seal(hover);
+    inspector::worker.SubmitHover(hover);
+    until([&] {
+        return inspector::worker.Get()->hover && inspector::worker.Get()->hover->serial == clickSerial;
+    });
+    render();
+    assert(inspector::pending && inspector::pending->action == 3 && inspector::pending->object == 101 &&
+           inspector::pending->key == clickSerial && inspector::pending->x == .75f &&
+           inspector::pending->y == .75f);
+    dump("picker");
+    auto picked = detail;
+    auto commit = inspector::pending->serial;
+    std::memcpy(picked.data() + 53, &commit, 4);
+    int action = 3;
+    std::memcpy(picked.data() + 57, &action, 4);
+    seal(picked);
+    inspector::worker.Submit(picked, false);
+    until([&] { return inspector::worker.Get()->detail->ack == commit; });
+    inspector::pending.reset();
+    render();
+    render();
+    assert(!inspector::picking && inspector::dock && inspector::dockInteractive && !g_overlayVisible &&
+           lastInteractiveRequest);
+    dump("object-card");
+    auto *card = ImGui::FindWindowByName("Inspector / object");
+    assert(card && card->Size.x < io.DisplaySize.x * .5f && card->Size.y < io.DisplaySize.y * .5f);
+    auto fullbrightId = card->GetID("Fullbright");
+    bool before = g_brightnessOn;
+    ImGui::ActivateItemByID(fullbrightId);
+    render();
+    assert(g_brightnessOn != before);
+    g_brightnessOn = before;
+    auto savedInspectorStyle = inspector_fx::preferences;
+    inspector_fx::preferences = {};
+    ImGui::ActivateItemByID(card->GetID("Style"));
+    render();
+    render();
+    assert(!GImGui->OpenPopupStack.empty());
+    auto *style = GImGui->OpenPopupStack.back().Window;
+    assert(style);
+    dump("style-popup");
+    inspector_fx::feedback.Reset();
+    ImGui::ActivateItemByID(style->GetID("Inspector sounds"));
+    render();
+    assert(!inspector_fx::preferences.sounds);
+    inspector_ui::Sound(suite_ui::Tone::InspectorSelect);
+    assert(inspector_fx::feedback.Take(suite_ui::LifecycleNow(), true).tone == suite_ui::Tone::None);
+    ImGui::ActivateItemByID(style->GetID("Selection effects"));
+    render();
+    assert(!inspector_fx::preferences.effects && !inspector_ui::Motion());
+    io.AddKeyEvent(ImGuiKey_Escape, true);
+    render();
+    io.AddKeyEvent(ImGuiKey_Escape, false);
+    render();
+    inspector_fx::preferences = savedInspectorStyle;
+    ImGui::ActivateItemByID(card->GetID("Details"));
+    for (int i = 0; i < 5; i++)
+    {
+        render();
+    }
+    assert(g_overlayVisible && !inspector::dockInteractive && inspector_ui::expanded);
     // Exercise real Object/Transform headers with ImGui's conflict checker left on.
-    assert(io.ConfigDebugHighlightIdConflicts);auto uiWindow=[&]()->ImGuiWindow*{for(auto* window:GImGui->Windows)if(window->Active&&std::string(window->Name).find("Inspector workspace")!=std::string::npos&&std::string(window->Name).find("Object summary")==std::string::npos)return window;return nullptr;};
-    for(const char* group:{"Object","Transform"}){auto* window=uiWindow();assert(window);auto tabs=ImHashStr("Inspector tabs",0,window->ID);auto properties=ImHashStr("Properties",0,tabs);auto scope=ImHashStr(group,0,properties);auto tableId=ImHashStr("##Fields",0,scope);auto* table=GImGui->Tables.GetByKey(tableId);assert(table);ImGui::SetScrollFromPosY(window,table->OuterRect.Min.y-window->Pos.y-ImGui::GetFrameHeight()*.5f,.5f);render();render();table=GImGui->Tables.GetByKey(tableId);ImVec2 at(table->OuterRect.Min.x+55,table->OuterRect.Min.y-ImGui::GetStyle().ItemSpacing.y-ImGui::GetFrameHeight()*.5f);io.AddMousePosEvent(at.x,at.y);render();render();render();if(GImGui->HoveredId!=ImHashStr(group,0,scope))std::cerr<<"Header "<<group<<" at "<<at.x<<","<<at.y<<" hovered="<<GImGui->HoveredId<<" expected="<<ImHashStr(group,0,scope)<<" clip="<<window->ClipRect.Min.y<<","<<window->ClipRect.Max.y<<" scroll="<<window->Scroll.y<<std::endl;assert(GImGui->HoveredId==ImHashStr(group,0,scope));assert(GImGui->HoveredIdPreviousFrameItemCount<=1&&GImGui->DebugDrawIdConflicts==0);}
-    dump("details-no-id-conflict");inspector::dock=inspector::dockInteractive=true;g_overlayVisible=false;
-    inspector::pinned=true;inspector_ui::ReturnToGame();render();assert(!lastInteractiveRequest&&!inspector::dockInteractive&&inspector::dock&&(card->Flags&ImGuiWindowFlags_NoInputs)==ImGuiWindowFlags_NoInputs);dump("pinned-card");
+    assert(io.ConfigDebugHighlightIdConflicts);
+    auto uiWindow = [&]() -> ImGuiWindow * {
+        for (auto *window : GImGui->Windows)
+            if (window->Active &&
+                std::string(window->Name).find("Inspector workspace") != std::string::npos &&
+                std::string(window->Name).find("Object summary") == std::string::npos)
+                return window;
+        return nullptr;
+    };
+    for (const char *group : {"Object", "Transform"})
+    {
+        auto *window = uiWindow();
+        assert(window);
+        auto tabs = ImHashStr("Inspector tabs", 0, window->ID);
+        auto properties = ImHashStr("Properties", 0, tabs);
+        auto scope = ImHashStr(group, 0, properties);
+        auto tableId = ImHashStr("##Fields", 0, scope);
+        auto *table = GImGui->Tables.GetByKey(tableId);
+        assert(table);
+        ImGui::SetScrollFromPosY(window,
+                                 table->OuterRect.Min.y - window->Pos.y - ImGui::GetFrameHeight() * .5f, .5f);
+        render();
+        render();
+        table = GImGui->Tables.GetByKey(tableId);
+        ImVec2 at(table->OuterRect.Min.x + 55,
+                  table->OuterRect.Min.y - ImGui::GetStyle().ItemSpacing.y - ImGui::GetFrameHeight() * .5f);
+        io.AddMousePosEvent(at.x, at.y);
+        render();
+        render();
+        render();
+        if (GImGui->HoveredId != ImHashStr(group, 0, scope))
+            std::cerr << "Header " << group << " at " << at.x << "," << at.y
+                      << " hovered=" << GImGui->HoveredId << " expected=" << ImHashStr(group, 0, scope)
+                      << " clip=" << window->ClipRect.Min.y << "," << window->ClipRect.Max.y
+                      << " scroll=" << window->Scroll.y << std::endl;
+        assert(GImGui->HoveredId == ImHashStr(group, 0, scope));
+        assert(GImGui->HoveredIdPreviousFrameItemCount <= 1 && GImGui->DebugDrawIdConflicts == 0);
+    }
+    dump("details-no-id-conflict");
+    inspector::dock = inspector::dockInteractive = true;
+    g_overlayVisible = false;
+    inspector::pinned = true;
+    inspector_ui::ReturnToGame();
+    render();
+    assert(!lastInteractiveRequest && !inspector::dockInteractive && inspector::dock &&
+           (card->Flags & ImGuiWindowFlags_NoInputs) == ImGuiWindowFlags_NoInputs);
+    dump("pinned-card");
     // Empty/failed/stale targets leave the picker usable; never select a neighbor.
-    inspector::pending.reset();inspector_ui::StartPick(3);for(int i=0;i<3;i++){render();}inspector::nativeClick=*inspector::NormalizePointer(1440,270,0,0,1920,1080);render();clickSerial=inspector::pointer.serial;auto miss=hover;std::memcpy(miss.data()+52,&clickSerial,4);int zero=0;std::memcpy(miss.data()+57,&zero,4);std::memcpy(miss.data()+61,&zero,4);miss[77]=0;seal(miss);inspector::worker.SubmitHover(miss);until([&]{return inspector::worker.Get()->hover->serial==clickSerial;});render();assert(inspector::picking&&!inspector::clickPointer&&!inspector::pending);
-    inspector_ui::EndPick();assert(!inspector::picking&&!g_overlayVisible&&!inspector::dockInteractive);
-    inspector::pending.reset();inspector_ui::StartPick(3);inspector::pointerProvider=[](inspector::Pointer& p){p=*inspector::NormalizePointer(1440,270,0,0,1920,1080);return true;};for(int i=0;i<3;i++){render();}
-    auto layerFixture=read("inspector-hover-layers.bin");auto publishLayers=[&](int object){auto bytes=object==202?read("inspector-hover-layers-sprite.bin"):layerFixture;auto token=inspector::pointer.serial;std::memcpy(bytes.data()+52,&token,4);std::memcpy(bytes.data()+57,&object,4);int kind=object==202?4:object==201?3:1;float distance=object==202?3.1f:object==201?3.18f:3.2f;std::memcpy(bytes.data()+61,&kind,4);std::memcpy(bytes.data()+73,&distance,4);seal(bytes);inspector::worker.SubmitHover(bytes);until([&]{auto h=inspector::worker.Get()->hover;return h&&h->serial==token&&h->object==object;});};
-    publishLayers(201);render();io.AddMouseWheelEvent(0,1);render();assert(inspector::pointer.preferred==202);publishLayers(202);render();
-    io.AddKeyEvent(ImGuiKey_Tab,true);render();io.AddKeyEvent(ImGuiKey_Tab,false);render();assert(inspector_ui::choicesOpen&&inspector_ui::choicePointer);auto frozen=inspector::pointer;inspector::pointerProvider=[](inspector::Pointer& p){p=*inspector::NormalizePointer(100,180,0,0,1920,1080);return true;};render();assert(inspector::pointer.x==frozen.x&&inspector::pointer.y==frozen.y);dump("target-layers");
-    inspector_ui::PreferTarget(201);publishLayers(201);render();io.AddKeyEvent(ImGuiKey_Enter,true);render();io.AddKeyEvent(ImGuiKey_Enter,false);render();assert(inspector::clickPointer&&inspector::clickPointer->preferred==201);publishLayers(201);render();assert(inspector::pending&&inspector::pending->action==3&&inspector::pending->object==201&&inspector::pending->key==inspector::pointer.serial);inspector::pending.reset();inspector_ui::EndPick();
+    inspector::pending.reset();
+    inspector_ui::StartPick(3);
+    for (int i = 0; i < 3; i++)
+    {
+        render();
+    }
+    inspector::nativeClick = *inspector::NormalizePointer(1440, 270, 0, 0, 1920, 1080);
+    render();
+    clickSerial = inspector::pointer.serial;
+    auto miss = hover;
+    std::memcpy(miss.data() + 52, &clickSerial, 4);
+    int zero = 0;
+    std::memcpy(miss.data() + 57, &zero, 4);
+    std::memcpy(miss.data() + 61, &zero, 4);
+    miss[77] = 0;
+    seal(miss);
+    inspector::worker.SubmitHover(miss);
+    until([&] { return inspector::worker.Get()->hover->serial == clickSerial; });
+    render();
+    assert(inspector::picking && !inspector::clickPointer && !inspector::pending);
+    inspector_ui::EndPick();
+    assert(!inspector::picking && !g_overlayVisible && !inspector::dockInteractive);
+    inspector::pending.reset();
+    inspector_ui::StartPick(3);
+    inspector::pointerProvider = [](inspector::Pointer &p) {
+        p = *inspector::NormalizePointer(1440, 270, 0, 0, 1920, 1080);
+        return true;
+    };
+    for (int i = 0; i < 3; i++)
+    {
+        render();
+    }
+    auto layerFixture = read("inspector-hover-layers.bin");
+    auto publishLayers = [&](int object) {
+        auto bytes = object == 202 ? read("inspector-hover-layers-sprite.bin") : layerFixture;
+        auto token = inspector::pointer.serial;
+        std::memcpy(bytes.data() + 52, &token, 4);
+        std::memcpy(bytes.data() + 57, &object, 4);
+        int kind = object == 202 ? 4 : object == 201 ? 3 : 1;
+        float distance = object == 202 ? 3.1f : object == 201 ? 3.18f : 3.2f;
+        std::memcpy(bytes.data() + 61, &kind, 4);
+        std::memcpy(bytes.data() + 73, &distance, 4);
+        seal(bytes);
+        inspector::worker.SubmitHover(bytes);
+        until([&] {
+            auto h = inspector::worker.Get()->hover;
+            return h && h->serial == token && h->object == object;
+        });
+    };
+    publishLayers(201);
+    render();
+    io.AddMouseWheelEvent(0, 1);
+    render();
+    assert(inspector::pointer.preferred == 202);
+    publishLayers(202);
+    render();
+    io.AddKeyEvent(ImGuiKey_Tab, true);
+    render();
+    io.AddKeyEvent(ImGuiKey_Tab, false);
+    render();
+    assert(inspector_ui::choicesOpen && inspector_ui::choicePointer);
+    auto frozen = inspector::pointer;
+    inspector::pointerProvider = [](inspector::Pointer &p) {
+        p = *inspector::NormalizePointer(100, 180, 0, 0, 1920, 1080);
+        return true;
+    };
+    render();
+    assert(inspector::pointer.x == frozen.x && inspector::pointer.y == frozen.y);
+    dump("target-layers");
+    inspector_ui::PreferTarget(201);
+    publishLayers(201);
+    render();
+    io.AddKeyEvent(ImGuiKey_Enter, true);
+    render();
+    io.AddKeyEvent(ImGuiKey_Enter, false);
+    render();
+    assert(inspector::clickPointer && inspector::clickPointer->preferred == 201);
+    publishLayers(201);
+    render();
+    assert(inspector::pending && inspector::pending->action == 3 && inspector::pending->object == 201 &&
+           inspector::pending->key == inspector::pointer.serial);
+    inspector::pending.reset();
+    inspector_ui::EndPick();
 
-    inspector_ui::Open();inspector::pending.reset();inspector_ui::StartPick(7);for(int i=0;i<3;i++){render();}io.AddKeyEvent(ImGuiKey_Escape,true);render();io.AddKeyEvent(ImGuiKey_Escape,false);render();assert(!inspector::picking&&g_overlayVisible&&!inspector::clickPointer);
-    inspector::pending.reset();g_overlayVisible=g_compactMode=true;g_allOverlayEnabled=false;inspector_ui::StartPick(3);assert(inspector::picking&&g_allOverlayEnabled&&!g_overlayVisible);inspector_ui::EndPick();assert(g_overlayVisible&&g_compactMode&&!g_allOverlayEnabled&&!lastInteractiveRequest);g_allOverlayEnabled=true;g_compactMode=false;g_overlayVisible=true;
-    inspector::pointerProvider=nullptr;inspector::pending.reset();inspector_ui::expanded=true;inspector_ui::resetDetails=true;inspector_ui::tabRequest=0;for(int i=0;i<4;i++)render();
-    inspector::reportFolder=std::filesystem::path(output)/"inspector-local-reports";ImGuiID saveId=0;for(auto* window:GImGui->Windows)if(window->Active&&std::string(window->Name).find("Inspector workspace")!=std::string::npos&&std::string(window->Name).find("Object summary")==std::string::npos)saveId=window->GetID("Save diagnostic snapshot");assert(saveId);ImGui::ActivateItemByID(saveId);render();assert(!inspector::lastReport.empty()&&std::filesystem::is_regular_file(std::filesystem::path(inspector::lastReport)));
-    inspector::focusSerial=123;g_overlayVisible=true;render();assert(g_overlayVisible&&inspector::focusSerial==0);
-    inspector::worker.Submit(read("inspector-focus-failed.bin"),false);until([&]{return inspector::worker.Get()->detail->ackAction==5&&!inspector::worker.Get()->detail->ackSuccess;});inspector::focusSerial=12;render();assert(g_overlayVisible&&inspector::focusSerial==0);
-    inspector::worker.Submit(read("inspector-focus-ok.bin"),false);until([&]{return inspector::worker.Get()->detail->ackAction==5&&inspector::worker.Get()->detail->ackSuccess;});inspector::focusSerial=12;render();assert(!g_overlayVisible&&!lastInteractiveRequest&&inspector::focusSerial==0);
-    inspector_ui::Open();inspector::pending.reset();inspector_ui::expanded=false;inspector_ui::resetDetails=true;for(int i=0;i<3;i++){render();}
-    ImGuiID endId=0;for(auto* window:GImGui->Windows)if(window->Active&&std::string(window->Name).find("Inspector workspace")!=std::string::npos&&std::string(window->Name).find("Object summary")==std::string::npos)endId=window->GetID("End inspection");assert(endId);ImGui::ActivateItemByID(endId);render();assert(!inspector::open&&suite_ui::navigation.Is(suite_ui::Page::Cheats));render();assert(!inspector::open);inspector_ui::Open();
-    g_speedrunMode=true;g_practiceMode=false;assert(!inspector_ui::Allowed());inspector_ui::RenderOverlay();assert(!inspector::open&&!inspector::picking&&!inspector::baseline);g_practiceMode=true;assert(inspector_ui::Allowed());inspector_ui::Open();data.replay3dState=2;inspector_ui::RenderOverlay();assert(!inspector::open&&!inspector_ui::Allowed());
-    data.replay3dState=0;g_speedrunMode=g_practiceMode=false;inspector_ui::Open();inspector::pending.reset();
-    for(auto size:{ImVec2(480,360),ImVec2(1920,1080)}){io.DisplaySize=size;ApplyTheme(1.5f);io.Fonts->Build();io.Fonts->SetTexID(1);inspector::dock=inspector::dockInteractive=true;inspector::pinned=false;g_overlayVisible=false;for(int i=0;i<3;i++)render();auto* panel=ImGui::FindWindowByName("Inspector / object");assert(panel);ImGui::SetScrollY(panel,10000);render();render();ImGui::ActivateItemByID(panel->GetID("Style"));render();render();assert(!GImGui->OpenPopupStack.empty());auto* popup=GImGui->OpenPopupStack.back().Window;assert(popup&&popup->Size.x<=size.x-20&&popup->Size.y<=size.y-20&&popup->Pos.x>=0&&popup->Pos.y>=0&&popup->Pos.x+popup->Size.x<=size.x+1&&popup->Pos.y+popup->Size.y<=size.y+1);dump("style-"+std::to_string(int(size.x))+"-dpi-150");io.AddKeyEvent(ImGuiKey_Escape,true);render();io.AddKeyEvent(ImGuiKey_Escape,false);render();assert(inspector::dockInteractive);}
-    data=savedData;g_speedrunMode=savedSpeed;g_practiceMode=savedPractice;io.DisplaySize=savedSize;ApplyTheme(1);io.Fonts->Build();io.Fonts->SetTexID(1);inspector::Close();inspector::pinned=false;
-    std::cout<<"7.11.5 actual ImGui: own Inspector page, summary/details at 480/1920 and 100/150 DPI, compact/pinned card, Style popup + Escape isolation, effect/sound mute, Fullbright, noncontiguous property groups / no ImGui ID conflicts, card Details, wheel + frozen Tab layers, collider-free target token commit, exact event-position/token commit, empty target retry, cancel, explicit session close, snapshots, focus ACK and clean/replay locks: PASS\n";
+    inspector_ui::Open();
+    inspector::pending.reset();
+    inspector_ui::StartPick(7);
+    for (int i = 0; i < 3; i++)
+    {
+        render();
+    }
+    io.AddKeyEvent(ImGuiKey_Escape, true);
+    render();
+    io.AddKeyEvent(ImGuiKey_Escape, false);
+    render();
+    assert(!inspector::picking && g_overlayVisible && !inspector::clickPointer);
+    inspector::pending.reset();
+    g_overlayVisible = g_compactMode = true;
+    g_allOverlayEnabled = false;
+    inspector_ui::StartPick(3);
+    assert(inspector::picking && g_allOverlayEnabled && !g_overlayVisible);
+    inspector_ui::EndPick();
+    assert(g_overlayVisible && g_compactMode && !g_allOverlayEnabled && !lastInteractiveRequest);
+    g_allOverlayEnabled = true;
+    g_compactMode = false;
+    g_overlayVisible = true;
+    inspector::pointerProvider = nullptr;
+    inspector::pending.reset();
+    inspector_ui::expanded = true;
+    inspector_ui::resetDetails = true;
+    inspector_ui::tabRequest = 0;
+    for (int i = 0; i < 4; i++)
+        render();
+    inspector::reportFolder = std::filesystem::path(output) / "inspector-local-reports";
+    ImGuiID saveId = 0;
+    for (auto *window : GImGui->Windows)
+        if (window->Active && std::string(window->Name).find("Inspector workspace") != std::string::npos &&
+            std::string(window->Name).find("Object summary") == std::string::npos)
+            saveId = window->GetID("Save diagnostic snapshot");
+    assert(saveId);
+    ImGui::ActivateItemByID(saveId);
+    render();
+    assert(!inspector::lastReport.empty() &&
+           std::filesystem::is_regular_file(std::filesystem::path(inspector::lastReport)));
+    inspector::focusSerial = 123;
+    g_overlayVisible = true;
+    render();
+    assert(g_overlayVisible && inspector::focusSerial == 0);
+    inspector::worker.Submit(read("inspector-focus-failed.bin"), false);
+    until([&] {
+        return inspector::worker.Get()->detail->ackAction == 5 &&
+               !inspector::worker.Get()->detail->ackSuccess;
+    });
+    inspector::focusSerial = 12;
+    render();
+    assert(g_overlayVisible && inspector::focusSerial == 0);
+    inspector::worker.Submit(read("inspector-focus-ok.bin"), false);
+    until([&] {
+        return inspector::worker.Get()->detail->ackAction == 5 && inspector::worker.Get()->detail->ackSuccess;
+    });
+    inspector::focusSerial = 12;
+    render();
+    assert(!g_overlayVisible && !lastInteractiveRequest && inspector::focusSerial == 0);
+    inspector_ui::Open();
+    inspector::pending.reset();
+    inspector_ui::expanded = false;
+    inspector_ui::resetDetails = true;
+    for (int i = 0; i < 3; i++)
+    {
+        render();
+    }
+    ImGuiID endId = 0;
+    for (auto *window : GImGui->Windows)
+        if (window->Active && std::string(window->Name).find("Inspector workspace") != std::string::npos &&
+            std::string(window->Name).find("Object summary") == std::string::npos)
+            endId = window->GetID("End inspection");
+    assert(endId);
+    ImGui::ActivateItemByID(endId);
+    render();
+    assert(!inspector::open && suite_ui::navigation.Is(suite_ui::Page::Cheats));
+    render();
+    assert(!inspector::open);
+    inspector_ui::Open();
+    g_speedrunMode = true;
+    g_practiceMode = false;
+    assert(!inspector_ui::Allowed());
+    inspector_ui::RenderOverlay();
+    assert(!inspector::open && !inspector::picking && !inspector::baseline);
+    g_practiceMode = true;
+    assert(inspector_ui::Allowed());
+    inspector_ui::Open();
+    data.replay3dState = 2;
+    inspector_ui::RenderOverlay();
+    assert(!inspector::open && !inspector_ui::Allowed());
+    data.replay3dState = 0;
+    g_speedrunMode = g_practiceMode = false;
+    inspector_ui::Open();
+    inspector::pending.reset();
+    for (auto size : {ImVec2(480, 360), ImVec2(1920, 1080)})
+    {
+        io.DisplaySize = size;
+        ApplyTheme(1.5f);
+        io.Fonts->Build();
+        io.Fonts->SetTexID(1);
+        inspector::dock = inspector::dockInteractive = true;
+        inspector::pinned = false;
+        g_overlayVisible = false;
+        for (int i = 0; i < 3; i++)
+            render();
+        auto *panel = ImGui::FindWindowByName("Inspector / object");
+        assert(panel);
+        ImGui::SetScrollY(panel, 10000);
+        render();
+        render();
+        ImGui::ActivateItemByID(panel->GetID("Style"));
+        render();
+        render();
+        assert(!GImGui->OpenPopupStack.empty());
+        auto *popup = GImGui->OpenPopupStack.back().Window;
+        assert(popup && popup->Size.x <= size.x - 20 && popup->Size.y <= size.y - 20 && popup->Pos.x >= 0 &&
+               popup->Pos.y >= 0 && popup->Pos.x + popup->Size.x <= size.x + 1 &&
+               popup->Pos.y + popup->Size.y <= size.y + 1);
+        dump("style-" + std::to_string(int(size.x)) + "-dpi-150");
+        io.AddKeyEvent(ImGuiKey_Escape, true);
+        render();
+        io.AddKeyEvent(ImGuiKey_Escape, false);
+        render();
+        assert(inspector::dockInteractive);
+    }
+    data = savedData;
+    g_speedrunMode = savedSpeed;
+    g_practiceMode = savedPractice;
+    io.DisplaySize = savedSize;
+    ApplyTheme(1);
+    io.Fonts->Build();
+    io.Fonts->SetTexID(1);
+    inspector::Close();
+    inspector::pinned = false;
+    std::cout
+        << "7.11.5 actual ImGui: own Inspector page, summary/details at 480/1920 and 100/150 DPI, compact/pinned card, Style popup + Escape isolation, effect/sound mute, Fullbright, noncontiguous property groups / no ImGui ID conflicts, card Details, wheel + frozen Tab layers, collider-free target token commit, exact event-position/token commit, empty target retry, cancel, explicit session close, snapshots, focus ACK and clean/replay locks: PASS\n";
 }

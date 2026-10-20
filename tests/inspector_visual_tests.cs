@@ -1,46 +1,391 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+
 // Engine-contract doubles only. Vectors, matrices and bounds come from the
 // actual SDK. The Helper is separately compiled against all original types.
-namespace UnityEngine {
-    public class Object {static int next;readonly int id=++next;public bool Destroyed;public int GetInstanceID(){return id;}public static bool operator==(Object a,Object b){if(ReferenceEquals(a,b))return true;if(ReferenceEquals(a,null))return b.Destroyed;if(ReferenceEquals(b,null))return a.Destroyed;return false;}public static bool operator!=(Object a,Object b){return !(a==b);}public override bool Equals(object o){return ReferenceEquals(this,o);}public override int GetHashCode(){return id;}}
-    public sealed class GameObject:Object {public string name;public bool activeInHierarchy=true;public int layer;public Transform transform=new Transform();public readonly Dictionary<Type,object> Components=new Dictionary<Type,object>();public T GetComponent<T>()where T:class{object o;return Components.TryGetValue(typeof(T),out o)?o as T:null;}}
-    public sealed class Transform:Object {public Transform Parent;public bool IsChildOf(Transform target){for(var at=Parent;at!=null;at=at.Parent)if(at==target)return true;return false;}}
-    public class Collider:Object {}
-    public struct Ray {public Vector3 origin,direction;public Ray(Vector3 o,Vector3 d){origin=o;direction=d;}public Vector3 GetPoint(float d){return origin+direction*d;}}
-    public sealed class Camera:Object {public int cullingMask=-1;}
-    public class Material:Object {}
-    public class Renderer:Object {public bool enabled=true,forceRenderingOff,isPartOfStaticBatch;public static int BoundsReads;public Bounds WorldBounds;public Bounds bounds{get{BoundsReads++;return WorldBounds;}}public Matrix4x4 worldToLocalMatrix=Matrix4x4.identity;public Material[] sharedMaterials=new[]{new Material()};}
-    public sealed class MeshRenderer:Renderer {public int subMeshStartIndex;}
-    public sealed class SkinnedMeshRenderer:Renderer {}
-    public sealed class SpriteRenderer:Renderer {public Sprite sprite;public SpriteDrawMode drawMode=SpriteDrawMode.Simple;public bool flipX,flipY;}
-    public sealed class MeshFilter:Object {public Mesh sharedMesh;}
-    public sealed class Mesh:Object {public bool isReadable=true;public Vector3[] Data;public int[][] Parts;public int Reads;public int vertexCount{get{return Data.Length;}}public int subMeshCount{get{return Parts.Length;}}public Vector3[] vertices{get{Reads++;return (Vector3[])Data.Clone();}}public MeshTopology GetTopology(int at){return MeshTopology.Triangles;}public ulong GetIndexCount(int at){return (ulong)Parts[at].Length;}public int[] GetTriangles(int at){return (int[])Parts[at].Clone();}}
-    public sealed class Sprite:Object {public Vector2[] vertices;public ushort[] triangles;}
+namespace UnityEngine
+{
+public class Object
+{
+    static int next;
+    readonly int id = ++next;
+    public bool Destroyed;
+
+    public int GetInstanceID()
+    {
+        return id;
+    }
+
+    public static bool operator ==(Object a, Object b)
+    {
+        if (ReferenceEquals(a, b))
+            return true;
+        if (ReferenceEquals(a, null))
+            return b.Destroyed;
+        if (ReferenceEquals(b, null))
+            return a.Destroyed;
+        return false;
+    }
+
+    public static bool operator !=(Object a, Object b)
+    {
+        return !(a == b);
+    }
+
+    public override bool Equals(object o)
+    {
+        return ReferenceEquals(this, o);
+    }
+
+    public override int GetHashCode()
+    {
+        return id;
+    }
 }
-public static class InspectorWire {public static void Text(System.IO.BinaryWriter w,string t,int max=2048){var b=System.Text.Encoding.UTF8.GetBytes(t??"");w.Write(b.Length);w.Write(b);}}
-class InspectorVisualTests {
-    static void Check(bool okay,string why){if(!okay)throw new Exception(why);}
-    static Bounds Box(float x=0,float z=5){return new Bounds(new Vector3(x,0,z),new Vector3(2,2,.1f));}
-    static Mesh Quad(){return new Mesh{Data=new[]{new Vector3(-1,-1,5),new Vector3(1,-1,5),new Vector3(1,1,5),new Vector3(-1,1,5)},Parts=new[]{new[]{0,1,2,0,2,3}}};}
-    static GameObject Add(InspectorVisualPicking scope,Renderer renderer,string name,Mesh mesh=null){var obj=new GameObject{name=name};if(mesh!=null)obj.Components[typeof(MeshFilter)]=new MeshFilter{sharedMesh=mesh};scope.Register(obj,renderer);return obj;}
-    public static int Main(){
-        var camera=new Camera();var ray=new Ray(Vector3.zero,Vector3.forward);var hits=new List<InspectorPickHit>();var scope=new InspectorVisualPicking();var mesh=Quad();var renderer=new MeshRenderer{WorldBounds=Box()};var materials=renderer.sharedMaterials;var crate=Add(scope,renderer,"Crate",mesh);scope.Tick(1);scope.Collect(ray,camera,null,hits);Check(hits.Count==1&&hits[0].Kind==3&&hits[0].Id==crate.GetInstanceID()&&hits[0].Collider==null,"readable visual without a collider");
-        for(int i=2;i<100;i++){scope.Tick(i);hits.Clear();scope.Collect(ray,camera,null,hits);}Check(mesh.Reads==1&&ReferenceEquals(materials,renderer.sharedMaterials)&&!renderer.forceRenderingOff&&renderer.enabled,"shared geometry cached; renderers/materials unchanged");
-        hits.Clear();scope.Collect(new Ray(new Vector3(1.8f,0,0),Vector3.forward),camera,null,hits);Check(hits.Count==0,"triangle miss does not substitute bounds");
-        camera.cullingMask=0;hits.Clear();scope.Collect(ray,camera,null,hits);Check(hits.Count==0,"camera layers honored");camera.cullingMask=-1;
-        renderer.forceRenderingOff=true;hits.Clear();scope.Collect(ray,camera,null,hits);Check(hits.Count==0,"forceRenderingOff honored");renderer.forceRenderingOff=false;
-        scope.Clear();var unreadable=Quad();unreadable.isReadable=false;Add(scope,new MeshRenderer{WorldBounds=Box()},"Unreadable mesh",unreadable);scope.Tick(1);hits.Clear();scope.Collect(ray,camera,null,hits);Check(hits.Count==1&&hits[0].Kind==2&&unreadable.Reads==0,"unreadable geometry labelled bounds, no forbidden vertex read");
-        scope.Clear();Add(scope,new SkinnedMeshRenderer{WorldBounds=Box()},"Monster skin");scope.Tick(1);hits.Clear();scope.Collect(ray,camera,null,hits);Check(hits.Count==1&&hits[0].Kind==2,"skin bounds explicitly approximate");
-        scope.Clear();var shared=Quad();for(int i=0;i<10;i++)Add(scope,new MeshRenderer{WorldBounds=Box()},"Repeated wall "+i,shared);scope.Tick(1);hits.Clear();scope.Collect(ray,camera,null,hits);Check(hits.Count==10&&hits.TrueForAll(x=>x.Kind==3)&&shared.Reads==1,"shared mesh cache not throttled as ten new captures");
-        scope.Clear();var first=Quad();var second=Quad();Add(scope,new MeshRenderer{WorldBounds=Box()},"First",first);Add(scope,new MeshRenderer{WorldBounds=Box()},"Second",second);scope.Tick(1);hits.Clear();scope.Collect(ray,camera,null,hits);Check(first.Reads+second.Reads==1,"one new geometry copy per frame");scope.Tick(2);hits.Clear();scope.Collect(ray,camera,null,hits);Check(first.Reads+second.Reads==2&&hits.TrueForAll(x=>x.Kind==3),"pending geometry warmed on the next frame");
-        scope.Clear();var decal=new SpriteRenderer{WorldBounds=Box(),sprite=new Sprite{vertices=new[]{new Vector2(-1,-1),new Vector2(0,-1),new Vector2(0,1)},triangles=new ushort[]{0,1,2}}};var matrix=Matrix4x4.identity;matrix.m23=-5;decal.worldToLocalMatrix=matrix;var art=Add(scope,decal,"Graffiti sprite");scope.Tick(1);hits.Clear();scope.Collect(new Ray(new Vector3(.2f,0,0),Vector3.forward),camera,null,hits);Check(hits.Count==0,"tight sprite triangle excludes empty bounding rectangle");decal.flipX=true;scope.Tick(2);hits.Clear();scope.Collect(new Ray(new Vector3(.2f,0,0),Vector3.forward),camera,null,hits);Check(hits.Count==1&&hits[0].Kind==4&&hits[0].Id==art.GetInstanceID(),"sprite flip and renderer matrix honored");
-        decal.sprite=new Sprite{vertices=new[]{new Vector2(0,-1),new Vector2(1,-1),new Vector2(0,1)},triangles=new ushort[]{0,1,2}};scope.Tick(3);hits.Clear();scope.Collect(new Ray(new Vector3(.2f,0,0),Vector3.forward),camera,null,hits);Check(hits.Count==0,"animated sprite source change invalidates stale triangles");
-        hits.Clear();scope.Collect(ray,camera,art.transform,hits);Check(hits.Count==0,"gameplay player rig exclusion honored");
-        scope.Clear();var batched=Quad();batched.Data=new[]{new Vector3(40,-1,5),new Vector3(42,-1,5),new Vector3(41,1,5),new Vector3(-1,-1,5),new Vector3(1,-1,5),new Vector3(0,1,5)};batched.Parts=new[]{new[]{0,1,2},new[]{3,4,5}};Add(scope,new MeshRenderer{WorldBounds=Box(),isPartOfStaticBatch=true,subMeshStartIndex=0},"Other batch section",batched);var own=Add(scope,new MeshRenderer{WorldBounds=Box(),isPartOfStaticBatch=true,subMeshStartIndex=1},"Own batch section",batched);for(int i=1;i<4;i++){scope.Tick(i);hits.Clear();scope.Collect(ray,camera,null,hits);}Check(hits.Count==1&&hits[0].Id==own.GetInstanceID()&&hits[0].Kind==3,"static batch submesh ranges cannot select an adjacent object");
-        scope.Clear();for(int i=0;i<132;i++)Add(scope,new SkinnedMeshRenderer{WorldBounds=Box()},"Layer "+i);scope.Tick(1);hits.Clear();Check(scope.Collect(ray,camera,null,hits)&&hits.Count==128,"broad-phase candidates bounded and partial flagged");Check(InspectorPickOrder.Normalize(hits)&&hits.Count==32,"published layers bounded and partial flagged");
-        scope.Clear();var inactive=Add(scope,new SkinnedMeshRenderer{WorldBounds=Box()},"Later object");inactive.activeInHierarchy=false;scope.Tick(1);hits.Clear();scope.Collect(ray,camera,null,hits);Check(hits.Count==0,"inactive object omitted");inactive.activeInHierarchy=true;scope.Tick(2);hits.Clear();scope.Collect(ray,camera,null,hits);Check(hits.Count==1,"sliced live bounds refresh sees activated objects");
-        scope.Clear();for(int i=0;i<20005;i++)Add(scope,new SkinnedMeshRenderer{WorldBounds=Box(20)},"Limit "+i);Check(scope.Count==20000,"renderer index capped at 20000");scope.Tick(1);hits.Clear();Check(scope.Collect(ray,camera,null,hits)&&hits.Count==0,"index truncation is explicitly partial");scope.Clear();Check(scope.Count==0,"scene/close releases visual index");Console.WriteLine("Production InspectorVisualPicking engine-contract doubles: collider-free meshes/sprites, cached geometry, one new copy/frame, no source writes, geometry scope, thin graphics, current bounds/layers, static batch ownership, frozen resources and candidate budgets: PASS");return 0;
+
+public sealed class GameObject : Object
+{
+    public string name;
+    public bool activeInHierarchy = true;
+    public int layer;
+    public Transform transform = new Transform();
+    public readonly Dictionary<Type, object> Components = new Dictionary<Type, object>();
+    public T GetComponent<T>()
+
+        where T : class
+    {
+        object o;
+        return Components.TryGetValue(typeof(T), out o) ? o as T : null;
+    }
+}
+
+public sealed class Transform : Object
+{
+    public Transform Parent;
+
+    public bool IsChildOf(Transform target)
+    {
+        for (var at = Parent; at != null; at = at.Parent)
+            if (at == target)
+                return true;
+        return false;
+    }
+}
+
+public class Collider : Object
+{
+}
+
+public struct Ray
+{
+    public Vector3 origin, direction;
+
+    public Ray(Vector3 o, Vector3 d)
+    {
+        origin = o;
+        direction = d;
+    }
+
+    public Vector3 GetPoint(float d)
+    {
+        return origin + direction * d;
+    }
+}
+
+public sealed class Camera : Object
+{
+    public int cullingMask = -1;
+}
+
+public class Material : Object
+{
+}
+
+public class Renderer : Object
+{
+    public bool enabled = true, forceRenderingOff, isPartOfStaticBatch;
+    public static int BoundsReads;
+    public Bounds WorldBounds;
+    public Bounds bounds
+    {
+        get {
+            BoundsReads++;
+            return WorldBounds;
+        }
+    }
+    public Matrix4x4 worldToLocalMatrix = Matrix4x4.identity;
+    public Material[] sharedMaterials = new[] { new Material() };
+}
+
+public sealed class MeshRenderer : Renderer
+{
+    public int subMeshStartIndex;
+}
+
+public sealed class SkinnedMeshRenderer : Renderer
+{
+}
+
+public sealed class SpriteRenderer : Renderer
+{
+    public Sprite sprite;
+    public SpriteDrawMode drawMode = SpriteDrawMode.Simple;
+    public bool flipX, flipY;
+}
+
+public sealed class MeshFilter : Object
+{
+    public Mesh sharedMesh;
+}
+
+public sealed class Mesh : Object
+{
+    public bool isReadable = true;
+    public Vector3[] Data;
+    public int[][] Parts;
+    public int Reads;
+    public int vertexCount
+    {
+        get {
+            return Data.Length;
+        }
+    }
+    public int subMeshCount
+    {
+        get {
+            return Parts.Length;
+        }
+    }
+    public Vector3[] vertices
+    {
+        get {
+            Reads++;
+            return (Vector3[])Data.Clone();
+        }
+    }
+
+    public MeshTopology GetTopology(int at)
+    {
+        return MeshTopology.Triangles;
+    }
+
+    public ulong GetIndexCount(int at)
+    {
+        return (ulong)Parts[at].Length;
+    }
+
+    public int[] GetTriangles(int at)
+    {
+        return (int[])Parts[at].Clone();
+    }
+}
+
+public sealed class Sprite : Object
+{
+    public Vector2[] vertices;
+    public ushort[] triangles;
+}
+}
+
+public static class InspectorWire
+{
+    public static void Text(System.IO.BinaryWriter w, string t, int max = 2048)
+    {
+        var b = System.Text.Encoding.UTF8.GetBytes(t ?? "");
+        w.Write(b.Length);
+        w.Write(b);
+    }
+}
+
+class InspectorVisualTests
+{
+    static void Check(bool okay, string why)
+    {
+        if (!okay)
+            throw new Exception(why);
+    }
+
+    static Bounds Box(float x = 0, float z = 5)
+    {
+        return new Bounds(new Vector3(x, 0, z), new Vector3(2, 2, .1f));
+    }
+
+    static Mesh Quad()
+    {
+        return new Mesh { Data = new[] { new Vector3(-1, -1, 5), new Vector3(1, -1, 5), new Vector3(1, 1, 5),
+                                         new Vector3(-1, 1, 5) },
+                          Parts = new[] { new[] { 0, 1, 2, 0, 2, 3 } } };
+    }
+
+    static GameObject Add(InspectorVisualPicking scope, Renderer renderer, string name, Mesh mesh = null)
+    {
+        var obj = new GameObject { name = name };
+        if (mesh != null)
+            obj.Components[typeof(MeshFilter)] = new MeshFilter { sharedMesh = mesh };
+        scope.Register(obj, renderer);
+        return obj;
+    }
+
+    public static int Main()
+    {
+        var camera = new Camera();
+        var ray = new Ray(Vector3.zero, Vector3.forward);
+        var hits = new List<InspectorPickHit>();
+        var scope = new InspectorVisualPicking();
+        var mesh = Quad();
+        var renderer = new MeshRenderer { WorldBounds = Box() };
+        var materials = renderer.sharedMaterials;
+        var crate = Add(scope, renderer, "Crate", mesh);
+        scope.Tick(1);
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 1 && hits[0].Kind == 3 && hits[0].Id == crate.GetInstanceID() &&
+                  hits[0].Collider == null,
+              "readable visual without a collider");
+        for (int i = 2; i < 100; i++)
+        {
+            scope.Tick(i);
+            hits.Clear();
+            scope.Collect(ray, camera, null, hits);
+        }
+        Check(mesh.Reads == 1 && ReferenceEquals(materials, renderer.sharedMaterials) &&
+                  !renderer.forceRenderingOff && renderer.enabled,
+              "shared geometry cached; renderers/materials unchanged");
+        hits.Clear();
+        scope.Collect(new Ray(new Vector3(1.8f, 0, 0), Vector3.forward), camera, null, hits);
+        Check(hits.Count == 0, "triangle miss does not substitute bounds");
+        camera.cullingMask = 0;
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 0, "camera layers honored");
+        camera.cullingMask = -1;
+        renderer.forceRenderingOff = true;
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 0, "forceRenderingOff honored");
+        renderer.forceRenderingOff = false;
+        scope.Clear();
+        var unreadable = Quad();
+        unreadable.isReadable = false;
+        Add(scope, new MeshRenderer { WorldBounds = Box() }, "Unreadable mesh", unreadable);
+        scope.Tick(1);
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 1 && hits[0].Kind == 2 && unreadable.Reads == 0,
+              "unreadable geometry labelled bounds, no forbidden vertex read");
+        scope.Clear();
+        Add(scope, new SkinnedMeshRenderer { WorldBounds = Box() }, "Monster skin");
+        scope.Tick(1);
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 1 && hits[0].Kind == 2, "skin bounds explicitly approximate");
+        scope.Clear();
+        var shared = Quad();
+        for (int i = 0; i < 10; i++)
+            Add(scope, new MeshRenderer { WorldBounds = Box() }, "Repeated wall " + i, shared);
+        scope.Tick(1);
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 10 && hits.TrueForAll(x => x.Kind == 3) && shared.Reads == 1,
+              "shared mesh cache not throttled as ten new captures");
+        scope.Clear();
+        var first = Quad();
+        var second = Quad();
+        Add(scope, new MeshRenderer { WorldBounds = Box() }, "First", first);
+        Add(scope, new MeshRenderer { WorldBounds = Box() }, "Second", second);
+        scope.Tick(1);
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(first.Reads + second.Reads == 1, "one new geometry copy per frame");
+        scope.Tick(2);
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(first.Reads + second.Reads == 2 && hits.TrueForAll(x => x.Kind == 3),
+              "pending geometry warmed on the next frame");
+        scope.Clear();
+        var decal = new SpriteRenderer {
+            WorldBounds = Box(),
+            sprite =
+                new Sprite { vertices = new[] { new Vector2(-1, -1), new Vector2(0, -1), new Vector2(0, 1) },
+                             triangles = new ushort[] { 0, 1, 2 } }
+        };
+        var matrix = Matrix4x4.identity;
+        matrix.m23 = -5;
+        decal.worldToLocalMatrix = matrix;
+        var art = Add(scope, decal, "Graffiti sprite");
+        scope.Tick(1);
+        hits.Clear();
+        scope.Collect(new Ray(new Vector3(.2f, 0, 0), Vector3.forward), camera, null, hits);
+        Check(hits.Count == 0, "tight sprite triangle excludes empty bounding rectangle");
+        decal.flipX = true;
+        scope.Tick(2);
+        hits.Clear();
+        scope.Collect(new Ray(new Vector3(.2f, 0, 0), Vector3.forward), camera, null, hits);
+        Check(hits.Count == 1 && hits[0].Kind == 4 && hits[0].Id == art.GetInstanceID(),
+              "sprite flip and renderer matrix honored");
+        decal.sprite =
+            new Sprite { vertices = new[] { new Vector2(0, -1), new Vector2(1, -1), new Vector2(0, 1) },
+                         triangles = new ushort[] { 0, 1, 2 } };
+        scope.Tick(3);
+        hits.Clear();
+        scope.Collect(new Ray(new Vector3(.2f, 0, 0), Vector3.forward), camera, null, hits);
+        Check(hits.Count == 0, "animated sprite source change invalidates stale triangles");
+        hits.Clear();
+        scope.Collect(ray, camera, art.transform, hits);
+        Check(hits.Count == 0, "gameplay player rig exclusion honored");
+        scope.Clear();
+        var batched = Quad();
+        batched.Data = new[] { new Vector3(40, -1, 5), new Vector3(42, -1, 5), new Vector3(41, 1, 5),
+                               new Vector3(-1, -1, 5), new Vector3(1, -1, 5),  new Vector3(0, 1, 5) };
+        batched.Parts = new[] { new[] { 0, 1, 2 }, new[] { 3, 4, 5 } };
+        Add(scope,
+            new MeshRenderer { WorldBounds = Box(), isPartOfStaticBatch = true, subMeshStartIndex = 0 },
+            "Other batch section", batched);
+        var own =
+            Add(scope,
+                new MeshRenderer { WorldBounds = Box(), isPartOfStaticBatch = true, subMeshStartIndex = 1 },
+                "Own batch section", batched);
+        for (int i = 1; i < 4; i++)
+        {
+            scope.Tick(i);
+            hits.Clear();
+            scope.Collect(ray, camera, null, hits);
+        }
+        Check(hits.Count == 1 && hits[0].Id == own.GetInstanceID() && hits[0].Kind == 3,
+              "static batch submesh ranges cannot select an adjacent object");
+        scope.Clear();
+        for (int i = 0; i < 132; i++)
+            Add(scope, new SkinnedMeshRenderer { WorldBounds = Box() }, "Layer " + i);
+        scope.Tick(1);
+        hits.Clear();
+        Check(scope.Collect(ray, camera, null, hits) && hits.Count == 128,
+              "broad-phase candidates bounded and partial flagged");
+        Check(InspectorPickOrder.Normalize(hits) && hits.Count == 32,
+              "published layers bounded and partial flagged");
+        scope.Clear();
+        var inactive = Add(scope, new SkinnedMeshRenderer { WorldBounds = Box() }, "Later object");
+        inactive.activeInHierarchy = false;
+        scope.Tick(1);
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 0, "inactive object omitted");
+        inactive.activeInHierarchy = true;
+        scope.Tick(2);
+        hits.Clear();
+        scope.Collect(ray, camera, null, hits);
+        Check(hits.Count == 1, "sliced live bounds refresh sees activated objects");
+        scope.Clear();
+        for (int i = 0; i < 20005; i++)
+            Add(scope, new SkinnedMeshRenderer { WorldBounds = Box(20) }, "Limit " + i);
+        Check(scope.Count == 20000, "renderer index capped at 20000");
+        scope.Tick(1);
+        hits.Clear();
+        Check(scope.Collect(ray, camera, null, hits) && hits.Count == 0,
+              "index truncation is explicitly partial");
+        scope.Clear();
+        Check(scope.Count == 0, "scene/close releases visual index");
+        Console.WriteLine(
+            "Production InspectorVisualPicking engine-contract doubles: collider-free meshes/sprites, cached geometry, one new copy/frame, no source writes, geometry scope, thin graphics, current bounds/layers, static batch ownership, frozen resources and candidate budgets: PASS");
+        return 0;
     }
 }

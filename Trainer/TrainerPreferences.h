@@ -1,13 +1,13 @@
 #pragma once
 #include "AppearancePreferences.h"
-#include "ExperiencePreferences.h"
+#include "ExperienceModel.h"
 #include "InspectorPresentation.h"
 #include "InputModel.h"
 #include "MapLevels.h"
 #include "MinimapOptions.h"
 #include "OverlayConfiguration.h"
 #include "OverlayPolicy.h"
-#include "PlannerPreferences.h"
+#include "SeedSearchOptions.h"
 #include "ReplayPreferences.h"
 #include <algorithm>
 #include <cmath>
@@ -15,7 +15,8 @@
 #include <sstream>
 #include <string>
 
-struct TrainerPreferences {
+struct TrainerPreferences
+{
     OverlayLayout hud{false}, speedrun{true};
     suite_input::Preferences input;
     MinimapOptions map;
@@ -35,7 +36,9 @@ struct TrainerPreferences {
     float text[4] = {.91f, .95f, .95f, 1};
     float header[4] = {.37f, .83f, .77f, 1};
     float accent[4] = {1, .69f, .38f, 1};
-    void Validate() {
+
+    void Validate()
+    {
         input.Validate();
         experience.Validate();
         inspector.Validate();
@@ -60,16 +63,19 @@ struct TrainerPreferences {
                 color[i] = std::isfinite(color[i]) ? std::clamp(color[i], 0.f, 1.f) : 1.f;
         background[3] = 1; // Opaque readable menu; minimap has separate opacity.
     }
-    std::string Encode() const {
+
+    std::string Encode() const
+    {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out.precision(9);
         out << "version=18\nframeLimitMode=" << frameLimitMode << "\ngameFrameLimit=" << gameFrameLimit
             << "\nvSyncMode=" << vSyncMode << "\nreports=" << reports << "\nrawSpawn=" << rawSpawn
-            << "\ncompact=" << compact << "\nminimap=" << minimap << "\npath=" << path << "\nlockAspect=" << lockAspect
-            << "\nplayer=" << player << "\ncrystals=" << crystals << "\nmonster=" << monster << "\nvisuals=" << visuals
-            << "\nwidth=" << width << "\nheight=" << height << "\nfps=" << fps << "\nlevel=" << level
-            << "\nseed=" << seed << "\nopacity=" << opacity << '\n';
+            << "\ncompact=" << compact << "\nminimap=" << minimap << "\npath=" << path
+            << "\nlockAspect=" << lockAspect << "\nplayer=" << player << "\ncrystals=" << crystals
+            << "\nmonster=" << monster << "\nvisuals=" << visuals << "\nwidth=" << width
+            << "\nheight=" << height << "\nfps=" << fps << "\nlevel=" << level << "\nseed=" << seed
+            << "\nopacity=" << opacity << '\n';
         const float *colors[] = {background, text, header, accent};
         const char *names[] = {"background", "text", "header", "accent"};
         for (int c = 0; c < 4; c++)
@@ -86,18 +92,22 @@ struct TrainerPreferences {
         planner.Encode(out);
         return out.str();
     }
-    static TrainerPreferences Decode(const std::string &input) {
+
+    static TrainerPreferences Decode(const std::string &input)
+    {
         int version = 0;
         std::istringstream versions(input);
         std::string line;
         while (std::getline(versions, line))
-            if (line.rfind("version=", 0) == 0) {
+            if (line.rfind("version=", 0) == 0)
+            {
                 std::istringstream value(line.substr(8));
                 value >> version;
             }
         TrainerPreferences result;
         std::istringstream lines(input);
-        while (std::getline(lines, line)) {
+        while (std::getline(lines, line))
+        {
             auto split = line.find('=');
             if (split == std::string::npos)
                 continue;
@@ -127,18 +137,23 @@ struct TrainerPreferences {
             else if (key.rfind("planner.", 0) == 0)
                 result.planner.Decode(key.substr(8), value);
 
-            else if (key.rfind("hud.", 0) == 0) {
+            else if (key.rfind("hud.", 0) == 0)
+            {
                 auto field = key.substr(4);
                 if (version < 12 && field == "show25")
                     continue;
-                result.hud.Decode(field, version < 12 && field.rfind("order", 0) == 0 && integer >= 25 ? -1 : value);
-            } else if (key.rfind("speedrun.", 0) == 0) {
+                result.hud.Decode(field,
+                                  version < 12 && field.rfind("order", 0) == 0 && integer >= 25 ? -1 : value);
+            }
+            else if (key.rfind("speedrun.", 0) == 0)
+            {
                 auto field = key.substr(9);
                 if (version < 12 && field == "show25")
                     continue;
-                result.speedrun.Decode(field,
-                                       version < 12 && field.rfind("order", 0) == 0 && integer >= 25 ? -1 : value);
-            } else if (key == "compact")
+                result.speedrun.Decode(
+                    field, version < 12 && field.rfind("order", 0) == 0 && integer >= 25 ? -1 : value);
+            }
+            else if (key == "compact")
                 result.compact = flag;
             else if (key == "frameLimitMode")
                 result.frameLimitMode = integer;
@@ -176,7 +191,8 @@ struct TrainerPreferences {
                 result.seed = integer;
             else if (key == "opacity")
                 result.opacity = static_cast<float>(std::clamp(value, .1, 1.));
-            else {
+            else
+            {
                 float *colors[] = {result.background, result.text, result.header, result.accent};
                 const char *names[] = {"background", "text", "header", "accent"};
                 for (int c = 0; c < 4; c++)
@@ -185,13 +201,15 @@ struct TrainerPreferences {
                             colors[c][i] = static_cast<float>(std::clamp(value, 0., 1.));
             }
         }
-        if (version < 13) {
+        if (version < 13)
+        {
             const float old[4][4] = {
                 {.065f, .075f, .095f, 1}, {.9f, .93f, .97f, 1}, {.34f, .70f, .95f, 1}, {1, .64f, .29f, 1}};
             TrainerPreferences fresh;
             float *colors[] = {result.background, result.text, result.header, result.accent};
             const float *defaults[] = {fresh.background, fresh.text, fresh.header, fresh.accent};
-            for (int k = 0; k < 4; k++) {
+            for (int k = 0; k < 4; k++)
+            {
                 bool same = true;
                 for (int i = 0; i < 4; i++)
                     same &= std::abs(colors[k][i] - old[k][i]) < .00001f;
@@ -199,7 +217,8 @@ struct TrainerPreferences {
                     std::copy(defaults[k], defaults[k] + 4, colors[k]);
             }
         }
-        if (version < 15) {
+        if (version < 15)
+        {
             if (result.hud.width == 240)
                 result.hud.width = 320;
             if (result.speedrun.width == 300)

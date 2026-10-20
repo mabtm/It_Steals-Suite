@@ -1,7 +1,0 @@
-Hide-&-Seek-Bodengeometrie aus der vom Nutzer bereitgestellten `sharedassets5.assets`, NavMeshData path ID 62. SHA256 der Quelldatei: 2c8434c5352649065bf5b52c9c3ef1366d8679d67ea3d50858c2474d41edccae
-
-Das Fixture enthält die Polygonfächer der sechs gespeicherten NavMesh-Tiles (einschließlich Wandoberseiten). Es enthält keine Live-Collider, Spielermaße oder zufällige Kristallauswahl. Diese werden in den Tests ausdrücklich als separate Szenarien ergänzt; das Fixture ersetzt keinen Unity-Laufzeittest.
-
-Outside: `hide-seek-outside-floor.assetmesh` enthält 4743 Vertexpositionen und 4390 Dreiecke aus `sharedassets13.assets`, NavMeshData path ID 6. SHA256 der Quelldatei: 62cb4145df861624151e6750987a6b8f8b11d7764a8826d1dbcaaa734b14cdf4. Beide Fixtures enthalten Tile-Koordinaten vor dem NavMeshData-Positionsversatz; der Test verwendet denselben Koordinatenraum für Bodenhöhe und Zielpunkte. Zur Laufzeit liefert Unity die bereits transformierte Triangulierung. Es werden keine Collider aus diesen Assets erfunden.
-
-Die Regressionstests ab 6.9.5 prüfen beide Assets zusätzlich mit dem gespeicherten Weltversatz (-6.3200407, 2.1241815, -5.5100975) und einer unabhängig davon gesetzten physischen Spielerunterkante. Dabei verwirft der frühere Höhenfilter alle Dreiecke. Geprüft werden die neue kataloggestützte Flächenauswahl, sichtbare Konturen, erreichbare Ziele, Rampen und Ausschluss darüberliegender Dächer. Die Fixture-Koordinaten im File bleiben unverändert.

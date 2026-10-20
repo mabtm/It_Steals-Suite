@@ -1,1 +1,0 @@
-PASS: optimized production build with warnings as errors. See PRUEFUNG.md for compiler and reference boundaries.

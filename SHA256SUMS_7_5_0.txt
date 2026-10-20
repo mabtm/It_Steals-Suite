@@ -1,4 +1,0 @@
-aee7e232672f2f800b5929c94c26d617cf4e9bb495df4f36da4191af1a65af93  bin/ItStealsHelper.dll
-58c17005e12f9d7b5b268162f52559d7ca9121b55ea18fd5a692e55a67660b50  bin/ItStealsTrainer.exe
-2ae6a3376a34816252386e6d7dbc35d781af6e8cf485d9be7749cf396cd09759  bin/PracticeSuiteEncoder.exe
-7138d28c96d9d3e3af4ee3d8cad72741f8ffb40da90c1112235dea3ecd3178a3  Encoder/ffmpeg-8.1.3.tar.xz

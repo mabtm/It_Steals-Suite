@@ -1,1 +1,0 @@
-Reale ImGui-Zeichenausgabe der Version 6.9.8 mit synthetischer Telemetrie. Overview, Practice und Settings sowie drei Start- und eine Abschlussphase. Windows nutzt Segoe UI; der Host-Renderer verwendet DejaVu Sans. Keine Live-Spiel-/FPS- oder Audio-Hardware-Aufnahmen.

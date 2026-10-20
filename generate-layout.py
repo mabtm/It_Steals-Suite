@@ -1,4 +1,5 @@
 """Generate/check telemetry declarations from the shared layout schema."""
+
 from pathlib import Path
 import argparse
 import json
@@ -24,8 +25,12 @@ for field in fields:
 cs += "}\n"
 header_path = root / "Trainer/SharedProtocol.h"
 header = header_path.read_text()
-header = re.sub(r'ItStealsSharedMem\.v\d+', f"ItStealsSharedMem.v{layout['version']}", header)
-header = re.sub(r'kProtocolVersion = \d+', f"kProtocolVersion = {layout['version']}", header)
+header = re.sub(
+    r"ItStealsSharedMem\.v\d+", f"ItStealsSharedMem.v{layout['version']}", header
+)
+header = re.sub(
+    r"kProtocolVersion = \d+", f"kProtocolVersion = {layout['version']}", header
+)
 before, rest = header.split("struct GameData {", 1)
 _, after = rest.split("struct TrainerCommands {", 1)
 native = "struct GameData {\n"
@@ -36,23 +41,73 @@ native += "};\n"
 header = before + native + "struct TrainerCommands {" + after
 start = header.index("static_assert(sizeof(GameData)")
 end = header.index("inline bool ValidCoordinate")
-checks = [f"static_assert(sizeof(GameData) == {position});", f"static_assert(sizeof(TrainerCommands) == {layout['commandSize']});",
-          "static_assert(sizeof(SharedHeader) == 64);", "static_assert(offsetof(SharedHeader, commandAck) == 40);",
-          "static_assert(offsetof(TrainerCommands, hitboxEnabled) == 8);", "static_assert(offsetof(TrainerCommands, practiceSeed) == 20);",
-          "static_assert(offsetof(TrainerCommands, teleportX) == 28);", "static_assert(offsetof(TrainerCommands, seededPractice) == 40);", "static_assert(offsetof(TrainerCommands, teleportExitFreecam) == 41);", "static_assert(offsetof(TrainerCommands, telemetryOptions) == 44);", "static_assert(offsetof(TrainerCommands, windowModeCmd) == 48);", "static_assert(offsetof(TrainerCommands, inputCapture) == 52);", "static_assert(offsetof(TrainerCommands, reportOptions) == 56);", "static_assert(offsetof(TrainerCommands, teleportScene) == 60);"]
-checks += ["static_assert(offsetof(TrainerCommands, plannerRequest) == 64);", "static_assert(offsetof(TrainerCommands, plannerSeed) == 68);", "static_assert(offsetof(TrainerCommands, plannerLevel) == 72);", "static_assert(offsetof(TrainerCommands, plannerOptions) == 76);"]
-checks += ["static_assert(offsetof(TrainerCommands, plannerSearchCount) == 80);", "static_assert(offsetof(TrainerCommands, plannerBudgetMicros) == 88);"]
+checks = [
+    f"static_assert(sizeof(GameData) == {position});",
+    f"static_assert(sizeof(TrainerCommands) == {layout['commandSize']});",
+    "static_assert(sizeof(SharedHeader) == 64);",
+    "static_assert(offsetof(SharedHeader, commandAck) == 40);",
+    "static_assert(offsetof(TrainerCommands, hitboxEnabled) == 8);",
+    "static_assert(offsetof(TrainerCommands, practiceSeed) == 20);",
+    "static_assert(offsetof(TrainerCommands, teleportX) == 28);",
+    "static_assert(offsetof(TrainerCommands, seededPractice) == 40);",
+    "static_assert(offsetof(TrainerCommands, teleportExitFreecam) == 41);",
+    "static_assert(offsetof(TrainerCommands, telemetryOptions) == 44);",
+    "static_assert(offsetof(TrainerCommands, windowModeCmd) == 48);",
+    "static_assert(offsetof(TrainerCommands, inputCapture) == 52);",
+    "static_assert(offsetof(TrainerCommands, reportOptions) == 56);",
+    "static_assert(offsetof(TrainerCommands, teleportScene) == 60);",
+]
+checks += [
+    "static_assert(offsetof(TrainerCommands, plannerRequest) == 64);",
+    "static_assert(offsetof(TrainerCommands, plannerSeed) == 68);",
+    "static_assert(offsetof(TrainerCommands, plannerLevel) == 72);",
+    "static_assert(offsetof(TrainerCommands, plannerOptions) == 76);",
+]
+checks += [
+    "static_assert(offsetof(TrainerCommands, plannerSearchCount) == 80);",
+    "static_assert(offsetof(TrainerCommands, plannerBudgetMicros) == 88);",
+]
 checks += ["static_assert(offsetof(TrainerCommands, plannerSearchKey) == 92);"]
-checks += ["static_assert(offsetof(TrainerCommands, frameLimitMode) == 100);", "static_assert(offsetof(TrainerCommands, gameFrameLimit) == 108);", "static_assert(offsetof(TrainerCommands, runReviewRequest) == 112);", "static_assert(offsetof(TrainerCommands, runReviewId) == 116);", "static_assert(offsetof(TrainerCommands, runHudVisible) == 124);"]
-checks += ["static_assert(offsetof(TrainerCommands, replay3dCmd) == 136);", "static_assert(offsetof(TrainerCommands, replay3dRunId) == 140);", "static_assert(offsetof(TrainerCommands, replay3dSeconds) == 148);", "static_assert(offsetof(TrainerCommands, replay3dOptions) == 156);", "static_assert(offsetof(TrainerCommands, replay3dSpeed) == 160);", "static_assert(sizeof(TrainerCommands) <= kPayloadOffset-kCommandOffset);"]
-checks += ["static_assert(offsetof(TrainerCommands, replay3dLoopA) == 164);", "static_assert(offsetof(TrainerCommands, replay3dLoopB) == 172);", "static_assert(offsetof(TrainerCommands, replay3dFollowDistance) == 180);", "static_assert(offsetof(TrainerCommands, replay3dFollowHeight) == 184);", "static_assert(offsetof(TrainerCommands, replay3dTrailSeconds) == 188);"]
-checks += [f"static_assert(offsetof(GameData, {field['name']}) == {field['offset']});" for field in fields]
+checks += [
+    "static_assert(offsetof(TrainerCommands, frameLimitMode) == 100);",
+    "static_assert(offsetof(TrainerCommands, gameFrameLimit) == 108);",
+    "static_assert(offsetof(TrainerCommands, runReviewRequest) == 112);",
+    "static_assert(offsetof(TrainerCommands, runReviewId) == 116);",
+    "static_assert(offsetof(TrainerCommands, runHudVisible) == 124);",
+]
+checks += [
+    "static_assert(offsetof(TrainerCommands, replay3dCmd) == 136);",
+    "static_assert(offsetof(TrainerCommands, replay3dRunId) == 140);",
+    "static_assert(offsetof(TrainerCommands, replay3dSeconds) == 148);",
+    "static_assert(offsetof(TrainerCommands, replay3dOptions) == 156);",
+    "static_assert(offsetof(TrainerCommands, replay3dSpeed) == 160);",
+    "static_assert(sizeof(TrainerCommands) <= kPayloadOffset-kCommandOffset);",
+]
+checks += [
+    "static_assert(offsetof(TrainerCommands, replay3dLoopA) == 164);",
+    "static_assert(offsetof(TrainerCommands, replay3dLoopB) == 172);",
+    "static_assert(offsetof(TrainerCommands, replay3dFollowDistance) == 180);",
+    "static_assert(offsetof(TrainerCommands, replay3dFollowHeight) == 184);",
+    "static_assert(offsetof(TrainerCommands, replay3dTrailSeconds) == 188);",
+]
+checks += [
+    f"static_assert(offsetof(GameData, {field['name']}) == {field['offset']});"
+    for field in fields
+]
 header = header[:start] + "\n".join(checks) + "\n\n" + header[end:]
 protocol_path = root / "Mod/SharedMemoryProtocol.cs"
 protocol = protocol_path.read_text()
-protocol = re.sub(r'ItStealsSharedMem\.v\d+', f"ItStealsSharedMem.v{layout['version']}", protocol)
-protocol = re.sub(r'(Magic = 0x53535449, Version = )\d+', rf"\g<1>{layout['version']}", protocol)
-for path, content in [(root / "Mod/SharedLayout.cs", cs), (header_path, header), (protocol_path, protocol)]:
+protocol = re.sub(
+    r"ItStealsSharedMem\.v\d+", f"ItStealsSharedMem.v{layout['version']}", protocol
+)
+protocol = re.sub(
+    r"(Magic = 0x53535449, Version = )\d+", rf"\g<1>{layout['version']}", protocol
+)
+for path, content in [
+    (root / "Mod/SharedLayout.cs", cs),
+    (header_path, header),
+    (protocol_path, protocol),
+]:
     if args.check:
         assert path.read_text() == content, f"Regenerate {path.name}"
     else:

@@ -1,2 +1,0 @@
-RUN /workspace/scratch/7083248ce79b/analysis/tools/usr/bin/mono
-mod PASS

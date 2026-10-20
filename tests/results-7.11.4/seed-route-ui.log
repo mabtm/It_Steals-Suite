@@ -1,2 +1,0 @@
-Seed route actual ImGui: 480/1280 at 100/150 DPI; optimal toggle, immediate full route, completed prefix persists across repeated pulse cycles, restart/pause/resume, white pulse over cyan route and reduced motion: PASS
-7.11.4 real ImGui: route survives same-layout working/completed refresh, new seed/session resets, partial route retains checked pieces without crossing unknown gaps or showing a pulse in them at 480/1280 and 100/150 DPI: PASS

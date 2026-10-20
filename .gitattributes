@@ -1,5 +1,5 @@
-# Preserve the exact supplied bytes, including source and replay fixture hashes.
-* -text
+# Normalize source text; preserve binary recordings and release files.
+* text=auto eol=lf
 *.png binary
 *.gif binary
 *.jpg binary
@@ -13,3 +13,7 @@
 *.isrun binary
 *.isinput binary
 *.isaudio binary
+
+*.bin binary
+*.gz binary
+*.asc -text

@@ -1,1 +1,0 @@
-Production frame channel / host graphics doubles: v2 pose bytes, serial handshake, top-down BGRA, nonfinite pose/dimensions/options rejection, capture error publication, disconnect cleanup: PASS

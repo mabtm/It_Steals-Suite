@@ -1,4 +1,0 @@
-RUN g++
-RUN /workspace/scratch/ef104db600fd/checks/portable-tests-final-695
-Portable C#/C++ generation, old-pipeline ranking parity, 1/3/6 workers, seed counting, spawn filter, cancellation/restart and strict validation: PASS
-portable PASS

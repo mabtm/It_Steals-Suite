@@ -41,5 +41,24 @@ __pycache__/
 **/MelonLoader.dll
 **/0Harmony.dll
 
-# The three supplied bin/ release files, existing test fixtures, previews,
-# third-party encoder sources and notices are intentionally versioned.
+# Generated output, user recordings, and editor backups
+/build/
+/tests/results*/
+/tests/previews*/
+/Encoder/.encoder-build.*/
+*.draw
+*.log
+*.tmp
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+*~
+AENDERUNGEN*
+ÄNDERUNGEN*
+**/RunReviews/
+**/ReplayInbox/
+
+# Supplied bin/ releases, fixed test fixtures, and encoder sources/licenses
+# are intentional inputs and remain versioned.

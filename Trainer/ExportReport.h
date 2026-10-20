@@ -7,13 +7,23 @@
 #include <iomanip>
 #include <atomic>
 #include <memory>
-namespace suite_clip {
-struct ExportPipelineStats {
-    std::atomic<uint64_t> sceneFrames{0},asyncSceneFrames{0},compositionFrames{0},peakInFlight{0};
-    std::atomic<uint64_t> sceneRenderMicros{0},sceneReadbackMicros{0},sceneTransferMicros{0},composeMicros{0},compositionReadbackMicros{0};
-    static uint64_t Micros(double ms){return std::isfinite(ms)&&ms>0?uint64_t(std::min(ms,60000.)*1000):0;}
+
+namespace suite_clip
+{
+struct ExportPipelineStats
+{
+    std::atomic<uint64_t> sceneFrames{0}, asyncSceneFrames{0}, compositionFrames{0}, peakInFlight{0};
+    std::atomic<uint64_t> sceneRenderMicros{0}, sceneReadbackMicros{0}, sceneTransferMicros{0},
+        composeMicros{0}, compositionReadbackMicros{0};
+
+    static uint64_t Micros(double ms)
+    {
+        return std::isfinite(ms) && ms > 0 ? uint64_t(std::min(ms, 60000.) * 1000) : 0;
+    }
 };
-struct ExportSource {
+
+struct ExportSource
+{
     int64_t run = 0;
     int seed = 0, scene = 0;
     std::string hash;
@@ -21,8 +31,10 @@ struct ExportSource {
     practice::ReplayAudioInfo audio;
     std::shared_ptr<ExportPipelineStats> pipeline;
 };
+
 inline void WriteExportReport(const std::filesystem::path &output, const Options &o, ExportSource source,
-                              double wallSeconds) {
+                              double wallSeconds)
+{
     auto path = output;
     path += L".json";
     // The video is already complete. Never replace an existing sidecar.
@@ -44,12 +56,25 @@ inline void WriteExportReport(const std::filesystem::path &output, const Options
          << ",\n  \"firstSourceTime\": " << o.At(0) << ",\n  \"lastSourceTime\": " << o.At(o.Frames() - 1)
          << ",\n  \"sizeLimitBytes\": " << o.maxFileBytes
          << ",\n  \"actualBytes\": " << (o.format == 3 ? 0 : std::filesystem::file_size(output))
-         << ",\n  \"exportWallSeconds\": " << wallSeconds << ",\n  \"audio\": " << (o.AudioEnabled()?"true":"false") << ",\n  \"audioSourceFlags\": " << source.audio.flags << ",\n  \"audioSourceGaps\": " << source.audio.gaps << ",\n  \"audioOutputRate\": " << (o.AudioEnabled()?48000:0);
-    if(source.pipeline){const auto& p=*source.pipeline;file<<",\n  \"pipelineSlots\": 3,\n  \"peakFramesInFlight\": "<<p.peakInFlight.load()
-        <<",\n  \"sceneFrames\": "<<p.sceneFrames.load()<<",\n  \"asyncSceneFrames\": "<<p.asyncSceneFrames.load()
-        <<",\n  \"sceneRenderMilliseconds\": "<<p.sceneRenderMicros.load()/1000.<<",\n  \"sceneReadbackLatencyMilliseconds\": "<<p.sceneReadbackMicros.load()/1000.
-        <<",\n  \"sceneTransferMilliseconds\": "<<p.sceneTransferMicros.load()/1000.<<",\n  \"compositionFrames\": "<<p.compositionFrames.load()
-        <<",\n  \"compositionMilliseconds\": "<<p.composeMicros.load()/1000.<<",\n  \"compositionReadbackLatencyMilliseconds\": "<<p.compositionReadbackMicros.load()/1000.;}
-    file<<"\n}\n";
+         << ",\n  \"exportWallSeconds\": " << wallSeconds
+         << ",\n  \"audio\": " << (o.AudioEnabled() ? "true" : "false")
+         << ",\n  \"audioSourceFlags\": " << source.audio.flags
+         << ",\n  \"audioSourceGaps\": " << source.audio.gaps
+         << ",\n  \"audioOutputRate\": " << (o.AudioEnabled() ? 48000 : 0);
+    if (source.pipeline)
+    {
+        const auto &p = *source.pipeline;
+        file << ",\n  \"pipelineSlots\": 3,\n  \"peakFramesInFlight\": " << p.peakInFlight.load()
+             << ",\n  \"sceneFrames\": " << p.sceneFrames.load()
+             << ",\n  \"asyncSceneFrames\": " << p.asyncSceneFrames.load()
+             << ",\n  \"sceneRenderMilliseconds\": " << p.sceneRenderMicros.load() / 1000.
+             << ",\n  \"sceneReadbackLatencyMilliseconds\": " << p.sceneReadbackMicros.load() / 1000.
+             << ",\n  \"sceneTransferMilliseconds\": " << p.sceneTransferMicros.load() / 1000.
+             << ",\n  \"compositionFrames\": " << p.compositionFrames.load()
+             << ",\n  \"compositionMilliseconds\": " << p.composeMicros.load() / 1000.
+             << ",\n  \"compositionReadbackLatencyMilliseconds\": "
+             << p.compositionReadbackMicros.load() / 1000.;
+    }
+    file << "\n}\n";
 }
 } // namespace suite_clip
