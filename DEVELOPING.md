@@ -9,6 +9,8 @@ The suite has two runtimes: **Mod/** runs inside Unity through MelonLoader; **Tr
 | Mod/ | Game hooks, capture, scene geometry, seed generation, run storage, and replay rendering |
 | Trainer/ | Overlay, settings, background routing/search, Inspector, replay library, and export orchestration |
 | Trainer/imgui/ | Unmodified third-party UI sources and their license |
+| Installer/ | Guided setup, verified file installation, release packaging, and ownership-aware uninstall |
+| assets/ | Editable repository branding and pre-generated Windows icon/installer graphics |
 | tests/ | Logic tests, platform contract adapters, benchmarks, and fixed compatibility fixtures |
 | bin/ | Supplied compatible trainer, mod, and separate video encoder |
 | Encoder/ | Encoder build script, corresponding source archives, signatures, and licenses |
@@ -27,6 +29,26 @@ Install Visual Studio C++ Build Tools with a Windows SDK, .NET Framework 4.7.2 t
 The script locates Mono-compatible loader/Harmony references and MSBuild, then builds both projects into **bin/**. If necessary, pass `-MelonAssemblyPath`, `-HarmonyAssemblyPath`, or `-PlatformToolset v143` for your installed tools; the project defaults to v145. A source build replaces the local supplied trainer/mod binaries, so validate it before distributing a release.
 
 Original game, Unity, loader, and Harmony assemblies are local build inputs. Do not commit them. Rebuild the encoder separately with **Encoder/build-encoder.sh** on Linux/WSL; distribute its source/licenses and update the trainer's encoder identity together, as described in [Encoder/NOTICE.md](Encoder/NOTICE.md).
+
+## Release packages
+
+On Windows, install **NSIS 3** alongside C++ Build Tools, then run:
+
+```powershell
+.\tests\installer_tests.ps1
+.\Installer\Release.ps1 -PlatformToolset v143
+.\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
+```
+
+The release script builds the native trainer with an embedded icon/version resource and static runtime, bundles the compatible existing mod **7.11.4**, and writes Setup, portable ZIP, individual binaries, corresponding encoder sources, and checksums to **build/release/**. It does not claim to rebuild the SDK-dependent mod. Use the main build script for a complete mod/trainer source build.
+
+The release workflow runs the portable suite on Linux, then installer contracts, the real MSVC build, packaging, and a controlled Windows launcher smoke test. Only then does it create a draft, upload all seven assets, and publish the release. Existing published versions are kept; increment **SUITE_VERSION** in **Trainer/SuiteBranding.h** for a new release. No long-lived publishing token is stored in the repository.
+
+Installer tests cover corruption, traversal, rollback, loader preservation, the actual pinned official archive, and uninstall ownership using temporary folders. Launcher tests use an isolated x64 test executable and local settings; they do not launch or certify a live Unity session. Native installation UI/UAC and in-game behavior still need a Windows game check.
+
+The installer keeps complete existing MelonLoader installations. New installs use the official **0.7.3 x64** archive with a pinned SHA-256, bounded download and extraction, and transactional file writes. Uninstall preserves modified files, other mods, shared MelonLoader, and user data.
+
+Branding uses the existing Suite route mark. Normal builds use committed assets; to regenerate icons/installer bitmaps, install Pillow/CairoSVG and run **assets/build.py**. README screenshots are production ImGui captures using synthetic test fixtures.
 
 ## Reproducible checks
 

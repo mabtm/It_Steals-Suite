@@ -26,6 +26,7 @@ struct TrainerPreferences
     AppearancePreferences appearance;
     ReplayPreferences replay;
     bool reports = false;
+    bool autoStartGame = true;
     bool rawSpawn = false;
     bool compact = false, minimap = true, path = false, lockAspect = true;
     bool player = true, crystals = true, monster = true, visuals = true;
@@ -75,7 +76,7 @@ struct TrainerPreferences
             << "\nlockAspect=" << lockAspect << "\nplayer=" << player << "\ncrystals=" << crystals
             << "\nmonster=" << monster << "\nvisuals=" << visuals << "\nwidth=" << width
             << "\nheight=" << height << "\nfps=" << fps << "\nlevel=" << level << "\nseed=" << seed
-            << "\nopacity=" << opacity << '\n';
+            << "\nautoStartGame=" << autoStartGame << "\nopacity=" << opacity << '\n';
         const float *colors[] = {background, text, header, accent};
         const char *names[] = {"background", "text", "header", "accent"};
         for (int c = 0; c < 4; c++)
@@ -153,6 +154,8 @@ struct TrainerPreferences
                 result.speedrun.Decode(
                     field, version < 12 && field.rfind("order", 0) == 0 && integer >= 25 ? -1 : value);
             }
+            else if (key == "autoStartGame" && (value == 0 || value == 1))
+                result.autoStartGame = flag;
             else if (key == "compact")
                 result.compact = flag;
             else if (key == "frameLimitMode")

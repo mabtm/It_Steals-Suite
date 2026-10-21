@@ -1,0 +1,151 @@
+name: Build and publish PracticeSuite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'Trainer/**'
+      - 'Mod/**'
+      - 'Installer/**'
+      - 'assets/**'
+      - 'bin/**'
+      - 'tests/**'
+      - 'protocol-layout.json'
+      - 'generate-layout.py'
+      - '.github/workflows/release.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribution-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Production logic and UI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install managed test tools
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends mono-mcs mono-runtime
+      - name: Test production logic, UI, and managed contracts
+        run: python3 tests/run.py --ui --managed --jobs 2 --output build/verification
+      - name: Retain verification logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: production-verification
+          path: |
+            build/verification/summary.json
+            build/verification/**/*.log
+          retention-days: 14
+          if-no-files-found: warn
+
+  release:
+    name: Windows build, installer, and release
+    needs: verify
+    runs-on: windows-2022
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Ensure NSIS 3 is installed
+        run: |
+          if (-not (Test-Path (Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'))) {
+            choco install nsis --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed.' }
+          }
+      - name: Verify installer contracts and pinned official loader
+        run: |
+          & .\tests\installer_tests.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Installer contract tests failed.' }
+      - name: Build native trainer and all release packages
+        run: |
+          & .\Installer\Release.ps1 -PlatformToolset v143 -SourceCommit $env:GITHUB_SHA
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Release packaging failed.' }
+      - name: Test the real Windows launcher against a controlled executable
+        run: |
+          & .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native launcher smoke test failed.' }
+      - name: Retain packages and Windows verification
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-distribution
+          path: |
+            build/release/*
+            build/installer-tests/summary.json
+            build/windows-launcher-tests/summary.json
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Refresh the supplied trainer from the verified Windows build
+        if: github.ref == 'refs/heads/main'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git add -- bin/ItStealsTrainer.exe
+          git diff --cached --quiet -- bin/ItStealsTrainer.exe
+          if ($LASTEXITCODE -eq 1) {
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Update verified PracticeSuite trainer [skip ci]"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not commit the verified trainer.' }
+            git push origin HEAD:main
+            if ($LASTEXITCODE -ne 0) { throw 'The source branch changed; inspect it before retrying publication.' }
+          } elseif ($LASTEXITCODE -ne 0) {
+            throw 'Could not compare the supplied trainer.'
+          }
+      - name: Publish a complete release after every check passes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $header = Get-Content .\Trainer\SuiteBranding.h -Raw
+          $version = [regex]::Match($header, '#define SUITE_VERSION "(\d+\.\d+\.\d+)"').Groups[1].Value
+          if (-not $version) { throw 'Release version is missing.' }
+          $tag = "v$version"
+          $existing = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect existing releases.' }
+          $release = @($existing | ConvertFrom-Json) | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
+          if ($release -and -not $release.draft) {
+            Write-Output "Release $tag is already published. Increment SUITE_VERSION to publish another version."
+            exit 0
+          }
+          if ($release -and $release.target_commitish -ne $env:GITHUB_SHA) {
+            throw 'A draft for this version belongs to another commit. Review it before reusing the version.'
+          }
+          $notes = @'
+          Guided installation, automatic game startup, and a new repository presentation.
+
+          - Setup installs the trainer, encoder, and mod; detects Steam libraries; verifies official MelonLoader 0.7.3 when needed; and creates branded shortcuts.
+          - Existing complete MelonLoader installations, other mods, settings, and replays are preserved.
+          - The trainer starts It Steals once on launch. Disable it under Settings > System or use --no-launch.
+          - Portable ZIP and all three runtime binaries are available separately. Keep encoder sources and licenses when redistributing the encoder.
+          - Trainer 7.12.0 uses the compatible mod 7.11.4 and protocol 29.
+          - Both Hide & Seek modes retain WIP map geometry and seed search.
+
+          Verification: production logic/UI/managed contracts, Windows installer contracts, native MSVC build, package integrity, and controlled Windows launcher smoke tests. This does not replace testing in a live Unity game. Builds are unsigned. Observed local run validation is not tamper-proof certification.
+
+          Author: mab
+          '@
+          $notesFile = Join-Path $env:RUNNER_TEMP 'practice-suite-release.md'
+          [IO.File]::WriteAllText($notesFile, $notes, (New-Object Text.UTF8Encoding($false)))
+          if (-not $release) {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "PracticeSuite $tag / mab" --notes-file $notesFile --draft
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create release draft.' }
+          }
+          $names = @('ItStealsSuite-Setup.exe','ItStealsSuite-Portable.zip','ItStealsTrainer.exe','PracticeSuiteEncoder.exe','ItStealsHelper.dll','Encoder-Sources.zip','SHA256SUMS.txt')
+          $assets = @($names | ForEach-Object {
+            $path = Join-Path (Get-Location) "build/release/$_"
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing release asset: $_" }
+            $path
+          })
+          gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed; release remains a draft.' }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

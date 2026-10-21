@@ -617,6 +617,11 @@ void RenderMainWindow(const std::string &mode, int seed)
                 }
                 if (suite_ui::BeginTabItem("System"))
                 {
+                    ImGui::TextColored(g_headerCol, "Startup");
+                    suite_ui::Checkbox("Start It Steals with PracticeSuite", &g_autoStartGame);
+                    Help(
+                        "Start the installed game once when the trainer opens. An existing game is reused. Closing the game does not restart it. Use --no-launch to skip this once.");
+                    ImGui::Separator();
                     ImGui::TextColored(g_headerCol, "Interface");
                     suite_ui::Checkbox("UI sounds", &suite_ui::preferences.sounds);
                     Help(
@@ -679,6 +684,7 @@ void RenderMainWindow(const std::string &mode, int seed)
                 defaults.level = g_selectedSpeedrunLevel;
                 defaults.seed = g_practiceSeed;
                 defaults.reports = g_reportsEnabled;
+                defaults.autoStartGame = g_autoStartGame;
                 ApplyPreferences(defaults);
             }
             if (suite_ui::Button("Save settings now"))

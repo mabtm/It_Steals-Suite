@@ -17,3 +17,5 @@
 *.bin binary
 *.gz binary
 *.asc -text
+
+*.bmp binary

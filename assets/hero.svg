@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="520" viewBox="0 0 1440 520">
+<title>It Steals PracticeSuite 7.12.0 by mab</title>
+<defs>
+<linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101c23"/><stop offset="1" stop-color="#0b141a"/></linearGradient>
+<radialGradient id="glow"><stop stop-color="#386b5e" stop-opacity=".32"/><stop offset="1" stop-color="#102029" stop-opacity="0"/></radialGradient>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#42615d" stroke-opacity=".12"/></pattern>
+</defs>
+<rect width="1440" height="520" rx="28" fill="url(#bg)"/><rect width="1440" height="520" rx="28" fill="url(#grid)"/>
+<ellipse cx="1100" cy="250" rx="450" ry="340" fill="url(#glow)"/>
+<g font-family="Segoe UI,DejaVu Sans,Arial,sans-serif">
+<g fill="#83e6d2" stroke="#83e6d2" transform="translate(58 46) scale(.15)">
+<path d="M61 399V123H230V287H435V61" fill="none" stroke-width="20"/><circle cx="61" cy="399" r="33" fill="#101c23" stroke-width="13"/>
+<path d="m230 90 33 33-33 33-33-33zm205 164 33 33-33 33-33-33zm0-226 33 33-33 33-33-33z" stroke="none"/>
+</g>
+<text x="151" y="79" fill="#edf8f5" font-size="25" font-weight="700" letter-spacing="2">PRACTICE SUITE</text>
+<text x="151" y="106" fill="#8dafa9" font-size="17" letter-spacing="2">IT STEALS / BY MAB</text>
+<rect x="58" y="154" width="258" height="33" rx="16" fill="#19372f" stroke="#2f6554"/>
+<text x="77" y="176" fill="#9ce6bd" font-size="16" font-weight="600">v7.12.0 · WINDOWS x64</text>
+<text x="58" y="250" fill="#f1f8f7" font-size="54" font-weight="700" letter-spacing="-1.8">Your next run,</text>
+<text x="58" y="312" fill="#8ee5d1" font-size="54" font-weight="700" letter-spacing="-1.8">better understood.</text>
+<text x="60" y="361" fill="#a5babd" font-size="21">Practice layouts. Find routes. Review every move.</text>
+<path d="M60 401H641" stroke="#2e4249"/>
+<text x="60" y="443" fill="#dbece9" font-size="18">PRACTICE</text><text x="210" y="443" fill="#53776e" font-size="18">/</text>
+<text x="247" y="443" fill="#dbece9" font-size="18">ANALYZE</text><text x="386" y="443" fill="#53776e" font-size="18">/</text>
+<text x="423" y="443" fill="#dbece9" font-size="18">CREATE</text>
+<g transform="translate(820 56)">
+<rect width="558" height="412" rx="20" fill="#101d23" stroke="#35514c"/>
+<circle cx="27" cy="26" r="4" fill="#89e1b2"/><text x="42" y="32" fill="#afcac2" font-size="15" letter-spacing="1.5">ROUTE WORKSPACE</text>
+<text x="398" y="32" fill="#678981" font-size="13">SCHEMATIC</text><path d="M0 52H558" stroke="#2b403f"/>
+<g transform="translate(30 78)">
+<path d="M0 0H344V236H0Z M74 0V84H155 M73 156V236 M235 0V98 M235 165V236 M156 158V236" fill="none" stroke="#516367" stroke-width="10" stroke-linecap="square"/>
+<path d="M34 202V116H193V131H304V32" fill="none" stroke="#77ddc6" stroke-width="4" stroke-linejoin="round"/>
+<circle cx="34" cy="202" r="10" fill="#101d23" stroke="#77ddc6" stroke-width="3"/>
+<path d="m193 120 11 11-11 11-11-11zm111-99 11 11-11 11-11-11z" fill="#e5be84"/>
+<path d="m111 110 8 6-8 6m156 3 8 6-8 6" fill="none" stroke="#effcf8" stroke-width="2"/>
+</g>
+<path d="M407 79V315" stroke="#2b403f"/>
+<text x="427" y="104" fill="#7c9b94" font-size="13">LAYOUT</text><text x="427" y="134" fill="#e9f4ee" font-size="18">Classic</text>
+<text x="427" y="186" fill="#7c9b94" font-size="13">CAPTURE</text><text x="427" y="216" fill="#8fe2bd" font-size="18">Replay</text>
+<text x="427" y="269" fill="#7c9b94" font-size="13">AUTHOR</text><text x="427" y="299" fill="#e9f4ee" font-size="18">mab</text>
+<path d="M29 354H529" stroke="#2b403f"/>
+<text x="29" y="386" fill="#abc2bc" font-size="15">One suite. From the first seed to the final frame.</text>
+</g></g></svg>

@@ -15,6 +15,7 @@
 #include <cassert>
 #include <iostream>
 
+bool g_autoStartGame = true;
 bool g_overlayVisible = true, g_allOverlayEnabled = true, g_quit = false, g_resetLayout = false;
 bool g_compactMode = false, g_showMinimapWindow = true, g_showPath = false, minimapLockAspect = true;
 bool g_showPlayerPanel = true, g_showCrystalPanel = true, g_showMonsterPanel = true,

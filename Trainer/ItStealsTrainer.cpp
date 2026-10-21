@@ -19,6 +19,7 @@
 #include "TrainerSettings.h"
 #include "HudEditorModel.h"
 #include "TrainerTray.h"
+#include "GameLaunch.h"
 
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
@@ -50,6 +51,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "ReplayArchive.h"
 #include "Replay3DControls.h"
 
+bool g_autoStartGame = true;
+std::string g_gameLaunchStatus = "Not requested";
 bool g_overlayVisible = false;
 bool g_allOverlayEnabled = true, g_quit = false, g_resetLayout = false;
 bool g_softwareRenderer = false;
@@ -255,6 +258,40 @@ DWORD GetProcessIdByName(const wchar_t *name)
     }
     CloseHandle(snapshot);
     return 0;
+}
+
+bool StartInstalledGame()
+{
+    try
+    {
+        if (GetProcessIdByName(L"It Steals.exe"))
+        {
+            g_gameLaunchStatus = "Game is already running";
+            return true;
+        }
+        auto location = game_launch::Resolve(game_launch::ApplicationDirectory(), game_launch::SteamRoots());
+        if (location.game.empty())
+        {
+            g_gameLaunchStatus = "Game not found. Run Suite Setup or configure installation.ini";
+            return false;
+        }
+        if (GetProcessIdByName(L"It Steals.exe"))
+            return true;
+        DWORD error = 0;
+        if (!game_launch::Start(location, error))
+        {
+            g_gameLaunchStatus = "Game launch failed (Windows error " + std::to_string(error) + ")";
+            return false;
+        }
+        g_gameLaunchStatus =
+            location.steam.empty() ? "Started configured game" : "Requested game through Steam";
+        return true;
+    }
+    catch (const std::exception &)
+    {
+        g_gameLaunchStatus = "Game location could not be read. Run Suite Setup again";
+        return false;
+    }
 }
 
 void CleanupDeviceD3D();
@@ -759,6 +796,7 @@ TrainerPreferences CollectPreferences()
     p.speedrun = g_speedrunLayout;
     p.map = g_mapOptions;
     p.reports = g_reportsEnabled;
+    p.autoStartGame = g_autoStartGame;
     p.planner = g_plannerOptions;
     p.compact = g_compactMode;
     p.minimap = g_showMinimapWindow;
@@ -799,6 +837,7 @@ void ApplyPreferences(TrainerPreferences p)
     g_speedrunLayout = p.speedrun;
     g_mapOptions = p.map;
     g_reportsEnabled = p.reports;
+    g_autoStartGame = p.autoStartGame;
     g_plannerOptions = p.planner;
     g_compactMode = p.compact;
     g_showMinimapWindow = p.minimap;
@@ -897,7 +936,9 @@ std::string BuildDiagnostics()
     out.imbue(std::locale::classic());
     out << "[Connection and build]\nAuthor: " << suite_brand::Author << "\nTrainer: " << suite_brand::Version
         << " / protocol " << kProtocolVersion << "\nMod: " << (g_pShared ? g_pShared->version : "--")
-        << "\nStatus: " << g_connectionStatus << "\nGame PID: " << g_gamePid;
+        << "\nAuto-start game: " << (g_autoStartGame ? "enabled" : "disabled")
+        << "\nLast game launch: " << g_gameLaunchStatus << "\nStatus: " << g_connectionStatus
+        << "\nGame PID: " << g_gamePid;
     if (g_pShared)
         out << "\nGame reported version: " << g_pShared->gameVersion << "; Unity: " << g_pShared->unityVersion
             << "\nGame assembly file SHA256: " << g_pShared->gameAssemblyHash << "\nModule base: 0x"
@@ -1371,6 +1412,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             nullptr,
             L"ItStealsPracticeOverlay.v6",
             nullptr};
+    g_wc.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(101));
+    g_wc.hIconSm = static_cast<HICON>(
+        LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(101), IMAGE_ICON, 16, 16, LR_SHARED));
     if (!RegisterClassExW(&g_wc))
     {
         MessageBoxW(nullptr, L"Could not create the window class.", L"Trainer", MB_ICONERROR);
@@ -1416,6 +1460,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     KeyEdge f2, f3, f4, f5, f6, shiftT, f8, pickerKey, replayTab, replayEscape, replaySpace, replayLeft,
         replayRight, replayHome, replayEnd, replayFast, replaySlow, replayMark;
     bool occluded = false;
+    game_launch::StartupOnce startup;
+    bool launchRequested =
+        startup.Plan(g_autoStartGame, GetProcessIdByName(L"It Steals.exe") != 0, game_launch::NoLaunchFlag());
     TrainerTray tray(
         [] {
             if (!IsWindow(g_gameWnd))
@@ -1426,11 +1473,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             g_compactMode = false;
             SetOverlayInteractive(true);
         },
-        [] { g_quit = true; });
+        [] { g_quit = true; }, [&] { launchRequested = true; });
     uint32_t previousOptions = 0;
     HWND previousForeground = nullptr;
     while (!g_quit)
     {
+        if (launchRequested)
+        {
+            launchRequested = false;
+            if (!StartInstalledGame())
+                tray.LaunchWarning();
+        }
         suite_ui::lifecycleTime = GetTickCount64() / 1000.0;
         MSG message{};
         int messages = 0;

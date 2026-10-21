@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="550" viewBox="0 0 720 550">
+<title>It Steals PracticeSuite 7.12.0 by mab</title>
+<defs><linearGradient id="b" x2="1" y2="1"><stop stop-color="#13242b"/><stop offset="1" stop-color="#0c161d"/></linearGradient><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#467065" stroke-opacity=".15"/></pattern></defs>
+<rect width="720" height="550" rx="24" fill="url(#b)"/><rect width="720" height="550" rx="24" fill="url(#g)"/>
+<g font-family="Segoe UI,DejaVu Sans,Arial,sans-serif">
+<g transform="translate(42 42) scale(.17)" stroke="#89e4cf"><path d="M61 399V123H230V287H435V61" fill="none" stroke-width="20"/><circle cx="61" cy="399" r="33" fill="#13242b" stroke-width="13"/><path d="m230 90 33 33-33 33-33-33zm205 164 33 33-33 33-33-33zm0-226 33 33-33 33-33-33z" fill="#89e4cf" stroke="none"/></g>
+<text x="153" y="84" fill="#eff7f3" font-size="31" font-weight="700" letter-spacing="1">PRACTICE SUITE</text>
+<text x="153" y="119" fill="#a2bdb6" font-size="23">IT STEALS / BY MAB</text>
+<rect x="42" y="177" width="322" height="46" rx="22" fill="#203f34" stroke="#39644e"/>
+<text x="61" y="208" fill="#a4e8c1" font-size="23">v7.12.0 · WINDOWS x64</text>
+<text x="42" y="303" fill="#eff8f4" font-size="56" font-weight="700" letter-spacing="-1.5">Your next run,</text>
+<text x="42" y="371" fill="#92e4d1" font-size="56" font-weight="700" letter-spacing="-1.5">better understood.</text>
+<text x="42" y="429" fill="#a9c3ba" font-size="25">Practice layouts. Find routes.</text>
+<text x="42" y="467" fill="#a9c3ba" font-size="25">Review every move.</text>
+<path d="M42 501H678" stroke="#37554a"/>
+</g></svg>

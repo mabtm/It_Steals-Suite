@@ -3,6 +3,7 @@
 #include <shellapi.h>
 #include <functional>
 #include <string>
+#include "SuiteBranding.h"
 
 // A stable control window survives game/overlay recreation. It never covers
 // the game and gives a waiting trainer an explicit, reachable Exit command.
@@ -13,7 +14,11 @@ class TrainerTray
     bool present = false, canOpen = false;
     ULONGLONG nextRetry = 0;
     std::wstring tooltip;
-    std::function<void()> open, quit;
+    std::function<void()> open, quit, launch;
+    std::wstring brand =
+        L"PracticeSuite v" +
+        std::wstring(suite_brand::Version, suite_brand::Version + sizeof(suite_brand::Version) - 1) +
+        L" / mab";
     static constexpr UINT callback = WM_APP + 42;
 
     NOTIFYICONDATAW Data() const
@@ -24,7 +29,9 @@ class TrainerTray
         data.uID = 1;
         data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         data.uCallbackMessage = callback;
-        data.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        data.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(101));
+        if (!data.hIcon)
+            data.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
         wcsncpy(data.szTip, tooltip.c_str(), 127);
         data.szTip[127] = 0;
         return data;
@@ -69,6 +76,8 @@ class TrainerTray
                     AppendMenuW(menu, MF_STRING | (self->canOpen ? 0 : MF_GRAYED), 1,
                                 L"Open PracticeSuite menu");
                     AppendMenuW(menu, MF_STRING, 2, L"Exit PracticeSuite");
+                    if (!self->canOpen && self->launch)
+                        AppendMenuW(menu, MF_STRING, 3, L"Start It Steals");
                     SetForegroundWindow(hwnd);
                     UINT selected = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
                                                    cursor.x, cursor.y, 0, hwnd, nullptr);
@@ -78,6 +87,8 @@ class TrainerTray
                         self->open();
                     if (selected == 2)
                         self->quit();
+                    if (selected == 3 && self->launch)
+                        self->launch();
                 }
                 return 0;
             }
@@ -91,7 +102,9 @@ class TrainerTray
     }
 
   public:
-    TrainerTray(std::function<void()> onOpen, std::function<void()> onQuit) : open(onOpen), quit(onQuit)
+    TrainerTray(std::function<void()> onOpen, std::function<void()> onQuit,
+                std::function<void()> onLaunch = {})
+        : open(onOpen), quit(onQuit), launch(onLaunch)
     {
         WNDCLASSW type{};
         type.lpfnWndProc = Proc;
@@ -101,7 +114,7 @@ class TrainerTray
         {
             window = CreateWindowExW(WS_EX_TOOLWINDOW, type.lpszClassName, L"It Steals PracticeSuite",
                                      WS_OVERLAPPED, 0, 0, 0, 0, nullptr, nullptr, type.hInstance, this);
-            tooltip = L"PracticeSuite 6 | waiting for It Steals";
+            tooltip = brand + L" | waiting for It Steals";
             if (window)
                 Add();
         }
@@ -124,7 +137,7 @@ class TrainerTray
     void Update(const std::string &status, bool gameExists)
     {
         canOpen = gameExists;
-        std::wstring next = L"PracticeSuite 6 | " + std::wstring(status.begin(), status.end());
+        std::wstring next = brand + L" | " + std::wstring(status.begin(), status.end());
         if (next != tooltip)
         {
             tooltip = next;
@@ -137,5 +150,18 @@ class TrainerTray
         }
         if (window && !present && GetTickCount64() >= nextRetry)
             Add();
+    }
+
+    void LaunchWarning()
+    {
+        if (!present)
+            return;
+        auto data = Data();
+        data.uFlags = NIF_INFO;
+        data.dwInfoFlags = NIIF_WARNING;
+        wcscpy(data.szInfoTitle, L"It Steals could not be started");
+        wcscpy(data.szInfo,
+               L"Run PracticeSuite Setup or start the game manually. Details are available in Diagnostics.");
+        Shell_NotifyIconW(NIM_MODIFY, &data);
     }
 };
