@@ -9,7 +9,7 @@ The suite has two runtimes: **Mod/** runs inside Unity through MelonLoader; **Tr
 | Mod/ | Game hooks, capture, scene geometry, seed generation, run storage, and replay rendering |
 | Trainer/ | Overlay, settings, background routing/search, Inspector, replay library, and export orchestration |
 | Trainer/imgui/ | Unmodified third-party UI sources and their license |
-| Installer/ | Guided setup, verified file installation, release packaging, and ownership-aware uninstall |
+| Installer/ | Guided setup, verified installation/updates, release packaging, and ownership-aware uninstall |
 | assets/ | Editable repository branding and pre-generated Windows icon/installer graphics |
 | tests/ | Logic tests, platform contract adapters, benchmarks, and fixed compatibility fixtures |
 | bin/ | Supplied compatible trainer, mod, and separate video encoder |
@@ -36,19 +36,30 @@ On Windows, install **NSIS 3** alongside C++ Build Tools, then run:
 
 ```powershell
 .\tests\installer_tests.ps1
+.\tests\updater_tests.ps1
 .\Installer\Release.ps1 -PlatformToolset v143
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
 The release script builds the native trainer with an embedded icon/version resource and static runtime, bundles the compatible existing mod **7.11.4**, and writes Setup, portable ZIP, individual binaries, corresponding encoder sources, and checksums to **build/release/**. It does not claim to rebuild the SDK-dependent mod. Use the main build script for a complete mod/trainer source build.
 
-The release workflow runs the portable suite on Linux, then installer contracts, the real MSVC build, packaging, and a controlled Windows launcher smoke test. Only then does it create a draft, upload all seven assets, and publish the release. Existing published versions are kept; increment **SUITE_VERSION** in **Trainer/SuiteBranding.h** for a new release. No long-lived publishing token is stored in the repository.
+The release workflow runs the portable suite on Linux, then installer contracts, the real MSVC build, packaging, controlled Windows launcher/update process tests, and an authenticated download of the existing private release through the production WinHTTP transport. Only then does it create a draft, upload all seven assets, and publish the release. Existing published versions are kept; increment **SUITE_VERSION** in **Trainer/SuiteBranding.h** for a new release. Release notes come from the complete current entry in CHANGELOG.md. No long-lived publishing token is stored in the repository.
 
 Installer tests cover corruption, traversal, rollback, loader preservation, the actual pinned official archive, and uninstall ownership using temporary folders. Launcher tests use an isolated x64 test executable and local settings; they do not launch or certify a live Unity session. Native installation UI/UAC and in-game behavior still need a Windows game check.
 
 The installer keeps complete existing MelonLoader installations. New installs use the official **0.7.3 x64** archive with a pinned SHA-256, bounded download and extraction, and transactional file writes. Uninstall preserves modified files, other mods, shared MelonLoader, and user data.
 
 Branding uses the existing Suite route mark. Normal builds use committed assets; to regenerate icons/installer bitmaps, install Pillow/CairoSVG and run **assets/build.py**. README screenshots are production ImGui captures using synthetic test fixtures.
+
+## Update contract
+
+**SuiteUpdateModel.h** owns bounded release parsing, semantic version comparison, asset identity, and prompt rules. **SuiteUpdater.h** owns one background WinHTTP/hash worker, immutable UI snapshots, Windows Credential Manager, and staging. **SuiteUpdateUI.h** renders the Updates workspace, prompt, and embedded changelog. Windows resources embed the current updater, installer, and full CHANGELOG.md, so individual trainer downloads retain the trusted bootstrap.
+
+Only stable releases from **mabtm/It_Steals-Suite** are selected. Downloads require the exact portable asset name, a bounded size, and GitHub's SHA-256 digest. HTTPS requests retain certificate verification; redirects are handled explicitly, and Authorization is sent only to api.github.com. Missing access or an incomplete package never triggers installation.
+
+**Installer/Update.ps1** verifies and extracts the package, checks exact process image paths and creation times, requests elevation before closing applications, and reuses **Install-Suite** for transactional replacement and rollback. Its original controller restarts the trainer without elevation; **--restart-after-update** requests game startup even when ordinary auto-start is disabled. No GitHub token is passed to the helper. Update preferences contain only the auto-check choice and last-read changelog version; prompt suppression is per running trainer/game session.
+
+The Windows transport test reads a short-lived Actions token from its explicit test environment, exercises real Credential Manager and private release/CDN downloads, verifies the complete package, and deletes the credential. It refuses to replace an existing saved credential. Process fixtures and filesystem fault injection test the production apply step without interacting with a real Unity game. Interactive UAC acceptance, live game shutdown, and restart still need an in-game test.
 
 ## Reproducible checks
 

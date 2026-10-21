@@ -67,6 +67,10 @@ jobs:
         run: |
           & .\tests\installer_tests.ps1
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Installer contract tests failed.' }
+      - name: Verify transactional updater and process ownership
+        run: |
+          & .\tests\updater_tests.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Updater contract tests failed.' }
       - name: Build native trainer and all release packages
         run: |
           & .\Installer\Release.ps1 -PlatformToolset v143 -SourceCommit $env:GITHUB_SHA
@@ -75,6 +79,12 @@ jobs:
         run: |
           & .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native launcher smoke test failed.' }
+      - name: Test the production updater against the existing private release
+        env:
+          SUITE_UPDATE_TEST_TOKEN: ${{ github.token }}
+        run: |
+          & .\tests\updater_windows_tests.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native updater transport test failed.' }
       - name: Retain packages and Windows verification
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -84,6 +94,8 @@ jobs:
             build/release/*
             build/installer-tests/summary.json
             build/windows-launcher-tests/summary.json
+            build/updater-tests/summary.json
+            build/windows-updater-tests/summary.json
           retention-days: 14
           if-no-files-found: warn
       - name: Refresh the supplied trainer from the verified Windows build
@@ -119,19 +131,18 @@ jobs:
           if ($release -and $release.target_commitish -ne $env:GITHUB_SHA) {
             throw 'A draft for this version belongs to another commit. Review it before reusing the version.'
           }
-          $notes = @'
-          Guided installation, automatic game startup, and a new repository presentation.
+          $changelog = Get-Content .\CHANGELOG.md -Raw
+          $pattern = '(?ms)^### v' + [regex]::Escape($version) + ' Changelog\s*\r?\n(?<body>.*?)(?=^### v\d+\.\d+\.\d+ Changelog|\z)'
+          $changes = [regex]::Match($changelog, $pattern)
+          if (-not $changes.Success) { throw 'The complete current changelog is missing.' }
+          $notes = "### v$version Changelog`n`n" + $changes.Groups['body'].Value.Trim() + "`n`n" + @'
+          Install Setup once to enable in-game updates. Use Updates to check manually, install a verified release, or read the complete version history. Private builds require a GitHub token with Contents: read access; it is stored only in Windows Credential Manager.
 
-          - Setup installs the trainer, encoder, and mod; detects Steam libraries; verifies official MelonLoader 0.7.3 when needed; and creates branded shortcuts.
-          - Existing complete MelonLoader installations, other mods, settings, and replays are preserved.
-          - The trainer starts It Steals once on launch. Disable it under Settings > System or use --no-launch.
-          - Portable ZIP and all three runtime binaries are available separately. Keep encoder sources and licenses when redistributing the encoder.
-          - Trainer 7.12.0 uses the compatible mod 7.11.4 and protocol 29.
-          - Both Hide & Seek modes retain WIP map geometry and seed search.
+          Installation preserves settings, replays, other mods, and existing MelonLoader. Accept the Windows permission prompt to update; the game and trainer restart automatically. Both Hide & Seek modes remain WIP for minimap geometry and seed search.
 
-          Verification: production logic/UI/managed contracts, Windows installer contracts, native MSVC build, package integrity, and controlled Windows launcher smoke tests. This does not replace testing in a live Unity game. Builds are unsigned. Observed local run validation is not tamper-proof certification.
+          Compatible mod: 7.11.4 / protocol 29. Author: mab.
 
-          Author: mab
+          Verification: production logic, ImGui UI, managed contracts, Windows installer/update transactions, controlled process ownership/launcher tests, native MSVC build, real private GitHub release download and SHA-256 verification. Live Unity and interactive UAC still require an in-game test. Builds are unsigned; local run validation is not tamper-proof certification.
           '@
           $notesFile = Join-Path $env:RUNNER_TEMP 'practice-suite-release.md'
           [IO.File]::WriteAllText($notesFile, $notes, (New-Object Text.UTF8Encoding($false)))

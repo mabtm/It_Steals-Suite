@@ -1,0 +1,29 @@
+[CmdletBinding()]
+param()
+Set-StrictMode -Version Latest
+$ErrorActionPreference='Stop'
+$root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+if(-not $env:SUITE_UPDATE_TEST_TOKEN){throw 'The private-repository transport check requires a CI token with release read access.'}
+$vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+$visualStudio=& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+if(-not $visualStudio){throw 'Visual C++ build tools are missing.'}
+$tools=Join-Path $visualStudio 'VC/Auxiliary/Build/vcvars64.bat'
+$out=Join-Path $root 'build/windows-updater-tests'
+$null=[IO.Directory]::CreateDirectory($out)
+$command=Join-Path $out 'compile.cmd'
+$lines=@(
+    '@echo off',
+    ('call "'+$tools+'" >nul'),
+    ('cd /d "'+(Join-Path $root 'Trainer')+'"'),
+    ('rc /nologo /fo "'+(Join-Path $out 'suite.res')+'" TrainerResources.rc'),
+    'if errorlevel 1 exit /b 1',
+    ('cl /nologo /std:c++20 /EHsc /MT /utf-8 /DUNICODE /D_UNICODE /DNOMINMAX /I"'+(Join-Path $root 'Trainer')+'" /Fo"'+(Join-Path $out 'contract.obj')+'" /Fe"'+(Join-Path $out 'contract.exe')+'" "'+(Join-Path $PSScriptRoot 'update_windows_contract.cpp')+'" "'+(Join-Path $out 'suite.res')+'" /link winhttp.lib advapi32.lib bcrypt.lib shell32.lib ole32.lib'),
+    'exit /b %errorlevel%'
+)
+[IO.File]::WriteAllLines($command,$lines,[Text.Encoding]::ASCII)
+& $env:ComSpec /d /c $command
+if($LASTEXITCODE -ne 0){throw 'Native updater contract compilation failed.'}
+& (Join-Path $out 'contract.exe')
+if($LASTEXITCODE -ne 0){throw 'Native updater transport contract failed.'}
+@{passed=$true;checks=@('actual private GitHub API','Credential Manager round trip and deletion','safe asset redirect','streamed package SHA-256 and length','embedded current and historical changelog');liveUacTested=$false}|
+    ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $out 'summary.json') -Encoding UTF8

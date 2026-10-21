@@ -9,7 +9,7 @@ SetCompressor /SOLID lzma
 !include "x64.nsh"
 !include "WinVer.nsh"
 !ifndef VERSION
-!define VERSION "7.12.0"
+!define VERSION "7.12.1"
 !endif
 !ifndef PAYLOAD
 !error "Pass -DPAYLOAD=<verified payload folder>"
@@ -140,6 +140,7 @@ Section "PracticeSuite" SEC_MAIN
         CreateShortcut "$DESKTOP\It Steals PracticeSuite.lnk" "$INSTDIR\ItStealsTrainer.exe" "" "$INSTDIR\ItStealsTrainer.exe" 0
     ${EndIf}
     WriteRegStr HKLM "Software\mab\ItStealsPracticeSuite" "InstallDir" "$INSTDIR"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayName" "It Steals PracticeSuite"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayVersion" "${VERSION}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "Publisher" "mab"

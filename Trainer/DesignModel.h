@@ -15,6 +15,7 @@ enum class Page
     Replay,
     Diagnostics,
     Inspector,
+    Updates,
     Count
 };
 inline constexpr int PageCount = int(Page::Count);

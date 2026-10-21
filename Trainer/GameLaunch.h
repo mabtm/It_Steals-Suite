@@ -316,6 +316,20 @@ inline std::vector<fs::path> SteamRoots()
     return roots;
 }
 
+inline bool RestartAfterUpdateFlag()
+{
+    int count = 0;
+    auto arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    bool found = false;
+    if (arguments)
+    {
+        for (int i = 1; i < count; i++)
+            found = found || std::wstring_view(arguments[i]) == L"--restart-after-update";
+        LocalFree(arguments);
+    }
+    return found;
+}
+
 inline bool NoLaunchFlag()
 {
     int count = 0;

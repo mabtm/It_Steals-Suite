@@ -20,6 +20,7 @@
 #include "HudEditorModel.h"
 #include "TrainerTray.h"
 #include "GameLaunch.h"
+#include "SuiteUpdater.h"
 
 #include "imgui.h"
 #include "imgui_impl_dx11.h"
@@ -146,6 +147,14 @@ bool g_practiceMode = false;
 int g_selectedSpeedrunLevel = 0;
 int g_practiceSeed = 0;
 
+inline bool UpdateInputRequested()
+{
+    const auto &p = suite_update::service.presentation;
+    return (p.changelog || p.prompt ||
+            suite_update::service.View()->phase == suite_update::Phase::Installing) &&
+           !(g_pShared && g_pShared->timerState == 1);
+}
+
 bool OverlayRequested()
 {
     bool menu = g_overlayVisible && !g_compactMode;
@@ -156,7 +165,9 @@ bool OverlayRequested()
     bool startup = suite_ui::lifecycle.WantsStartup(suite_ui::LifecycleNow(), suite_ui::preferences,
                                                     (g_pShared && g_pShared->timerState == 1) || result);
     bool replay = g_pShared && g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3;
-    return inspector::picking || (inspector::dock && g_allOverlayEnabled) || replay || result || startup ||
+    return UpdateInputRequested() ||
+           suite_update::service.View()->phase == suite_update::Phase::Downloading || inspector::picking ||
+           (inspector::dock && g_allOverlayEnabled) || replay || result || startup ||
            suite_ui::LifecycleNow() - suite_run::presentation.toastAt < 3 || suite_ui::lifecycle.Exiting() ||
            (g_allOverlayEnabled && (menu || hud || map)) ||
            SpeedrunHudAllowed(g_speedrunMode, g_practiceMode);
@@ -166,8 +177,8 @@ inline bool ClipInputRequested();
 
 bool MenuInputRequested()
 {
-    return inspector::picking || inspector::dockInteractive || suite_hud::active || ClipInputRequested() ||
-           suite_replay::ControlsRequested(g_pShared) ||
+    return UpdateInputRequested() || inspector::picking || inspector::dockInteractive || suite_hud::active ||
+           ClipInputRequested() || suite_replay::ControlsRequested(g_pShared) ||
            suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen) ||
            (g_allOverlayEnabled && g_overlayVisible && !g_compactMode);
 }
@@ -204,11 +215,12 @@ void UpdateOverlayStyle()
 void SetOverlayInteractive(bool interactive, bool userAction = true)
 {
     bool wasForeground = GetForegroundWindow() == g_hWnd;
-    g_overlayInteractive = !suite_ui::lifecycle.Exiting() &&
-                           (interactive || inspector::picking || inspector::dockInteractive ||
-                            suite_hud::active || ClipInputRequested() || suite_replay::controls ||
-                            suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen)) &&
-                           MenuInputRequested();
+    g_overlayInteractive =
+        !suite_ui::lifecycle.Exiting() &&
+        (interactive || UpdateInputRequested() || inspector::picking || inspector::dockInteractive ||
+         suite_hud::active || ClipInputRequested() || suite_replay::controls ||
+         suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen)) &&
+        MenuInputRequested();
     interactive = g_overlayInteractive;
     if (ImGui::GetCurrentContext())
     {
@@ -1447,6 +1459,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     std::filesystem::create_directories(g_settings.Directory(), directoryError);
     if (directoryError)
         g_settings.error = "Settings directory is not writable";
+    suite_update::service.Init(g_settings.Directory());
+    if (suite_update::service.autoCheck)
+        suite_update::service.Check();
     auto iniUtf8 = (g_settings.Directory() / L"layout.ini").u8string();
     std::string iniPath(reinterpret_cast<const char *>(iniUtf8.data()), iniUtf8.size());
     ImGuiIO &io = ImGui::GetIO();
@@ -1462,7 +1477,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     bool occluded = false;
     game_launch::StartupOnce startup;
     bool launchRequested =
-        startup.Plan(g_autoStartGame, GetProcessIdByName(L"It Steals.exe") != 0, game_launch::NoLaunchFlag());
+        startup.Plan(g_autoStartGame || game_launch::RestartAfterUpdateFlag(),
+                     GetProcessIdByName(L"It Steals.exe") != 0, game_launch::NoLaunchFlag());
     TrainerTray tray(
         [] {
             if (!IsWindow(g_gameWnd))
@@ -1476,6 +1492,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         [] { g_quit = true; }, [&] { launchRequested = true; });
     uint32_t previousOptions = 0;
     HWND previousForeground = nullptr;
+    DWORD updateSessionPid = 0;
+    std::string updateSession;
+    ULONGLONG nextUpdateCheck = GetTickCount64() + 20 * 60 * 1000;
     while (!g_quit)
     {
         if (launchRequested)
@@ -1612,6 +1631,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         }
         if (keyPressed(f3, 1) && !workspaceActive)
         {
+            if (suite_update_ui::Open())
+                suite_update_ui::Close();
             suite_replay::controls = false;
             if (inspector::picking)
                 inspector_ui::EndPick();
@@ -1744,6 +1765,46 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         suite_ui::lifecycle.Consider(suite_ui::LifecycleNow(), introReady, suite_ui::preferences,
                                      ActiveSpeedrun() ||
                                          suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen));
+        auto &updater = suite_update::service;
+        updater.Poll();
+        if (g_gamePid != updateSessionPid)
+        {
+            updateSessionPid = g_gamePid;
+            updateSession = suite_update::Service::Session(g_gamePid);
+            if (g_gamePid && updater.autoCheck)
+                updater.Check();
+        }
+        if (tick >= nextUpdateCheck)
+        {
+            nextUpdateCheck = tick + 20 * 60 * 1000;
+            if (updater.autoCheck)
+                updater.Check();
+        }
+        auto update = updater.View();
+        bool updateBlocked = (g_pShared && g_pShared->timerState == 1) || suite_clip::open ||
+                             suite_clip::exporting || suite_hud::active || inspector::picking ||
+                             inspector::dockInteractive || suite_replay::ControlsRequested(g_pShared) ||
+                             suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen) ||
+                             suite_ui::lifecycle.Exiting();
+        updater.installBlocked = updateBlocked;
+        bool introDone =
+            !suite_ui::preferences.launchGraphic ||
+            (suite_ui::lifecycle.presented && suite_ui::lifecycle.StartupAge(suite_ui::LifecycleNow()) >=
+                                                  suite_ui::Lifecycle::StartupDuration);
+        if (updater.presentation.Consider(
+                suite_brand::Version, updateSession, introReady, introDone, updateBlocked,
+                suite_update::Newer(update->latest, suite_brand::Version), suite_ui::LifecycleNow()))
+        {
+            suite_ui::PostGameTone(suite_ui::Tone::Confirm);
+            SetOverlayInteractive(true);
+            binding.Invalidate();
+        }
+        if (updater.presentation.installRequested && update->phase == suite_update::Phase::Ready &&
+            !updateBlocked)
+        {
+            updater.presentation.installRequested = false;
+            updater.Install(g_gamePid);
+        }
         if (!g_surfaceInteractive)
             g_layeredHud.SyncVisibility(visible, binding.clientRect);
         HWND foreground = GetForegroundWindow();
@@ -1998,6 +2059,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 suite_hud::Render();
                 suite_clip::Render();
                 suite_ui::RenderLifecycle(visible, introBlocked, introReady);
+                bool updateWasOpen = suite_update_ui::Open();
+                suite_update_ui::Overlays(suite_update::service.View(), updateBlocked);
+                if (updateWasOpen != suite_update_ui::Open())
+                {
+                    SetOverlayInteractive(MenuInputRequested());
+                    binding.Invalidate();
+                }
                 bool soundFocused =
                     GetForegroundWindow() == g_hWnd && g_overlayInteractive && !suite_ui::lifecycle.Exiting();
                 g_interfaceAudio.Policy(

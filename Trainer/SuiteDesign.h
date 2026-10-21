@@ -19,13 +19,15 @@ enum class Icon
     Path,
     Crystal,
     Trophy,
-    Lock
+    Lock,
+    Update
 };
 inline constexpr std::array<const char *, PageCount> PageNames = {
-    "Cheats", "Seed Map", "Speedrun", "Settings", "Replay", "Diagnostics", "Inspector"};
+    "Cheats", "Seed Map", "Speedrun", "Settings", "Replay", "Diagnostics", "Inspector", "Updates"};
 inline constexpr std::array<const char *, PageCount> PageDetails = {
-    "Live training tools", "Explore layouts and routes",   "Clean runs and practice", "Make the suite yours",
-    "Review every turn",   "Connection and system health", "Inspect the live scene"};
+    "Live training tools",    "Explore layouts and routes",  "Clean runs and practice",
+    "Make the suite yours",   "Review every turn",           "Connection and system health",
+    "Inspect the live scene", "Releases and version history"};
 
 inline void DrawIcon(ImDrawList *d, Icon icon, ImVec2 p, float size, ImU32 color)
 {
@@ -35,6 +37,13 @@ inline void DrawIcon(ImDrawList *d, Icon icon, ImVec2 p, float size, ImU32 color
     auto circle = [&](float x, float y, float r) { d->AddCircle(q(x, y), r * size, color, 20, line); };
     switch (icon)
     {
+    case Icon::Update:
+        circle(.5f, .5f, .37f);
+        leg(.5f, .2f, .5f, .62f);
+        leg(.32f, .46f, .5f, .64f);
+        leg(.5f, .64f, .68f, .46f);
+        leg(.31f, .78f, .69f, .78f);
+        break;
     case Icon::Collider:
         leg(.2f, .32f, .5f, .15f);
         leg(.5f, .15f, .8f, .32f);
@@ -193,8 +202,11 @@ inline void PageHeading(Page page)
     auto a = ImGui::GetCursorScreenPos();
     auto *d = ImGui::GetWindowDrawList();
     Motif(d, a, {a.x + w, a.y + h});
-    DrawIcon(d, page == Page::Inspector ? Icon::Scan : Icon(int(page)), {a.x, a.y + 3 * u}, 25 * u,
-             ImGui::GetColorU32(heading));
+    DrawIcon(d,
+             page == Page::Updates     ? Icon::Update
+             : page == Page::Inspector ? Icon::Scan
+                                       : Icon(int(page)),
+             {a.x, a.y + 3 * u}, 25 * u, ImGui::GetColorU32(heading));
     ImVec4 clip(a.x + 37 * u, a.y, a.x + w, a.y + h);
     TextAt(d, {a.x + 37 * u, a.y}, PageNames[int(page)], ink, 23 * u, clip);
     if (!compact)
@@ -215,7 +227,8 @@ inline void Sidebar(float height)
                            "Appearance, HUD, minimap and system preferences.",
                            "Review recordings with events and route playback.",
                            "Scan the connection and inspect technical details.",
-                           "F7 Picker, compact object card and engine details on request."};
+                           "F7 Picker, compact object card and engine details on request.",
+                           "Stable releases, automatic installation and the full version history."};
     for (int i = 0; i < PageCount; i++)
     {
         ImGui::PushID(i);
@@ -237,7 +250,11 @@ inline void Sidebar(float height)
         if (active > 0)
             d->AddLine({a.x + u, a.y + 10 * u}, {a.x + u, a.y + h - 10 * u},
                        ImGui::GetColorU32(Alpha(Color(AppearancePreferences::Animation), active)), 3 * u);
-        DrawIcon(d, i == int(Page::Inspector) ? Icon::Scan : Icon(i), {a.x + 13 * u, a.y + 13 * u}, 24 * u,
+        DrawIcon(d,
+                 i == int(Page::Updates)     ? Icon::Update
+                 : i == int(Page::Inspector) ? Icon::Scan
+                                             : Icon(i),
+                 {a.x + 13 * u, a.y + 13 * u}, 24 * u,
                  ImGui::GetColorU32(Blend(Blend(ink, background, .36f), heading, active)));
         if (wide)
             TextAt(d, {a.x + 48 * u, a.y + 16 * u}, PageNames[i],

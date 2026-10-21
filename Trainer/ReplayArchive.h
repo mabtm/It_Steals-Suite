@@ -638,6 +638,7 @@ class ReplayArchive
         }
         bool manifest = false;
         for (const std::string &version : {std::string(suite_brand::Version),
+                                           std::string("7.12.0"),
                                            std::string("7.11.5"),
                                            std::string("7.11.4"),
                                            std::string("7.11.3"),
@@ -663,13 +664,13 @@ class ReplayArchive
                                            std::string("7.3.0"),
                                            std::string("7.2.1"),
                                            std::string("7.2.0")})
-            if ((!hasMarks || version == suite_brand::Version || version == "7.11.5" || version == "7.11.4" ||
-                 version == "7.11.3" || version == "7.11.2" || version == "7.11.1" || version == "7.11.0" ||
-                 version == "7.10.1" || version == "7.10.0" || version == "7.9.0" || version == "7.8.1" ||
-                 version == "7.8.0" || version == "7.7.0" || version == "7.6.0" || version == "7.5.2" ||
-                 version == "7.5.1" || version == "7.5.0" || version == "7.4.0" || version == "7.3.5" ||
-                 version == "7.3.4" || version == "7.3.3" || version == "7.3.2" || version == "7.3.1" ||
-                 version == "7.3.0") &&
+            if ((!hasMarks || version == suite_brand::Version || version == "7.12.0" || version == "7.11.5" ||
+                 version == "7.11.4" || version == "7.11.3" || version == "7.11.2" || version == "7.11.1" ||
+                 version == "7.11.0" || version == "7.10.1" || version == "7.10.0" || version == "7.9.0" ||
+                 version == "7.8.1" || version == "7.8.0" || version == "7.7.0" || version == "7.6.0" ||
+                 version == "7.5.2" || version == "7.5.1" || version == "7.5.0" || version == "7.4.0" ||
+                 version == "7.3.5" || version == "7.3.4" || version == "7.3.3" || version == "7.3.2" ||
+                 version == "7.3.1" || version == "7.3.0") &&
                 files.count("manifest.json") &&
                 files["manifest.json"] ==
                     ReplayText(ReplayManifest(*d, hasInput, hasReport, version, hasMarks)))

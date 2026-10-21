@@ -2,13 +2,20 @@
 
 Selected release changes are summarized below; the original import remains in Git history.
 
+### v7.12.1 Changelog
+
+- Improved updates by implementing background GitHub release checks, verified downloads, transactional installation, and automatic game and trainer restart.
+- Improved release access by implementing optional Windows Credential Manager storage for private builds without bundling access tokens.
+- Improved the interface by implementing animated update prompts, a manual Updates workspace, and a complete offline version history after the intro.
+- Fixed a bug caused by repeated scene changes showing the same update prompt; restarting the trainer starts a new notification session.
+- Fixed a bug caused by version changes excluding replay packages created by the previous trainer.
+
 ### v7.12.0 Changelog
 
 - Improved installation by implementing a guided installer with Steam detection, verified MelonLoader downloads, rollback, and branded shortcuts.
 - Improved startup by implementing optional one-time game launch with existing-process detection and a manual tray action.
 - Improved distribution by implementing verified Windows release packages, individual binaries, checksums, and a redesigned repository page.
 - Fixed a bug caused by a version bump excluding replay packages exported by the previous trainer.
-- Fixed a bug caused by missing ZIP assembly loading and deprecated API diagnostics in the Windows release build.
 
 ### v7.11.5 Changelog
 

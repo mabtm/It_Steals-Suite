@@ -96,7 +96,7 @@ function Find-GameFolder {
 function Get-SuiteTarget([string]$Relative, [string]$Game, [string]$Application) {
     $null = Get-ContainedPath $Application $Relative
     if ($Relative -eq 'ItStealsHelper.dll') { return Get-ContainedPath $Game 'Mods/ItStealsHelper.dll' }
-    if ($Relative -in @('ItStealsTrainer.exe', 'PracticeSuiteEncoder.exe', 'build-info.json', 'Installer/Install.ps1') -or $Relative.StartsWith('Encoder/', [StringComparison]::Ordinal)) {
+    if ($Relative -in @('ItStealsTrainer.exe', 'PracticeSuiteEncoder.exe', 'build-info.json', 'Installer/Install.ps1', 'Installer/Update.ps1', 'CHANGELOG.md') -or $Relative.StartsWith('Encoder/', [StringComparison]::Ordinal)) {
         return Get-ContainedPath $Application $Relative
     }
     throw "Unexpected package file: $Relative"

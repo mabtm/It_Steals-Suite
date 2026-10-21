@@ -110,9 +110,14 @@ public class ControlledGame {
     Start-Sleep -Milliseconds 1500
     Assert (-not (Test-Path -LiteralPath $script:started)) 'Saved startup preference was ignored.'
     Close-ControlledTrainer $trainer
+    $trainer=Start-ControlledTrainer '--restart-after-update'
+    Wait-Until { (Read-StartedPid) -gt 0 } 'Explicit update restart did not override the ordinary startup opt-out.'
+    $restartedGame=[Diagnostics.Process]::GetProcessById((Read-StartedPid))
+    $owned.Add($restartedGame)
+    Close-ControlledTrainer $trainer
     $output=Join-Path $repo 'build/windows-launcher-tests'
     $null=[IO.Directory]::CreateDirectory($output)
-    @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','no automatic restart','one-time suppression','saved preference')} |
+    @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'summary.json') -Encoding UTF8
     Write-Output 'Windows native launcher smoke tests passed (controlled game, not Unity).'
 } catch {

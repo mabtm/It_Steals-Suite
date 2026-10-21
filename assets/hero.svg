@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="520" viewBox="0 0 1440 520">
-<title>It Steals PracticeSuite 7.12.0 by mab</title>
+<title>It Steals PracticeSuite 7.12.1 by mab</title>
 <defs>
 <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101c23"/><stop offset="1" stop-color="#0b141a"/></linearGradient>
 <radialGradient id="glow"><stop stop-color="#386b5e" stop-opacity=".32"/><stop offset="1" stop-color="#102029" stop-opacity="0"/></radialGradient>
@@ -15,7 +15,7 @@
 <text x="151" y="79" fill="#edf8f5" font-size="25" font-weight="700" letter-spacing="2">PRACTICE SUITE</text>
 <text x="151" y="106" fill="#8dafa9" font-size="17" letter-spacing="2">IT STEALS / BY MAB</text>
 <rect x="58" y="154" width="258" height="33" rx="16" fill="#19372f" stroke="#2f6554"/>
-<text x="77" y="176" fill="#9ce6bd" font-size="16" font-weight="600">v7.12.0 · WINDOWS x64</text>
+<text x="77" y="176" fill="#9ce6bd" font-size="16" font-weight="600">v7.12.1 · WINDOWS x64</text>
 <text x="58" y="250" fill="#f1f8f7" font-size="54" font-weight="700" letter-spacing="-1.8">Your next run,</text>
 <text x="58" y="312" fill="#8ee5d1" font-size="54" font-weight="700" letter-spacing="-1.8">better understood.</text>
 <text x="60" y="361" fill="#a5babd" font-size="21">Practice layouts. Find routes. Review every move.</text>

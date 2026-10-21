@@ -50,6 +50,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $root 'bin/ItStealsHelper.dll') -Destination (Join-Path $payload 'ItStealsHelper.dll')
     Copy-Item -LiteralPath (Join-Path $root 'Encoder') -Destination $payload -Recurse
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install.ps1') -Destination (Join-Path $payload 'Installer/Install.ps1')
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Update.ps1') -Destination (Join-Path $payload 'Installer/Update.ps1')
+    Copy-Item -LiteralPath (Join-Path $root 'CHANGELOG.md') -Destination (Join-Path $payload 'CHANGELOG.md')
     $buildInfo = [ordered]@{
         version = $version
         author = 'mab'
@@ -86,7 +88,7 @@ Portable installation:
 Optional automatic game launch: create installation.ini beside the trainer:
 gameExecutable=C:\Your game folder\It Steals.exe
 Use --no-launch to skip automatic launch once.
-Trainer 7.12.0 by mab uses compatible mod 7.11.4.
+Trainer 7.12.1 by mab uses compatible mod 7.11.4.
 Documentation: https://github.com/mabtm/It_Steals-Suite
 '@
     [IO.File]::WriteAllText((Join-Path $portable 'README.txt'), $quickstart, (New-Object Text.UTF8Encoding($false)))

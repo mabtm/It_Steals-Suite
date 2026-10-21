@@ -1,6 +1,7 @@
 #pragma once
 #include "SuiteExperience.h"
 #include "SuiteDesign.h"
+#include "SuiteUpdateUI.h"
 
 // Application UI. Game-window handling, rendering resources and preferences
 // are separate components; none of these controls accesses mapped memory.
@@ -267,6 +268,10 @@ void RenderMainWindow(const std::string &mode, int seed)
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * (.72f + .28f * reveal));
         if (!suite_ui::navigation.Is(suite_ui::Page::Replay) || !g_runReviewOpen)
             suite_ui::PageHeading(suite_ui::navigation.page);
+        if (suite_ui::navigation.Is(suite_ui::Page::Updates))
+            suite_update_ui::Page(*suite_update::service.View(), (g_pShared && g_pShared->timerState == 1) ||
+                                                                     suite_clip::open ||
+                                                                     suite_update::service.installBlocked);
         if (suite_ui::navigation.Is(suite_ui::Page::Inspector))
         {
             ImGui::BeginChild("Inspector workspace", {0, 0});

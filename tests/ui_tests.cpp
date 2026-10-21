@@ -1307,6 +1307,7 @@ void FinishVerificationCases(const std::string &output)
 }
 
 #include "design_ui_cases.inl"
+#include "update_ui_cases.inl"
 #include "replay_input_ui_cases.inl"
 
 void Workshop740Cases(const std::string &output)
@@ -1844,7 +1845,7 @@ int main(int argc, char **argv)
                 data.practiceModeActive = g_practiceMode;
                 Frame();
                 g_resetLayout = false;
-                assert(suite_ui::PageCount == 7);
+                assert(suite_ui::PageCount == 8);
                 for (int tab = 0; tab < suite_ui::PageCount; tab++)
                 {
                     suite_ui::navigation.Select(suite_ui::Page(tab), ImGui::GetTime());
@@ -2894,6 +2895,7 @@ int main(int argc, char **argv)
     assert(PreviewMovementTiming(timingMap).seconds < seconds);
     std::cout
         << "Clipped ImGui primitives fully covered by <=4 nonoverlapping HUD regions, mandatory badge, two corner panels/opacity, WIP only for 5/13, and live timing cache refresh: PASS\n";
+    UpdateUICases(argc > 1 ? argv[1] : "");
     ExperienceCases(argc > 1 ? argv[1] : "");
     AppearanceCases(argc > 1 ? argv[1] : "");
     MilestoneCases(argc > 1 ? argv[1] : "");

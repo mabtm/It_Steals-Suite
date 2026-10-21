@@ -47,7 +47,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;gdi32.lib;shell32.lib;bcrypt.lib;winmm.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;advapi32.lib;d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;gdi32.lib;shell32.lib;bcrypt.lib;winmm.lib;ole32.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest><EnableSegmentHeap>true</EnableSegmentHeap></Manifest>
   </ItemDefinitionGroup>

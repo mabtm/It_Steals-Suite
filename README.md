@@ -1,6 +1,6 @@
 <picture>
   <source media="(max-width: 720px)" srcset="assets/hero-mobile.svg">
-  <img src="assets/hero.svg" alt="It Steals PracticeSuite v7.12.0 by mab. Your next run, better understood." width="100%">
+  <img src="assets/hero.svg" alt="It Steals PracticeSuite v7.12.1 by mab. Your next run, better understood." width="100%">
 </picture>
 
 <p align="center">
@@ -60,6 +60,21 @@ Turn automatic startup off under **Settings → System**, or pass **--no-launch*
 - Provides a Windows uninstaller that removes unchanged files owned by the Suite and keeps modified files, other mods, MelonLoader, replays, and settings.
 
 Settings and recordings remain in the user's local application data. Normal trainer use does not require administrator access. Setup finishes by offering the installation folder, so it does not start an elevated trainer or game.
+
+</details>
+
+## Stay up to date
+
+Open **Updates** to see **Current / New**, check manually, install an update, or browse the complete version history. Automatic checks run in the background on startup and every 20 minutes. **Install / Later** appears once per game session, after the intro; restarting the trainer allows the prompt again. Runs and exports defer installation.
+
+**Install** downloads and checks the complete package first. Accept the Windows permission prompt; the updater closes the verified game and trainer processes, replaces the files with rollback protection, and restarts both. Settings and replays stay in place. Each new installed version shows its full changelog once after the intro, including an offline history of previous versions.
+
+<details>
+<summary><strong>Private builds and connection settings</strong></summary>
+
+Private releases need access to this repository. In **Updates → Connect private releases**, save a fine-grained GitHub token restricted to this repository with **Contents: read** permission. Windows Credential Manager stores it for your account on this PC; it is never bundled, written to settings, or included in reports. **Disconnect** removes it. Public releases work without a token.
+
+Install **7.12.1** once using Setup or the full portable package to receive the updater. Older trainer executables cannot update themselves retroactively. Automatic restart also works when ordinary game auto-start is disabled.
 
 </details>
 
@@ -156,6 +171,7 @@ The separate encoder, its corresponding source, and licenses are bundled; origin
 - **Diagnostics:** Scan known connection and performance conditions and copy reports or save local snapshots without uploading them.
 - **Appearance:** Customize theme colors, fonts, animations, quiet interface sounds, and startup graphics.
 - **Display controls:** Set overlay refresh, temporary game FPS/VSync overrides, and borderless window mode without rewriting saved game preferences.
+- **Updates:** Check GitHub releases, install verified packages with automatic restart, and browse complete current and historical changelogs.
 - **Startup:** Start the installed game once when opening the trainer, with a saved opt-out and a one-time command-line override.
 
 </details>
@@ -185,7 +201,7 @@ The separate encoder, its corresponding source, and licenses are bundled; origin
 | **Encoder-Sources.zip** | Corresponding encoder source, build script, and licenses for redistribution. |
 | **SHA256SUMS.txt** | SHA-256 checksums for the six downloadable packages/binaries above. |
 
-Trainer **7.12.0** intentionally uses compatible mod **7.11.4** and main protocol **29**. The release workflow builds the native trainer, verifies installer behavior, and publishes the seven assets together after checks pass.
+Trainer **7.12.1** intentionally uses compatible mod **7.11.4** and main protocol **29**. The release workflow builds the native trainer, verifies installer/update behavior and the real private-release download, and publishes the seven assets together after checks pass.
 
 ## Shortcuts
 
