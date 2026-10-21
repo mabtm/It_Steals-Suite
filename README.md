@@ -27,9 +27,9 @@
 <!-- release:start -->
 **[v7.12.3](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.3)**
 
-- Fixed a bug caused by game discovery relying only on Steam registry paths and manifests.
-- Improved installation by implementing saved-path, Windows installation, running-process, and standard-folder discovery that checks each game before selecting it.
-- Improved setup by implementing a Detect button that can refresh the game path without restarting the installer.
+- Fixed a bug caused by a PowerShell startup error that stopped automatic game detection.
+- Improved game detection by checking saved paths, Windows installation entries, running processes, and Steam libraries.
+- Improved setup with a Detect button to search again without restarting the installer.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

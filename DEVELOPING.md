@@ -76,7 +76,7 @@ Tests use fixed captures and synthetic fixtures. Some fixtures contain non-Engli
 ### vX.X.X Changelog
 
 - Removed [feature/file].
-- Improved [feature] by implementing [method] that [short explanation].
+- Improved [feature]: [what works better and how].
 - Fixed a bug caused by [issue].
 ```
 

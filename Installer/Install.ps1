@@ -4,11 +4,12 @@ param(
     [string]$GameDir,
     [string]$InstallDir,
     [string]$DiscoveryFile,
-    [string]$PayloadDir = (Join-Path $PSScriptRoot 'payload')
+    [string]$PayloadDir
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if (-not $PayloadDir) { $PayloadDir = Join-Path $PSScriptRoot 'payload' }
 $script:LoaderUrl = 'https://github.com/LavaGang/MelonLoader/releases/download/v0.7.3/MelonLoader.x64.zip'
 $script:LoaderHash = '5b2b2f3d1cd42b59ec886c5bdc2663edae87a0097a4f4a8f58c0965a99dda416'
 

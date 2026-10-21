@@ -4,16 +4,16 @@ Changes by version. The full development history is in Git.
 
 ### v7.12.3 Changelog
 
-- Fixed a bug caused by game discovery relying only on Steam registry paths and manifests.
-- Improved installation by implementing saved-path, Windows installation, running-process, and standard-folder discovery that checks each game before selecting it.
-- Improved setup by implementing a Detect button that can refresh the game path without restarting the installer.
+- Fixed a bug caused by a PowerShell startup error that stopped automatic game detection.
+- Improved game detection by checking saved paths, Windows installation entries, running processes, and Steam libraries.
+- Improved setup with a Detect button to search again without restarting the installer.
 
 ### v7.12.2 Changelog
 
 - Removed outdated WIP labels from both Hide & Seek modes.
-- Improved the GitHub page by implementing feature cards, an interface tour, and shorter guides that make the Suite easier to explore.
-- Improved release publishing by implementing shared notes and version checks that keep downloads and documentation together.
-- Improved project credits by implementing a clear AI disclosure that explains the reverse engineering, testing, and direction behind the code.
+- Improved the GitHub page with feature cards, an interface tour, and shorter guides.
+- Improved releases with consistent notes and checks that keep downloads and documentation on the same version.
+- Improved project credits to explain both the AI-generated code and the reverse engineering, testing, and direction behind it.
 - Fixed a bug caused by GitHub page formatting appearing in the in-game changelog.
 - Fixed a bug caused by the version change excluding compatible 7.12.1 replay packages.
 
