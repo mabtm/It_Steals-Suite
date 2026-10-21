@@ -45,6 +45,25 @@ try {
     $package = Join-Path $testRoot 'package'
     Make-Game $game
     Make-Package $package 'first'
+    # App-size entries must not consume the library limit before a second library.
+    $script:discoverySteamRoot = Join-Path $testRoot 'Steam'
+    $libraryRoot = Join-Path $testRoot 'Second library'
+    $secondaryGame = [IO.Path]::GetFullPath((Join-Path $libraryRoot 'steamapps/common/It Steals'))
+    Make-Game $secondaryGame
+    $apps = (1..100 | ForEach-Object { '"' + $_ + '" "123456789" ' }) -join ''
+    $escapedSteam = $script:discoverySteamRoot.Replace('\', '\\')
+    $escapedLibrary = $libraryRoot.Replace('\', '\\')
+    Write-TestFile (Join-Path $script:discoverySteamRoot 'steamapps/libraryfolders.vdf') ('"libraryfolders" { "0" { "path" "' + $escapedSteam + '" "apps" { ' + $apps + ' } } "1" { "path" "' + $escapedLibrary + '" } }')
+    Write-TestFile (Join-Path $libraryRoot 'steamapps/appmanifest_1349060.acf') '"AppState" { "appid" "1349060" "installdir" "It Steals" }'
+    function Get-ItemProperty {
+        [CmdletBinding()]param([string]$LiteralPath)
+        [pscustomobject]@{ SteamPath = $script:discoverySteamRoot }
+    }
+    try {
+        Assert ((Find-GameFolder) -eq $secondaryGame) 'Large modern Steam catalog hid the secondary library.'
+        Write-TestFile (Join-Path $script:discoverySteamRoot 'steamapps/libraryfolders.vdf') ('"LibraryFolders" { "1" "' + $escapedLibrary + '" }')
+        Assert ((Find-GameFolder) -eq $secondaryGame) 'Legacy Steam library discovery failed.'
+    } finally { Remove-Item Function:Get-ItemProperty }
     Write-TestFile (Join-Path $game 'Mods/Other.dll') 'other mod'
     $existingLoaderHash = (Get-FileHash -LiteralPath (Join-Path $game 'version.dll')).Hash
     Install-Suite $game $application $package | Out-Null

@@ -77,7 +77,8 @@ function Find-GameFolder {
         $libraries = @($root)
         $text = Read-SteamText (Join-Path $root 'steamapps/libraryfolders.vdf')
         foreach ($match in [regex]::Matches($text, '"(?:path|[0-9]+)"\s+"([^"]+)"')) {
-            $libraries += $match.Groups[1].Value.Replace('\\', '\')
+            $path = $match.Groups[1].Value.Replace('\\', '\')
+            if ([IO.Path]::IsPathRooted($path)) { $libraries += $path }
         }
         foreach ($library in ($libraries | Select-Object -Unique | Select-Object -First 32)) {
             $manifest = Read-SteamText (Join-Path $library 'steamapps/appmanifest_1349060.acf')
