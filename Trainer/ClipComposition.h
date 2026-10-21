@@ -260,8 +260,6 @@ inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Conten
                             IM_COL32(255, 255, 255, int(255 * std::pow(1 - age / .75f, 2))), 0, 2 * u);
         }
         draw->PopClipRect();
-        if (IsHideSeekScene(map.scene))
-            text(26, 78, 15, IM_COL32(255, 189, 105, 255), "Hide & Seek geometry / WIP");
     }
     if (!options.transparent)
     {

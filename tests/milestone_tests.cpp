@@ -312,7 +312,7 @@ int main()
     d.rngPatchComplete = 0;
     d.runWarnings = 8192;
     rows = Diagnose(in);
-    for (auto code : {"CON-002", "INP-001", "REN-001", "PER-001", "PER-002", "PER-003", "RNG-001", "MAP-001",
+    for (auto code : {"CON-002", "INP-001", "REN-001", "PER-001", "PER-002", "PER-003", "RNG-001",
                       "MAP-002", "IO-001", "REP-001", "VAL-001", "AUD-001"})
     {
         bool found = false;

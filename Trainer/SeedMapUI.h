@@ -761,9 +761,6 @@ inline void RenderSeedCanvas(const practice::MapAnalysis &analysis, float reques
                   playback          ? "N ^"
                   : route.estimated ? "N ^  |  unverified route legs hidden"
                                     : "N ^  |  spawn  |  crystals  |  route");
-    if (IsHideSeekScene(d.scene))
-        draw->AddText(ImVec2(origin.x + width - 43 * g_dpiScale, origin.y + 8), IM_COL32(255, 177, 76, 255),
-                      "WIP");
     draw->PopClipRect();
     draw->AddRect(origin, ImVec2(origin.x + width, origin.y + height), IM_COL32(57, 78, 96, 255), 6);
     if (hovered && !ImGui::IsMouseDragging(ImGuiMouseButton_Left))
@@ -858,11 +855,6 @@ inline void RenderSeedMapTab(bool restricted)
     }
     g_plannerTabActive = true;
     ImGui::Combo("Map", &g_plannerOptions.level, kMapLevelNames, kMapLevelCount);
-    if (IsHideSeekScene(kMapScenes[g_plannerOptions.level]))
-    {
-        ImGui::TextColored(ImVec4(1, .69f, .30f, 1), "WIP | map geometry and seed search");
-        Help(kHideSeekWipHelp);
-    }
     static int selected = -1;
     if (selected != g_plannerOptions.level)
     {

@@ -2821,22 +2821,22 @@ int main(int argc, char **argv)
     }
     std::cout << "Occupied HUD transfer: " << copied << " vs " << 1920ull * 1080 * 4
               << " bytes/frame at 1920x1080 (two corners, same pixels and alpha)\n";
-    for (int scene : {3, 5, 13})
+    for (int scene : kMapScenes)
     {
         data.currentSceneIndex = scene;
-        bool wip = false;
+        bool obsoleteLabel = false;
         for (int frame = 0; frame < 3; frame++)
         {
             ImGui::NewFrame();
             RenderMinimapWindow(12, 12, 0, 0, 0, 0, 0, 0, nullptr, 0, 100, 0, 100, true, false, false);
             ImGui::Render();
             CheckHudRegions();
-            wip = false;
+            obsoleteLabel = false;
             for (const auto *list : ImGui::GetDrawData()->CmdLists)
                 for (auto v : list->VtxBuffer)
-                    wip |= v.col == IM_COL32(255, 177, 76, 255);
+                    obsoleteLabel |= v.col == IM_COL32(255, 177, 76, 255);
         }
-        assert(wip == IsHideSeekScene(scene));
+        assert(!obsoleteLabel);
         auto d = std::make_shared<practice::MapData>(fixture);
         d->scene = scene;
         d->CalculateBounds();
@@ -2848,19 +2848,19 @@ int main(int argc, char **argv)
         {
             ImGui::NewFrame();
             ImGui::SetNextWindowSize(ImVec2(1000, 600), ImGuiCond_Always);
-            ImGui::Begin("WIP geometry QA");
+            ImGui::Begin("Supported map geometry QA");
             RenderSeedCanvas(map, 450);
             ImGui::End();
             ImGui::Render();
             CheckHudRegions();
         }
-        wip = false;
+        obsoleteLabel = false;
         for (const auto *list : ImGui::GetDrawData()->CmdLists)
             for (auto v : list->VtxBuffer)
-                wip |= v.col == IM_COL32(255, 177, 76, 255);
-        assert(wip == IsHideSeekScene(scene));
+                obsoleteLabel |= v.col == IM_COL32(255, 177, 76, 255);
+        assert(!obsoleteLabel);
         if (argc > 1 && scene == 5)
-            Dump(std::string(argv[1]) + "/hide-seek-wip.draw");
+            Dump(std::string(argv[1]) + "/hide-seek-supported.draw");
     }
     auto timingMap = std::make_shared<practice::MapAnalysis>(live);
     auto timingData = std::make_shared<practice::MapData>(*live.data);
@@ -2894,7 +2894,7 @@ int main(int argc, char **argv)
     practice::PublishMovement(updated);
     assert(PreviewMovementTiming(timingMap).seconds < seconds);
     std::cout
-        << "Clipped ImGui primitives fully covered by <=4 nonoverlapping HUD regions, mandatory badge, two corner panels/opacity, WIP only for 5/13, and live timing cache refresh: PASS\n";
+        << "Clipped ImGui primitives fully covered by <=4 nonoverlapping HUD regions, mandatory badge, two corner panels/opacity, all supported scenes without obsolete labels, and live timing cache refresh: PASS\n";
     UpdateUICases(argc > 1 ? argv[1] : "");
     ExperienceCases(argc > 1 ? argv[1] : "");
     AppearanceCases(argc > 1 ? argv[1] : "");

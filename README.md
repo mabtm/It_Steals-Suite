@@ -1,11 +1,11 @@
 <picture>
   <source media="(max-width: 720px)" srcset="assets/hero-mobile.svg">
-  <img src="assets/hero.svg" alt="It Steals PracticeSuite v7.12.1 by mab. Your next run, better understood." width="100%">
+  <img src="assets/hero.svg" alt="It Steals PracticeSuite — Practice. Understand. Improve." width="100%">
 </picture>
 
 <p align="center">
-  A community practice, routing, speedrun, and replay suite for <strong>It Steals</strong>.<br>
-  Windows x64 · MelonLoader · Native trainer · Built by <strong>mab</strong>
+  Practice seeds, find routes, study your runs, and turn replays into clips.<br>
+  <strong>For It Steals · Windows x64 · MelonLoader</strong>
 </p>
 
 <p align="center">
@@ -15,222 +15,192 @@
 </p>
 
 <p align="center">
-  <a href="#get-started">Install</a> · <a href="#inside-the-suite">Preview</a> · <a href="#features">Features</a> · <a href="#downloads">Downloads</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="DEVELOPING.md">Development</a>
+  <a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#downloads">Downloads</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="#about-the-project">About</a> · <a href="DEVELOPING.md">Development</a>
 </p>
 
-## Get started
+<img src="assets/showcase.gif" alt="A short tour of the actual Suite interface: practice, route search, replay review, and Clip Studio. All captures use test data." width="100%">
 
-| Step | What to do |
-| --- | --- |
-| **1 · Download** | Get **ItStealsSuite-Setup.exe** from the [latest release](https://github.com/mabtm/It_Steals-Suite/releases/latest). |
-| **2 · Choose the game** | Close It Steals and the trainer, run Setup, and confirm the detected game folder or browse to **It Steals.exe**. |
-| **3 · Install** | Choose the Suite folder and optional desktop shortcut; Setup installs the trainer, encoder, mod, and MelonLoader when needed. |
-| **4 · Play** | Start **PracticeSuite** from its shortcut; it starts the game automatically. Press **F3** to open the menu. |
+<sub>Actual Suite interface with test data. These previews show the tools and layout; they are not recordings of the game.</sub>
 
-Use **windowed or borderless** mode for the overlay. No compiler is needed. Setup requires Windows 10/11 x64, administrator access, and an installed Windows Mono copy of It Steals. A first-time MelonLoader installation needs an internet connection.
+## What's new
+
+<!-- release:start -->
+**[v7.12.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.2)**
+
+- Removed outdated WIP labels from both Hide & Seek modes.
+- Improved the GitHub page by implementing feature cards, an interface tour, and shorter guides that make the Suite easier to explore.
+- Improved release publishing by implementing shared notes and version checks that keep downloads and documentation together.
+
+[Full changelog](CHANGELOG.md)
+<!-- release:end -->
+
+## Install
+
+1. Download **[Setup](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsSuite-Setup.exe)** and close the game and trainer.
+2. Run it, confirm your **It Steals** folder, and choose where to install the Suite.
+3. Open the desktop shortcut. The trainer starts the game; press **F3** for the menu.
+
+Setup installs the trainer, mod, and encoder, adds the Suite icon to your shortcuts, and installs MelonLoader if needed. Use **windowed or borderless** mode for the overlay. You need Windows 10/11 x64 and an installed Windows Mono copy of It Steals. Setup asks for administrator access; a first-time MelonLoader install also needs internet access.
 
 <details>
-<summary><strong>Prefer a portable installation?</strong></summary>
+<summary><strong>Manual installation</strong></summary>
 
-1. Install [MelonLoader](https://github.com/LavaGang/MelonLoader.Installer/releases) for your **It Steals.exe** using its official installer; follow any prerequisites it requests and launch the game once.
-2. Extract **ItStealsSuite-Portable.zip** to a writable folder.
-3. Close the game and copy the included **ItStealsHelper.dll** into the game's **Mods** folder.
-4. Keep **ItStealsTrainer.exe**, **PracticeSuiteEncoder.exe**, and the **Encoder** folder together; start the game and trainer, then press **F3**.
+1. Install [MelonLoader](https://github.com/LavaGang/MelonLoader.Installer/releases) for **It Steals.exe** and launch the game once.
+2. Extract the [portable package](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsSuite-Portable.zip).
+3. Close the game and copy **ItStealsHelper.dll** into its **Mods** folder.
+4. Keep **ItStealsTrainer.exe**, **PracticeSuiteEncoder.exe**, and **Encoder/** together, then open the trainer.
 
-For automatic game startup, Steam installations are detected. For a custom location, create a UTF-8 **installation.ini** beside the trainer:
+Steam installs are detected automatically. For another location, create **installation.ini** beside the trainer:
 
-~~~
+```ini
 gameExecutable=C:\Games\It Steals\It Steals.exe
-~~~
+```
 
-Turn automatic startup off under **Settings → System**, or pass **--no-launch** to skip it once. The trainer reuses an existing game and does not restart it after you close it.
-
-</details>
-
-<details>
-<summary><strong>What Setup changes, updates, and keeps</strong></summary>
-
-- Detects primary and secondary Steam libraries, or accepts your selected game folder.
-- Checks that the game is a Windows x64 Mono installation.
-- Downloads official **MelonLoader 0.7.3 x64** only when needed and verifies its pinned SHA-256 before extracting.
-- Keeps a complete existing MelonLoader installation; conflicting or incomplete installations need repair with the official installer.
-- Installs the PracticeSuite mod into **Mods**, and the trainer, encoder, encoder sources/licenses, and startup configuration into the separate Suite folder.
-- Creates Start-menu and optional desktop shortcuts using the embedded Suite icon.
-- Verifies package files and restores previous files if a copy fails.
-- Provides a Windows uninstaller that removes unchanged files owned by the Suite and keeps modified files, other mods, MelonLoader, replays, and settings.
-
-Settings and recordings remain in the user's local application data. Normal trainer use does not require administrator access. Setup finishes by offering the installation folder, so it does not start an elevated trainer or game.
+Turn automatic game startup off in **Settings → System**, or use **--no-launch** for one launch.
 
 </details>
 
-## Stay up to date
+### Updates
 
-Open **Updates** to see **Current / New**, check manually, install an update, or browse the complete version history. Automatic checks run in the background on startup and every 20 minutes. **Install / Later** appears once per game session, after the intro; restarting the trainer allows the prompt again. Runs and exports defer installation.
+Open **Updates** to check for a release, see **Current / New**, or install it. The in-game **Install / Later** prompt appears once per game session; restarting the trainer allows it again. Updates wait while a run or export is active.
 
-**Install** downloads and checks the complete package first. Accept the Windows permission prompt; the updater closes the verified game and trainer processes, replaces the files with rollback protection, and restarts both. Settings and replays stay in place. Each new installed version shows its full changelog once after the intro, including an offline history of previous versions.
-
-<details>
-<summary><strong>Private builds and connection settings</strong></summary>
-
-Private releases need access to this repository. In **Updates → Connect private releases**, save a fine-grained GitHub token restricted to this repository with **Contents: read** permission. Windows Credential Manager stores it for your account on this PC; it is never bundled, written to settings, or included in reports. **Disconnect** removes it. Public releases work without a token.
-
-Install **7.12.1** once using Setup or the full portable package to receive the updater. Older trainer executables cannot update themselves retroactively. Automatic restart also works when ordinary game auto-start is disabled.
-
-</details>
-
-## Inside the suite
-
-<img src="assets/workspace.png" alt="PracticeSuite appearance editor with speedrun HUD and minimap" width="100%">
-
-*Actual production interface rendered with synthetic test data. Colors, placement, readability, and the native layout shown here are from the Suite.*
+The package is downloaded and checked before anything closes. After you accept the Windows permission prompt, the updater closes the game and trainer, installs the files, and restarts both. Settings and replays stay in place. A new version shows its changelog once after the intro; the full history is also available offline.
 
 <details>
-<summary><strong>Live Inspector — inspect the scene without losing your place</strong></summary>
+<summary><strong>Access to private releases</strong></summary>
 
-<img src="assets/inspector.png" alt="PracticeSuite Live Inspector showing object information and selection controls" width="100%">
-
-A dedicated workspace and floating object card keep picking, highlights, layers, and requested details close together. This interface preview uses synthetic Inspector fixtures.
-
-</details>
-
-<details>
-<summary><strong>Clip Studio — from recorded inputs to a finished clip</strong></summary>
-
-<img src="assets/clip-studio.png" alt="PracticeSuite Clip Studio timeline, input composition, and export controls" width="100%">
-
-Set the range, author camera keypoints, choose information and input layers, and check the composition before rendering. This preview uses a synthetic map replay; it is not a screenshot of original-game 3D rendering.
+While the repository is private, open **Updates → Connect private releases** and save a GitHub token limited to this repository with **Contents: read** access. It is stored in Windows Credential Manager for your Windows account. **Disconnect** removes it. Public releases need no token.
 
 </details>
 
 ## Features:
 
-**Practice and explore**
+<img src="assets/features.png" alt="Four Suite workspaces: Practice, Routing, Replay, and Clip Studio, shown with test data" width="100%">
 
-- **Fullbright:** Brighten practice and replay scenes using reversible unlit texture shaders.
-- **Freecam:** Explore independently without collecting crystals, with an optional player teleport for practice.
-- **Actual colliders:** Display captured collider shapes for players, monsters, crystals, and scene geometry.
-- **Fixed seeds:** Reuse a seed, seed type, and spawn settings for repeatable layouts.
-- **Scene controls:** Load supported practice modes and refresh captured map geometry.
-- **Live Inspector:** Pick visible object layers, inspect properties and colliders, watch changes, compare baselines, and probe paths from a workspace or floating card.
-
-<details>
-<summary><strong>Seeds, maps, and route planning</strong></summary>
-
-- **Seed search:** Rank layouts using spawn filters, complete routes, background workers, and verified portable generation where available.
-- **Pickup routing:** Plan checked walkable paths using player clearance and captured crystal collection regions.
-- **Route timing:** Estimate travel time with continuously learned straight, turning, starting, and slope movement when compatible data is available.
-- **Seed preview:** Inspect layouts, preview spawns, reveal complete planned paths, and transfer selected seeds into practice.
-- **Minimap:** View physical wall contours, crystals, player trails, monster paths, and optional route guidance.
-
-Route quality describes the captured model: larger layouts and pickup-region ordering use heuristics, and time estimates cannot predict enemy interference or player mistakes.
-
-</details>
+| Workspace | What you can do |
+| --- | --- |
+| **Practice** | Repeat a seed, explore with freecam and fullbright, show colliders, and inspect live objects. |
+| **Routing** | Search seeds, compare layouts, preview spawns, and plan crystal routes with learned movement timing. |
+| **Replay** | Record runs, compare paths, follow monster events, and review movement in 2D or 3D. |
+| **Clip Studio** | Edit camera moves, inputs, and overlays, then export a finished clip. |
 
 <details>
-<summary><strong>Speedruns, HUDs, and inputs</strong></summary>
+<summary><strong>All features</strong></summary>
 
-- **Clean speedruns:** Track timer, splits, personal bests, seed, and observed validity with a mandatory status badge.
-- **Run statistics:** Keep attempts, resets, completions, deaths, local bests, and daily/session progress.
-- **Finish screen:** Review check details, personal-best comparison, seed, and replay access in a dismissible result view.
-- **HUD editor:** Adjust HUD placement, scale, opacity, colors, fonts, metrics, and camera heading.
-- **Input overlay:** Show selectable keyboard, mouse, controller, and observed player-state information in game or replay clips.
+**Practice & inspection**
 
-</details>
+- **Seed controls:** Repeat a seed with the same seed type and spawn settings.
+- **Scene controls:** Load a supported mode and refresh its map capture.
+- **Freecam:** Move independently without collecting crystals, with optional player teleport for practice.
+- **Fullbright:** Brighten the scene while keeping its textures, then restore it when disabled.
+- **Colliders:** Show captured collision shapes for the scene, player, monsters, and crystals.
+- **Live Inspector:** Pick objects and overlapping layers, inspect properties, watch changes, compare saved values, and test paths.
 
-<details>
-<summary><strong>Replay library and analysis</strong></summary>
+**Seeds & routes**
 
-- **Replay library:** Retain eligible completed or aborted runs with status, mode, seed, time, names, categories, and notes.
-- **2D analysis:** Compare recorded and planned routes with pickups, monster movement, and flashlight/camera flashes.
-- **3D playback:** Review recorded movement and camera data in recorded, follow, or free views using original or simplified scene graphics.
-- **Timeline controls:** Seek, pause, loop, change playback speed, and add named markers.
-- **Replay layers:** Toggle captured colliders, speed trails, ceiling visibility, fullbright, and supported scene overlays.
-- **Recording check:** Inspect movement, camera, input, collider, animation, visual, and audio coverage before analysis or export.
-- **Game events:** Review captured monster states, game queries, animation data, and recorded game audio.
-- **Replay packages:** Import and export compatible packages while preserving replay identity and companion tracks.
+- **Seed search:** Search in the background and rank layouts using spawn filters and complete routes.
+- **Route planning:** Find walkable crystal paths using player clearance and crystal pickup areas.
+- **Time estimates:** Learn from recorded movement to account for straights, turns, starts, and slopes.
+- **Seed preview:** View spawns and full routes, then use the selected seed in practice.
+- **Minimap:** Show walls, crystals, player trails, monster movement, and optional route guidance.
 
-Available detail depends on what was captured; older recordings cannot recover missing tracks.
+**Runs & HUDs**
 
-</details>
+- **Run timer:** Track time, splits, personal bests, seed, and observed run validity.
+- **Statistics:** Keep attempts, resets, completions, deaths, and daily or session progress.
+- **Finish screen:** Review the result, run checks, personal-best comparison, and replay.
+- **HUD editor:** Change placement, size, opacity, colors, fonts, metrics, and camera heading.
+- **Input overlay:** Choose keyboard, mouse, controller, and player-state displays for play or clips.
 
-<details>
-<summary><strong>Clip creation and export</strong></summary>
+**Replay & clips**
 
-- **Cinematic keypoints:** Author cuts and eased camera moves, switch camera modes, and animate playback speed and scene-layer settings.
-- **Clip Studio:** Preview timeline ranges and customize information, inputs, composition, and export settings.
-- **Video formats:** Export MP4, lossless MKV/AVI, editing MOV, GIF, or PNG sequences using purpose-specific presets and supported 30/60/120 FPS options.
-- **Size budgets:** Re-encode a rendered clip toward a selected file-size budget using two-pass compression.
+- **Replay library:** Keep completed or aborted runs with their mode, seed, time, status, name, category, and notes.
+- **2D review:** Compare your path with a planned route, including pickups, monster movement, and light flashes.
+- **3D playback:** Review movement with recorded, follow, or free cameras in the original or simplified scene.
+- **Timeline:** Seek, pause, loop, change speed, and add named markers.
+- **Replay layers:** Toggle captured colliders, speed trails, ceilings, fullbright, and scene overlays.
+- **Capture checks:** See which movement, camera, input, animation, visual, and audio tracks were recorded.
+- **Game events:** Review captured monster states, animation data, game queries, and game audio.
+- **Replay packages:** Import and export compatible runs with their companion tracks.
+- **Camera editing:** Add cuts and smooth camera moves, switch views, and keyframe playback speed or scene layers.
+- **Clip Studio:** Set a range and arrange information, input, and export layers before rendering.
+- **Export:** Create MP4, lossless MKV/AVI, editing MOV, GIF, or PNG sequences with supported 30/60/120 FPS presets.
+- **File-size targets:** Re-encode a clip with two-pass compression to work toward a chosen size.
 
-The separate encoder, its corresponding source, and licenses are bundled; original game assets are read from your own installation.
+**Settings & maintenance**
 
-</details>
-
-<details>
-<summary><strong>Diagnostics, appearance, and display</strong></summary>
-
-- **Diagnostics:** Scan known connection and performance conditions and copy reports or save local snapshots without uploading them.
-- **Appearance:** Customize theme colors, fonts, animations, quiet interface sounds, and startup graphics.
-- **Display controls:** Set overlay refresh, temporary game FPS/VSync overrides, and borderless window mode without rewriting saved game preferences.
-- **Updates:** Check GitHub releases, install verified packages with automatic restart, and browse complete current and historical changelogs.
-- **Startup:** Start the installed game once when opening the trainer, with a saved opt-out and a one-time command-line override.
+- **Appearance:** Customize themes, fonts, animations, interface sounds, and the intro.
+- **Display controls:** Set overlay refresh, temporary game FPS/VSync overrides, and borderless mode.
+- **Diagnostics:** Check connection and performance issues and save or copy a local report.
+- **Updates:** Check GitHub releases, install verified packages, restart automatically, and read the version history.
+- **Game startup:** Start the game with the trainer, reuse a running game, or disable automatic startup.
 
 </details>
 
 ### Game modes
 
-| Supported | Supported |
+| Main modes | Bonus modes |
 | --- | --- |
 | Classic | Classic Bonus |
 | Camera | Camera Bright |
-| Timer | Ghost |
-| Hide & Seek **WIP** | Hide & Seek Outside **WIP** |
+| Hide & Seek | Hide & Seek Outside |
+| Timer · Ghost | — |
 
-**Map geometry, minimap, and seed search in both Hide & Seek modes remain work in progress.** Other features depend on the recorded scene and available tracks.
+<details>
+<summary><strong>See the tools side by side</strong></summary>
+
+<img src="assets/comparison.png" alt="Route planning, replay review, and object inspection side by side. Actual Suite interface with test data; no gameplay footage." width="100%">
+
+Plan a route, compare it with a recorded path, and inspect the objects behind it. These are interface captures with test data. In-game graphics and collider comparisons will use real recordings when those are ready.
+
+</details>
 
 ## Downloads
 
 [Latest release](https://github.com/mabtm/It_Steals-Suite/releases/latest) · [All releases](https://github.com/mabtm/It_Steals-Suite/releases)
 
-| Asset | Use |
+| File | Use |
 | --- | --- |
-| **ItStealsSuite-Setup.exe** | Guided installation with game detection and branded shortcuts. |
-| **ItStealsSuite-Portable.zip** | Complete package for manual installation, including encoder source/licenses. |
-| **ItStealsTrainer.exe** | Individual native trainer executable. |
-| **PracticeSuiteEncoder.exe** | Individual video encoder; keep it beside the trainer. |
-| **ItStealsHelper.dll** | PracticeSuite mod; place it in the game's **Mods** folder. |
-| **Encoder-Sources.zip** | Corresponding encoder source, build script, and licenses for redistribution. |
-| **SHA256SUMS.txt** | SHA-256 checksums for the six downloadable packages/binaries above. |
+| **[Setup](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsSuite-Setup.exe)** | Recommended. Installs everything and creates shortcuts. |
+| **[Portable ZIP](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsSuite-Portable.zip)** | Complete package for manual installation. |
+| **[Trainer EXE](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsTrainer.exe)** | The trainer application. |
+| **[Encoder EXE](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/PracticeSuiteEncoder.exe)** | Video encoder; keep it beside the trainer. |
+| **[Mod DLL](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsHelper.dll)** | Game mod; goes in the game's **Mods** folder. |
+| **[Encoder sources](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/Encoder-Sources.zip)** | Encoder source, build script, and licenses. |
+| **[Checksums](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/SHA256SUMS.txt)** | SHA-256 hashes for the downloads. |
 
-Trainer **7.12.1** intentionally uses compatible mod **7.11.4** and main protocol **29**. The release workflow builds the native trainer, verifies installer/update behavior and the real private-release download, and publishes the seven assets together after checks pass.
-
-## Shortcuts
+### Shortcuts
 
 | Key | Action |
 | --- | --- |
 | **F3** | Open or close the menu |
-| **F1 / F2 / F4** | Freecam / optional overlay visibility / compact HUD when allowed |
+| **F1 / F2 / F4** | Freecam / overlay visibility / compact HUD, when allowed |
 | **F5 / F6** | Refresh map data / request borderless mode |
-| **F7** | Start or cancel the Inspector picker |
-| **F8** | Analyze a finished run while the prompt is available |
+| **F7 / F8** | Inspector picker / analyze the finished run while its prompt is visible |
 | **Shift+T / T** | Toggle speedrun mode / restart in game |
 
 <details>
-<summary><strong>Connection help and important limits</strong></summary>
+<summary><strong>Help & useful limits</strong></summary>
 
-**No connection?** Check that MelonLoader loaded **ItStealsHelper.dll**, keep trainer/mod versions compatible, and open **Diagnostics** for a scan and suggested fixes.
-
-**No overlay?** Use windowed or borderless mode and press **F3**; **F6** requests borderless mode from the game.
-
-**Game did not start?** Confirm the game folder in Setup or **installation.ini**, check **Settings → System**, or use the tray menu's **Start It Steals** action.
-
-**Windows warning?** Current builds are unsigned; check the repository/release origin and supplied hashes.
-
-**Run validation?** Checks describe observed local conditions and violations; they are not tamper-proof certification or a substitute for moderator review.
+- **No connection?** Check that MelonLoader loads **ItStealsHelper.dll**, then open **Diagnostics**.
+- **No overlay?** Use windowed or borderless mode. **F3** opens the menu; **F6** requests borderless.
+- **Game did not start?** Check **Settings → System** and your game path, or use **Start It Steals** from the tray menu.
+- **Windows warning?** Builds are unsigned. Download from this repository and use the release checksums to check the files.
+- **What does Setup keep?** Settings, replays, other mods, and a complete existing MelonLoader install. A failed file copy rolls back; uninstall keeps modified files and user data.
+- **How exact are routes?** Larger layouts use heuristics. Time estimates depend on captured movement and cannot predict enemy interference or mistakes.
+- **What can a replay show?** Only the tracks captured during that run. Missing tracks cannot be recreated later.
+- **Are run checks official approval?** They describe observed local conditions. Leaderboard rules and moderator decisions still apply.
 
 </details>
 
----
+## About the project
 
-Unofficial community project by **mab**, not affiliated with the game's developer. Original game assets and Unity/MelonLoader assemblies are not distributed here.
+I'm **mab**, an It Steals speedrunner. I started this project to build the practice and analysis tools I wanted to use myself.
 
-[Development, architecture & tests](DEVELOPING.md) · [Changelog](CHANGELOG.md) · [Encoder source & licenses](Encoder/NOTICE.md) · [ImGui license](Trainer/imgui/LICENSE.txt)
+This is a **vibe-coded project**: the Suite's own code is AI-generated. I direct development, reverse-engineer the game, work out how its systems behave, and test the results in game. I also help investigate problems and decide what needs to change. Making that code clear, readable, and maintainable is part of the work.
+
+The source and changes are tracked here. Bug reports and ideas are welcome through [Issues](https://github.com/mabtm/It_Steals-Suite/issues); build instructions, the code map, and contribution notes are in [DEVELOPING.md](DEVELOPING.md).
+
+Unofficial community project. Original game assets and game/Unity/MelonLoader assemblies are not included. Third-party code keeps its own credits and licenses.
+
+[Development](DEVELOPING.md) · [Changelog](CHANGELOG.md) · [Encoder licenses](Encoder/NOTICE.md) · [ImGui license](Trainer/imgui/LICENSE.txt)

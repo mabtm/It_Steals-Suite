@@ -1,21 +1,28 @@
 # Changelog
 
-Selected release changes are summarized below; the original import remains in Git history.
+Changes by version. The full development history is in Git.
+
+### v7.12.2 Changelog
+
+- Removed outdated WIP labels from both Hide & Seek modes.
+- Improved the GitHub page by implementing feature cards, an interface tour, and shorter guides that make the Suite easier to explore.
+- Improved release publishing by implementing shared notes and version checks that keep downloads and documentation together.
+- Improved project credits by implementing a clear AI disclosure that explains the reverse engineering, testing, and direction behind the code.
 
 ### v7.12.1 Changelog
 
-- Improved updates by implementing background GitHub release checks, verified downloads, transactional installation, and automatic game and trainer restart.
-- Improved release access by implementing optional Windows Credential Manager storage for private builds without bundling access tokens.
-- Improved the interface by implementing animated update prompts, a manual Updates workspace, and a complete offline version history after the intro.
+- Improved updates by implementing background GitHub checks, verified downloads, file rollback, and automatic restart.
+- Improved release access by implementing Windows Credential Manager storage that keeps private-release tokens on the user's PC.
+- Improved the interface by implementing animated update prompts, a manual Updates tab, and offline changelogs after the intro.
 - Fixed a bug caused by repeated scene changes showing the same update prompt; restarting the trainer starts a new notification session.
-- Fixed a bug caused by version changes excluding replay packages created by the previous trainer.
+- Fixed a bug caused by a version change rejecting compatible replay packages.
 
 ### v7.12.0 Changelog
 
 - Improved installation by implementing a guided installer with Steam detection, verified MelonLoader downloads, rollback, and branded shortcuts.
 - Improved startup by implementing optional one-time game launch with existing-process detection and a manual tray action.
 - Improved distribution by implementing verified Windows release packages, individual binaries, checksums, and a redesigned repository page.
-- Fixed a bug caused by a version bump excluding replay packages exported by the previous trainer.
+- Fixed a bug caused by a version bump excluding replay packages exported by the previous version.
 
 ### v7.11.5 Changelog
 
@@ -26,7 +33,7 @@ Selected release changes are summarized below; the original import remains in Gi
 
 ### v7.11.4 Changelog
 
-- Improved large-layout routing by implementing cached checked-path closure, faster neighbor queries, and visit relocation.
+- Improved large-layout routing by implementing a cached route graph, faster neighbor queries, and improved visit ordering.
 - Fixed a bug caused by incomplete navigation data hiding otherwise checked route segments.
 
 ### v7.11.3 Changelog
@@ -59,7 +66,7 @@ Selected release changes are summarized below; the original import remains in Gi
 
 ### v7.9.0 Changelog
 
-- Improved export throughput by implementing three bounded frame slots and overlapping GPU readback with encoding.
+- Improved export throughput by implementing three frame buffers and overlapping GPU readback with encoding.
 - Improved replay analysis by implementing recording coverage checks and adaptive pose capture.
 
 ### v7.8.1 Changelog
@@ -99,7 +106,7 @@ Selected release changes are summarized below; the original import remains in Gi
 
 ### v7.3.5 Changelog
 
-- Improved replay visibility by implementing owned fade materials while retaining original renderer batches.
+- Improved replay visibility by implementing separate fade materials that preserve the original render batches.
 
 ### v7.3.1 Changelog
 
@@ -146,7 +153,7 @@ Selected release changes are summarized below; the original import remains in Gi
 
 - Removed approximate hitbox rendering in favor of actual supported collider shapes.
 - Improved route timing by implementing bounded online movement statistics across five movement classes.
-- Improved overlay efficiency by implementing cropped panel readbacks and reusable navigation caches.
+- Improved overlay efficiency by implementing cropped panel readback and reusable navigation caches.
 
 ### v6.9.6 Changelog
 

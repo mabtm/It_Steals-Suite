@@ -84,11 +84,11 @@ Portable installation:
 1. Install MelonLoader for It Steals using its official installer.
 2. Copy ItStealsHelper.dll into the game's Mods folder.
 3. Keep ItStealsTrainer.exe, PracticeSuiteEncoder.exe, and Encoder together.
-4. Start the game, then PracticeSuite. Press F3 to open the menu.
+4. Open PracticeSuite; it starts the game. Press F3 to open the menu.
 Optional automatic game launch: create installation.ini beside the trainer:
 gameExecutable=C:\Your game folder\It Steals.exe
 Use --no-launch to skip automatic launch once.
-Trainer 7.12.1 by mab uses compatible mod 7.11.4.
+Practice. Understand. Improve.
 Documentation: https://github.com/mabtm/It_Steals-Suite
 '@
     [IO.File]::WriteAllText((Join-Path $portable 'README.txt'), $quickstart, (New-Object Text.UTF8Encoding($false)))

@@ -90,5 +90,5 @@ void PhysicalMapUICases(const std::string &output)
     io.Fonts->Build();
     io.Fonts->SetTexID(1);
     std::cout
-        << "7.10 actual ImGui: physical polygon map/radar, shared floor, pickup route and WIP at 480/1920 and 100/150 DPI: PASS\n";
+        << "7.10 actual ImGui: physical polygon map/radar, shared floor, pickup route at 480/1920 and 100/150 DPI: PASS\n";
 }

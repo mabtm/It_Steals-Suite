@@ -68,8 +68,6 @@ inline void RenderMinimapWindow(float px, float pz, float rotY, float monX, floa
     if (!mapBoundsValid || (mapMaxX - mapMinX) < 0.01f || (mapMaxZ - mapMinZ) < 0.01f)
     {
         ImGui::TextDisabled("Waiting for map bounds...");
-        if (IsHideSeekScene(g_pShared->currentSceneIndex))
-            dl->AddText(ImVec2(winPos.x + 8, winPos.y + 8), IM_COL32(255, 177, 76, 255), "WIP");
         ImGui::End();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar(2);
@@ -381,8 +379,6 @@ inline void RenderMinimapWindow(float px, float pz, float rotY, float monX, floa
                     {winPos.x + (winSize.x - size.x) * .5f, winPos.y + winSize.y - 17 * g_dpiScale},
                     ImGui::ColorConvertFloat4ToU32(title), label);
     }
-    if (g_pShared && IsHideSeekScene(g_pShared->currentSceneIndex))
-        dl->AddText(ImVec2(winPos.x + 8, winPos.y + 8), IM_COL32(255, 177, 76, 255), "WIP");
     ImGui::End();
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(2);

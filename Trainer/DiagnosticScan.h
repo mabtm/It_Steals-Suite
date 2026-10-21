@@ -29,9 +29,8 @@ inline std::vector<DiagnosticFinding> Diagnose(const DiagnosticInputs &in)
     };
     if (!in.data)
     {
-        add(3, "CON-001", "Game helper is not connected", {},
-            std::string("Start the game with the supplied helper DLL (protocol ") +
-                std::to_string(kProtocolVersion) + "); keep only one helper in Mods.");
+        add(3, "CON-001", "The game mod is not connected", {},
+            "Start It Steals and check that MelonLoader loads ItStealsHelper.dll from the Mods folder.");
         return rows;
     }
     const auto &d = *in.data;
@@ -68,9 +67,6 @@ inline std::vector<DiagnosticFinding> Diagnose(const DiagnosticInputs &in)
         d.rngPatchComplete
             ? ""
             : "Confirm the supported game build and matching helper; reload the level to refresh the capture.");
-    if (d.currentSceneIndex == 5 || d.currentSceneIndex == 13)
-        add(1, "MAP-001", "Hide & Seek geometry is WIP", {},
-            "Known map-contour limitations are marked in the map and seed search.");
     if (in.mapRequested && d.playerReady && !in.mapReady)
         add(2, "MAP-002", "Current map capture is missing", {},
             "Load the selected map once. Use Refresh map geometry here after a stable level load.");

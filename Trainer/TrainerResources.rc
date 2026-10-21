@@ -25,7 +25,7 @@ BEGIN
             VALUE "OriginalFilename", "ItStealsTrainer.exe"
             VALUE "ProductName", "It Steals PracticeSuite"
             VALUE "ProductVersion", SUITE_VERSION
-            VALUE "LegalCopyright", "PracticeSuite by mab"
+            VALUE "Comments", "Vibe-coded project. See the repository for development credits."
         END
     END
     BLOCK "VarFileInfo"

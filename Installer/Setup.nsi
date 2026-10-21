@@ -9,7 +9,7 @@ SetCompressor /SOLID lzma
 !include "x64.nsh"
 !include "WinVer.nsh"
 !ifndef VERSION
-!define VERSION "7.12.1"
+!error "Pass -DVERSION=<suite version> through Installer/Release.ps1"
 !endif
 !ifndef PAYLOAD
 !error "Pass -DPAYLOAD=<verified payload folder>"
@@ -27,7 +27,7 @@ VIAddVersionKey "FileDescription" "PracticeSuite Setup"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "CompanyName" "mab"
-VIAddVersionKey "LegalCopyright" "PracticeSuite by mab"
+VIAddVersionKey "Comments" "Vibe-coded project. See the repository for development credits."
 Icon "..\assets\suite.ico"
 UninstallIcon "..\assets\suite.ico"
 !define MUI_ICON "..\assets\suite.ico"
@@ -39,7 +39,7 @@ UninstallIcon "..\assets\suite.ico"
 !define MUI_TEXTCOLOR "E8F5F1"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Ready for your next run."
-!define MUI_WELCOMEPAGE_TEXT "PracticeSuite v${VERSION} by mab$\r$\n$\r$\nInstall the trainer, video encoder, and game mod in one guided setup.$\r$\n$\r$\nSetup detects Steam libraries, verifies the official MelonLoader download when needed, and creates shortcuts with the suite icon.$\r$\n$\r$\nClose It Steals and PracticeSuite before continuing."
+!define MUI_WELCOMEPAGE_TEXT "PracticeSuite v${VERSION}$\r$\n$\r$\nPractice. Understand. Improve.$\r$\n$\r$\nInstall the trainer, video encoder, and game mod. Setup finds your Steam installation, installs MelonLoader when needed, and creates your shortcuts.$\r$\n$\r$\nClose It Steals and PracticeSuite before continuing."
 !insertmacro MUI_PAGE_WELCOME
 Page custom GamePage GameLeave
 !insertmacro MUI_PAGE_DIRECTORY

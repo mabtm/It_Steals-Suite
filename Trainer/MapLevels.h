@@ -17,6 +17,3 @@ inline bool IsHideSeekScene(int scene)
 {
     return scene == 5 || scene == 13;
 }
-
-inline constexpr const char *kHideSeekWipHelp =
-    "Hide & Seek and Hide & Seek Outside: map geometry and seed search are work in progress. Some passages or wall outlines can still be inaccurate; verify routes in game.";

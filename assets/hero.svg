@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="520" viewBox="0 0 1440 520">
-<title>It Steals PracticeSuite 7.12.1 by mab</title>
+<title>It Steals PracticeSuite — Practice. Understand. Improve.</title>
 <defs>
 <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101c23"/><stop offset="1" stop-color="#0b141a"/></linearGradient>
 <radialGradient id="glow"><stop stop-color="#386b5e" stop-opacity=".32"/><stop offset="1" stop-color="#102029" stop-opacity="0"/></radialGradient>
@@ -13,12 +13,12 @@
 <path d="m230 90 33 33-33 33-33-33zm205 164 33 33-33 33-33-33zm0-226 33 33-33 33-33-33z" stroke="none"/>
 </g>
 <text x="151" y="79" fill="#edf8f5" font-size="25" font-weight="700" letter-spacing="2">PRACTICE SUITE</text>
-<text x="151" y="106" fill="#8dafa9" font-size="17" letter-spacing="2">IT STEALS / BY MAB</text>
-<rect x="58" y="154" width="258" height="33" rx="16" fill="#19372f" stroke="#2f6554"/>
-<text x="77" y="176" fill="#9ce6bd" font-size="16" font-weight="600">v7.12.1 · WINDOWS x64</text>
-<text x="58" y="250" fill="#f1f8f7" font-size="54" font-weight="700" letter-spacing="-1.8">Your next run,</text>
-<text x="58" y="312" fill="#8ee5d1" font-size="54" font-weight="700" letter-spacing="-1.8">better understood.</text>
-<text x="60" y="361" fill="#a5babd" font-size="21">Practice layouts. Find routes. Review every move.</text>
+<text x="151" y="106" fill="#8dafa9" font-size="17" letter-spacing="2">FOR IT STEALS</text>
+<rect x="58" y="154" width="308" height="33" rx="16" fill="#19372f" stroke="#2f6554"/>
+<text x="77" y="176" fill="#9ce6bd" font-size="16" font-weight="600">WINDOWS x64 · MELONLOADER</text>
+<text x="58" y="250" fill="#f1f8f7" font-size="52" font-weight="700" letter-spacing="-1.8">Practice.</text>
+<text x="58" y="312" fill="#8ee5d1" font-size="52" font-weight="700" letter-spacing="-1.8">Understand. Improve.</text>
+<text x="60" y="361" fill="#a5babd" font-size="21">Seeds, routes, replays, and the details in between.</text>
 <path d="M60 401H641" stroke="#2e4249"/>
 <text x="60" y="443" fill="#dbece9" font-size="18">PRACTICE</text><text x="210" y="443" fill="#53776e" font-size="18">/</text>
 <text x="247" y="443" fill="#dbece9" font-size="18">ANALYZE</text><text x="386" y="443" fill="#53776e" font-size="18">/</text>
@@ -30,6 +30,7 @@
 <g transform="translate(30 78)">
 <path d="M0 0H344V236H0Z M74 0V84H155 M73 156V236 M235 0V98 M235 165V236 M156 158V236" fill="none" stroke="#516367" stroke-width="10" stroke-linecap="square"/>
 <path d="M34 202V116H193V131H304V32" fill="none" stroke="#77ddc6" stroke-width="4" stroke-linejoin="round"/>
+<path d="M34 202V116H193V131H304V32" fill="none" stroke="#edfff8" stroke-width="4" stroke-dasharray="12 1000"><animate attributeName="stroke-dashoffset" from="0" to="-1012" dur="10s" repeatCount="indefinite"/></path>
 <circle cx="34" cy="202" r="10" fill="#101d23" stroke="#77ddc6" stroke-width="3"/>
 <path d="m193 120 11 11-11 11-11-11zm111-99 11 11-11 11-11-11z" fill="#e5be84"/>
 <path d="m111 110 8 6-8 6m156 3 8 6-8 6" fill="none" stroke="#effcf8" stroke-width="2"/>
@@ -37,7 +38,7 @@
 <path d="M407 79V315" stroke="#2b403f"/>
 <text x="427" y="104" fill="#7c9b94" font-size="13">LAYOUT</text><text x="427" y="134" fill="#e9f4ee" font-size="18">Classic</text>
 <text x="427" y="186" fill="#7c9b94" font-size="13">CAPTURE</text><text x="427" y="216" fill="#8fe2bd" font-size="18">Replay</text>
-<text x="427" y="269" fill="#7c9b94" font-size="13">AUTHOR</text><text x="427" y="299" fill="#e9f4ee" font-size="18">mab</text>
+<text x="427" y="269" fill="#7c9b94" font-size="13">OUTPUT</text><text x="427" y="299" fill="#e9f4ee" font-size="18">Clips</text>
 <path d="M29 354H529" stroke="#2b403f"/>
-<text x="29" y="386" fill="#abc2bc" font-size="15">One suite. From the first seed to the final frame.</text>
+<text x="29" y="386" fill="#abc2bc" font-size="15">From your first seed to the final frame.</text>
 </g></g></svg>
