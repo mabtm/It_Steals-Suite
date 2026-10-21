@@ -638,6 +638,7 @@ class ReplayArchive
         }
         bool manifest = false;
         for (const std::string &version : {std::string(suite_brand::Version),
+                                           std::string("7.12.2"),
                                            std::string("7.12.1"),
                                            std::string("7.12.0"),
                                            std::string("7.11.5"),
@@ -665,7 +666,7 @@ class ReplayArchive
                                            std::string("7.3.0"),
                                            std::string("7.2.1"),
                                            std::string("7.2.0")})
-            if ((!hasMarks || version == suite_brand::Version || version == "7.12.1" || version == "7.12.0" || version == "7.11.5" ||
+            if ((!hasMarks || version == suite_brand::Version || version == "7.12.2" || version == "7.12.1" || version == "7.12.0" || version == "7.11.5" ||
                  version == "7.11.4" || version == "7.11.3" || version == "7.11.2" || version == "7.11.1" ||
                  version == "7.11.0" || version == "7.10.1" || version == "7.10.0" || version == "7.9.0" ||
                  version == "7.8.1" || version == "7.8.0" || version == "7.7.0" || version == "7.6.0" ||

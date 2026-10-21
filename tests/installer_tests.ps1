@@ -64,6 +64,82 @@ try {
         Write-TestFile (Join-Path $script:discoverySteamRoot 'steamapps/libraryfolders.vdf') ('"LibraryFolders" { "1" "' + $escapedLibrary + '" }')
         Assert ((Find-GameFolder) -eq $secondaryGame) 'Legacy Steam library discovery failed.'
     } finally { Remove-Item Function:Get-ItemProperty }
+    $hints = [pscustomobject]@{ GameFolders = @(); SteamRoots = @($script:discoverySteamRoot) }
+    Remove-Item -LiteralPath (Join-Path $libraryRoot 'steamapps/appmanifest_1349060.acf')
+    Assert ((Find-GameFolder $hints) -eq $secondaryGame) 'A valid game without an ACF was not discovered.'
+    Remove-Item -LiteralPath (Join-Path $script:discoverySteamRoot 'steamapps/libraryfolders.vdf')
+    Write-TestFile (Join-Path $script:discoverySteamRoot 'config/libraryfolders.vdf') ('"libraryfolders" { "1" { "PATH" "' + $escapedLibrary + '" } }')
+    Assert ((Find-GameFolder $hints) -eq $secondaryGame) 'Alternate Steam library metadata was not read.'
+    $brokenRoot = Join-Path $testRoot 'Broken metadata'
+    $null = [IO.Directory]::CreateDirectory((Join-Path $brokenRoot 'steamapps/libraryfolders.vdf'))
+    $hints.SteamRoots = @($brokenRoot, $script:discoverySteamRoot)
+    Assert ((Find-GameFolder $hints) -eq $secondaryGame) 'An unreadable first location prevented later discovery.'
+    $passed.Add('Steam libraries and valid installations survive missing or unreadable metadata')
+
+    $unicodeGame = Join-Path $testRoot ('Game & caf' + [char]0xE9 + ' [fixture]')
+    Make-Game $unicodeGame
+    $script:hintCase = 'uninstall'
+    $script:hintGame = $unicodeGame
+    function Get-ItemProperty {
+        [CmdletBinding()]param([string]$LiteralPath)
+        if ($script:hintCase -eq 'uninstall' -and $LiteralPath -like '*Uninstall\Steam App 1349060') {
+            return [pscustomobject]@{ InstallLocation = $script:hintGame }
+        }
+        if ($script:hintCase -eq 'steam-exe' -and $LiteralPath -like '*Valve\Steam') {
+            return [pscustomobject]@{ SteamExe = (Join-Path $script:discoverySteamRoot 'Steam.exe') }
+        }
+    }
+    function Get-Process {
+        [CmdletBinding()]param([string]$Name)
+        if ($script:hintCase -eq 'running-game' -and $Name -eq 'It Steals') {
+            return [pscustomobject]@{ Path = (Join-Path $script:hintGame 'It Steals.exe') }
+        }
+        if ($script:hintCase -eq 'running-steam' -and $Name -eq 'Steam') {
+            return [pscustomobject]@{ Path = (Join-Path $script:discoverySteamRoot 'Steam.exe') }
+        }
+    }
+    try {
+        Assert ((Find-GameFolder) -eq $unicodeGame) 'Windows game installation entry was not used.'
+        $script:hintCase = 'steam-exe'
+        Assert ((Find-GameFolder) -eq $secondaryGame) 'SteamExe-only registry discovery failed.'
+        $script:hintCase = 'running-game'
+        Assert ((Find-GameFolder) -eq $unicodeGame) 'A running game was not used as a path hint.'
+        $script:hintCase = 'running-steam'
+        Assert ((Find-GameFolder) -eq $secondaryGame) 'Running Steam did not reveal its libraries.'
+    } finally { Remove-Item Function:Get-ItemProperty; Remove-Item Function:Get-Process }
+    $passed.Add('Windows installation entries, SteamExe, and running processes provide verified paths')
+
+    $cachedSuite = Join-Path $testRoot 'Saved suite'
+    Write-TestFile (Join-Path $cachedSuite 'installation.ini') ("gameExecutable=" + (Join-Path $unicodeGame 'It Steals.exe') + "`r`n")
+    $savedInstallDir = $InstallDir
+    try {
+        $InstallDir = $cachedSuite
+        Assert ((Find-GameFolder) -eq $unicodeGame) 'Saved trainer game path was not reused.'
+        Remove-Item -LiteralPath (Join-Path $cachedSuite 'installation.ini')
+        Write-TestFile (Join-Path $cachedSuite 'installed-manifest.json') (@{ gameDirectory = $unicodeGame } | ConvertTo-Json)
+        Assert ((Find-GameFolder) -eq $unicodeGame) 'Existing installation receipt was not reused.'
+    } finally { $InstallDir = $savedInstallDir }
+    $passed.Add('saved game paths and installation receipts are reused with Unicode paths')
+
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        $ini = Join-Path $testRoot 'detected.ini'
+        $hostExecutable = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        & $hostExecutable -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File (Join-Path $repo 'Installer/Install.ps1') -Mode Discover -InstallDir $cachedSuite -DiscoveryFile $ini | Out-Null
+        Assert ($LASTEXITCODE -eq 0) 'The actual discovery command failed.'
+        Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+using System.Text;
+public static class SuiteDiscoveryIniTest {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetPrivateProfileStringW")]
+    public static extern uint Read(string section, string key, string fallback, StringBuilder output, uint size, string file);
+}
+'@
+        $value = New-Object Text.StringBuilder 32768
+        $null = [SuiteDiscoveryIniTest]::Read('Game', 'Directory', '', $value, 32768, $ini)
+        Assert ($value.ToString() -eq $unicodeGame) 'The Windows INI API used by Setup did not receive the detected Unicode path.'
+        $passed.Add('real discovery process writes a Unicode path readable by the Windows Setup INI API')
+    }
+
     Write-TestFile (Join-Path $game 'Mods/Other.dll') 'other mod'
     $existingLoaderHash = (Get-FileHash -LiteralPath (Join-Path $game 'version.dll')).Hash
     Install-Suite $game $application $package | Out-Null

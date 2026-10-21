@@ -99,6 +99,8 @@ For a local Windows package build, install **NSIS 3**, then run:
 
 Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.11.4**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
+Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
+
 ## Keep changes readable
 
 - Write code, comments, UI, and docs in English. Explain the reason for a check or workaround when it is not obvious.

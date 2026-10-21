@@ -28,6 +28,7 @@ VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "CompanyName" "mab"
 VIAddVersionKey "Comments" "Vibe-coded project. See the repository for development credits."
+VIAddVersionKey "LegalCopyright" "See project credits and bundled third-party licenses."
 Icon "..\assets\suite.ico"
 UninstallIcon "..\assets\suite.ico"
 !define MUI_ICON "..\assets\suite.ico"
@@ -58,6 +59,7 @@ Var GameEdit
 Var DesktopCheck
 Var DesktopEnabled
 Var Powershell
+Var GameHint
 
 Function .onInit
     ${IfNot} ${RunningX64}
@@ -70,15 +72,25 @@ Function .onInit
     ${EndIf}
     SetRegView 64
     SetShellVarContext all
+    ReadRegStr $0 HKLM "Software\mab\ItStealsPracticeSuite" "InstallDir"
+    ${If} $0 != ""
+        StrCpy $INSTDIR $0
+    ${EndIf}
     StrCpy $Powershell "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
     StrCpy $DesktopEnabled ${BST_CHECKED}
     InitPluginsDir
     SetOutPath "$PLUGINSDIR"
     File /oname=Install.ps1 "Install.ps1"
-    nsExec::ExecToStack '"$Powershell" -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$PLUGINSDIR\Install.ps1" -Mode Discover -DiscoveryFile "$PLUGINSDIR\detected.ini"'
+    Call DiscoverGame
+FunctionEnd
+Function DiscoverGame
+    nsExec::ExecToStack '"$Powershell" -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$PLUGINSDIR\Install.ps1" -Mode Discover -InstallDir "$INSTDIR" -DiscoveryFile "$PLUGINSDIR\detected.ini"'
     Pop $0
     Pop $1
-    ReadINIStr $GameDir "$PLUGINSDIR\detected.ini" "Game" "Directory"
+    StrCpy $GameDir ""
+    ${If} $0 == 0
+        ReadINIStr $GameDir "$PLUGINSDIR\detected.ini" "Game" "Directory"
+    ${EndIf}
 FunctionEnd
 Function GamePage
     !insertmacro MUI_HEADER_TEXT "Choose It Steals" "Select the folder containing It Steals.exe."
@@ -89,19 +101,37 @@ Function GamePage
     ${EndIf}
     ${NSD_CreateLabel} 0 0 100% 38u "Setup installs MelonLoader only when no complete loader is present. Original game files, replays, and other mods are kept."
     Pop $0
-    ${NSD_CreateDirRequest} 0 48u 78% 14u "$GameDir"
+    ${NSD_CreateDirRequest} 0 48u 64% 14u "$GameDir"
     Pop $GameEdit
-    ${NSD_CreateBrowseButton} 81% 47u 19% 16u "Browse..."
+    ${NSD_CreateBrowseButton} 66% 47u 17% 16u "Browse..."
     Pop $0
     ${NSD_OnClick} $0 BrowseGame
+    ${NSD_CreateButton} 85% 47u 15% 16u "Detect"
+    Pop $0
+    ${NSD_OnClick} $0 DetectGame
     ${NSD_CreateCheckbox} 0 82u 100% 14u "Create a desktop shortcut"
     Pop $DesktopCheck
     ${NSD_SetState} $DesktopCheck $DesktopEnabled
-    ${NSD_CreateLabel} 0 110u 100% 40u "A network connection is needed only for a first-time MelonLoader installation. Repair a conflicting or incomplete loader with the official installer."
-    Pop $0
+    ${If} $GameDir != ""
+        ${NSD_CreateLabel} 0 110u 100% 40u "Your game folder was detected automatically. Confirm it above, then continue."
+    ${Else}
+        ${NSD_CreateLabel} 0 110u 100% 40u "No game folder found. Open Steam and click Detect, or use Browse to select the folder containing It Steals.exe."
+    ${EndIf}
+    Pop $GameHint
     nsDialogs::Show
 FunctionEnd
+Function DetectGame
+    Pop $0
+    Call DiscoverGame
+    ${If} $GameDir != ""
+        ${NSD_SetText} $GameEdit $GameDir
+        ${NSD_SetText} $GameHint "Your game folder was detected automatically. Confirm it above, then continue."
+    ${Else}
+        ${NSD_SetText} $GameHint "No game folder found. Open Steam and click Detect, or select the game folder with Browse."
+    ${EndIf}
+FunctionEnd
 Function BrowseGame
+    Pop $0
     nsDialogs::SelectFolderDialog "Choose the It Steals game folder" "$GameDir"
     Pop $0
     ${If} $0 != error
@@ -140,6 +170,7 @@ Section "PracticeSuite" SEC_MAIN
         CreateShortcut "$DESKTOP\It Steals PracticeSuite.lnk" "$INSTDIR\ItStealsTrainer.exe" "" "$INSTDIR\ItStealsTrainer.exe" 0
     ${EndIf}
     WriteRegStr HKLM "Software\mab\ItStealsPracticeSuite" "InstallDir" "$INSTDIR"
+    WriteRegStr HKLM "Software\mab\ItStealsPracticeSuite" "GameDir" "$GameDir"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayName" "It Steals PracticeSuite"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayVersion" "${VERSION}"

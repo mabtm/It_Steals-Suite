@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.12.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.2)**
+**[v7.12.3](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.3)**
 
-- Removed outdated WIP labels from both Hide & Seek modes.
-- Improved the GitHub page by implementing feature cards, an interface tour, and shorter guides that make the Suite easier to explore.
-- Improved release publishing by implementing shared notes and version checks that keep downloads and documentation together.
+- Fixed a bug caused by game discovery relying only on Steam registry paths and manifests.
+- Improved installation by implementing saved-path, Windows installation, running-process, and standard-folder discovery that checks each game before selecting it.
+- Improved setup by implementing a Detect button that can refresh the game path without restarting the installer.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -40,7 +40,7 @@
 2. Run it, confirm your **It Steals** folder, and choose where to install the Suite.
 3. Open the desktop shortcut. The trainer starts the game; press **F3** for the menu.
 
-Setup installs the trainer, mod, and encoder, adds the Suite icon to your shortcuts, and installs MelonLoader if needed. Use **windowed or borderless** mode for the overlay. You need Windows 10/11 x64 and an installed Windows Mono copy of It Steals. Setup asks for administrator access; a first-time MelonLoader install also needs internet access.
+Setup detects Steam libraries, Windows installation entries, and the previously saved game path. It installs the trainer, mod, and encoder, adds the Suite icon to your shortcuts, and installs MelonLoader if needed. Use **windowed or borderless** mode for the overlay. You need Windows 10/11 x64 and an installed Windows Mono copy of It Steals. Setup asks for administrator access; a first-time MelonLoader install also needs internet access.
 
 <details>
 <summary><strong>Manual installation</strong></summary>

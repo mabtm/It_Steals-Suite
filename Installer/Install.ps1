@@ -58,35 +58,116 @@ function Test-GameFolder([string]$Folder) {
 }
 
 function Read-SteamText([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf) -or (Get-Item -LiteralPath $Path).Length -gt 524288) { return '' }
-    return [IO.File]::ReadAllText($Path)
+    try {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf) -or (Get-Item -LiteralPath $Path).Length -gt 524288) { return '' }
+        return [IO.File]::ReadAllText($Path)
+    } catch { return '' }
 }
 
-function Find-GameFolder {
-    $roots = @()
-    foreach ($key in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Valve\Steam', 'HKLM:\SOFTWARE\WOW6432Node\Valve\Steam')) {
-        $properties = Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue
-        if ($properties) {
-            foreach ($name in @('SteamPath', 'InstallPath')) {
-                $property = $properties.PSObject.Properties[$name]
-                if ($property -and $property.Value) { $roots += [string]$property.Value }
+function Add-DiscoveryPath($Paths, [string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path) -or $Paths.Count -ge 64) { return }
+    try {
+        $expanded = [Environment]::ExpandEnvironmentVariables($Path.Trim().Trim('"'))
+        if (-not [IO.Path]::IsPathRooted($expanded)) { return }
+        $full = [IO.Path]::GetFullPath($expanded)
+        if (-not ($Paths -contains $full)) { $Paths.Add($full) }
+    } catch { }
+}
+
+function Get-DiscoveryHints {
+    $games = New-Object 'System.Collections.Generic.List[string]'
+    $steam = New-Object 'System.Collections.Generic.List[string]'
+    $registeredGames = New-Object 'System.Collections.Generic.List[string]'
+    $suites = New-Object 'System.Collections.Generic.List[string]'
+    Add-DiscoveryPath $suites $InstallDir
+    foreach ($hive in @('HKLM:', 'HKCU:')) {
+        foreach ($view in @('Software', 'Software\WOW6432Node')) {
+            $suite = Get-ItemProperty -LiteralPath "$hive\$view\mab\ItStealsPracticeSuite" -ErrorAction SilentlyContinue
+            if ($suite) {
+                foreach ($field in @('GameDir', 'InstallDir')) {
+                    $value = $suite.PSObject.Properties[$field]
+                    if ($value) {
+                        if ($field -eq 'GameDir') { Add-DiscoveryPath $registeredGames $value.Value }
+                        else { Add-DiscoveryPath $suites $value.Value }
+                    }
+                }
+            }
+            $app = Get-ItemProperty -LiteralPath "$hive\$view\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1349060" -ErrorAction SilentlyContinue
+            if ($app) {
+                $value = $app.PSObject.Properties['InstallLocation']
+                if ($value) { Add-DiscoveryPath $registeredGames $value.Value }
+            }
+            $client = Get-ItemProperty -LiteralPath "$hive\$view\Valve\Steam" -ErrorAction SilentlyContinue
+            if ($client) {
+                foreach ($field in @('SteamPath', 'InstallPath', 'SteamExe')) {
+                    $value = $client.PSObject.Properties[$field]
+                    if ($value -and $value.Value) {
+                        $path = [string]$value.Value
+                        if ($field -eq 'SteamExe') { $path = [IO.Path]::GetDirectoryName($path.Trim('"')) }
+                        Add-DiscoveryPath $steam $path
+                    }
+                }
             }
         }
     }
-    foreach ($root in ($roots | Select-Object -Unique | Select-Object -First 8)) {
-        $libraries = @($root)
-        $text = Read-SteamText (Join-Path $root 'steamapps/libraryfolders.vdf')
-        foreach ($match in [regex]::Matches($text, '"(?:path|[0-9]+)"\s+"([^"]+)"')) {
-            $path = $match.Groups[1].Value.Replace('\\', '\')
-            if ([IO.Path]::IsPathRooted($path)) { $libraries += $path }
+    foreach ($suite in $suites) {
+        $config = Read-SteamText (Join-Path $suite 'installation.ini')
+        $entry = [regex]::Match($config, '(?m)^gameExecutable=(.+)\r?$')
+        if ($entry.Success) {
+            try { Add-DiscoveryPath $games ([IO.Path]::GetDirectoryName($entry.Groups[1].Value.Trim())) } catch { }
         }
-        foreach ($library in ($libraries | Select-Object -Unique | Select-Object -First 32)) {
+        try {
+            $text = Read-SteamText (Join-Path $suite 'installed-manifest.json')
+            if ($text) {
+                $receipt = $text | ConvertFrom-Json
+                $value = $receipt.PSObject.Properties['gameDirectory']
+                if ($value) { Add-DiscoveryPath $games $value.Value }
+            }
+        } catch { }
+    }
+    foreach ($registered in $registeredGames) { Add-DiscoveryPath $games $registered }
+    foreach ($name in @('It Steals', 'Steam')) {
+        foreach ($process in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
+            try {
+                $folder = [IO.Path]::GetDirectoryName($process.Path)
+                if ($name -eq 'It Steals') { Add-DiscoveryPath $games $folder }
+                else { Add-DiscoveryPath $steam $folder }
+            } catch { }
+        }
+    }
+    foreach ($base in @(${env:ProgramFiles(x86)}, $env:ProgramFiles, $env:ProgramW6432, $env:LOCALAPPDATA)) {
+        if ($base) { Add-DiscoveryPath $steam (Join-Path $base 'Steam') }
+    }
+    return [pscustomobject]@{ GameFolders = @($games.ToArray()); SteamRoots = @($steam.ToArray()) }
+}
+
+function Find-GameFolder($Hints = $null) {
+    if ($null -eq $Hints) { $Hints = Get-DiscoveryHints }
+    foreach ($candidate in $Hints.GameFolders) {
+        if (Test-GameFolder $candidate) { return [IO.Path]::GetFullPath($candidate) }
+    }
+    foreach ($root in ($Hints.SteamRoots | Select-Object -First 16)) {
+        $libraries = New-Object 'System.Collections.Generic.List[string]'
+        Add-DiscoveryPath $libraries $root
+        foreach ($relative in @('steamapps/libraryfolders.vdf', 'config/libraryfolders.vdf')) {
+            $text = Read-SteamText (Join-Path $root $relative)
+            foreach ($match in [regex]::Matches($text, '(?i)"(?:path|[0-9]+)"\s+"([^"]+)"')) {
+                Add-DiscoveryPath $libraries ($match.Groups[1].Value.Replace('\\', '\'))
+            }
+        }
+        foreach ($library in ($libraries | Select-Object -First 32)) {
+            $common = Join-Path $library 'steamapps/common'
             $manifest = Read-SteamText (Join-Path $library 'steamapps/appmanifest_1349060.acf')
-            $directory = [regex]::Match($manifest, '"installdir"\s+"([^"]+)"')
-            if ($manifest -notmatch '"appid"\s+"1349060"' -or -not $directory.Success) { continue }
-            $name = $directory.Groups[1].Value
-            if ($name -in '.', '..' -or $name -match '[\\/:]') { continue }
-            $candidate = Join-Path (Join-Path $library 'steamapps/common') $name
+            $directory = [regex]::Match($manifest, '(?i)"installdir"\s+"([^"]+)"')
+            if ($manifest -match '"appid"\s+"1349060"' -and $directory.Success) {
+                $name = $directory.Groups[1].Value
+                if ($name -notin '.', '..' -and $name -notmatch '[\\/:]') {
+                    $candidate = Join-Path $common $name
+                    if (Test-GameFolder $candidate) { return [IO.Path]::GetFullPath($candidate) }
+                }
+            }
+            # A copied installation may still be valid after its ACF was removed.
+            $candidate = Join-Path $common 'It Steals'
             if (Test-GameFolder $candidate) { return [IO.Path]::GetFullPath($candidate) }
         }
     }

@@ -3,18 +3,23 @@ void UpdateUICases(const std::string &output)
 {
     auto saved = data;
     auto &io = ImGui::GetIO();
+    std::string current = suite_brand::Version;
+    auto version = *suite_update::Version::Parse(current);
+    std::string next = std::to_string(version.parts[0]) + "." + std::to_string(version.parts[1]) + "." +
+                       std::to_string(version.parts[2] + 1);
     suite_update::service.bundled = suite_update::Changelog(
-        "### v7.12.1 Changelog\n- Improved updates by implementing verified GitHub downloads, transactional installation and automatic restart.\n- Improved the interface by implementing a complete offline version history.\n\n### v7.12.0 Changelog\n- Improved installation by implementing a guided installer.\n");
+        "### v" + current + " Changelog\n- Improved updates by implementing verified downloads.\n\n"
+        "### v7.12.0 Changelog\n- Improved installation by implementing a guided installer.\n");
     auto snapshot = std::make_shared<suite_update::Snapshot>();
     snapshot->phase = suite_update::Phase::Available;
     snapshot->message = "A new PracticeSuite update is available.";
-    snapshot->latest.version = "7.12.2";
+    snapshot->latest.version = next;
     snapshot->latest.asset = 1234;
     snapshot->latest.size = 20 * 1024 * 1024;
     snapshot->latest.sha256 = std::string(64, 'a');
     snapshot->latest.notes =
         "![Suite banner](banner.svg)\n\n[Download Setup](setup.exe)\n\n"
-        "### v7.12.2 Changelog\n\n- Improved replay tools with a verified release update.\n"
+        "### v" + next + " Changelog\n\n- Improved replay tools with a verified release update.\n"
         "- Fixed a bug caused by a disconnected session.\n\n"
         "### Install\nClose the game.\n<details>\n| Download | File |\n</details>\n";
     snapshot->releases.push_back(snapshot->latest);

@@ -2,6 +2,12 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.12.3 Changelog
+
+- Fixed a bug caused by game discovery relying only on Steam registry paths and manifests.
+- Improved installation by implementing saved-path, Windows installation, running-process, and standard-folder discovery that checks each game before selecting it.
+- Improved setup by implementing a Detect button that can refresh the game path without restarting the installer.
+
 ### v7.12.2 Changelog
 
 - Removed outdated WIP labels from both Hide & Seek modes.
