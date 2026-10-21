@@ -67,7 +67,7 @@ Tests use fixed captures and synthetic fixtures. Some fixtures contain non-Engli
 
 ## Ship a release
 
-1. Change **SUITE_VERSION** and **SUITE_VERSION_COMPONENTS** in **Trainer/SuiteBranding.h** together.
+1. Change **SUITE_VERSION** and **SUITE_VERSION_COMPONENTS** in **Trainer/SuiteBranding.h** together; keep the previous exporter version supported in **ReplayArchive.h** and its package-import regression test.
 2. Add a short entry at the top of **CHANGELOG.md**, using the format below.
 3. Run `python repository.py sync`, check the changes, and push to **main**.
 4. Watch **Actions → Build and publish PracticeSuite**. Resolve failures before publishing another version.
@@ -84,7 +84,7 @@ Only include bullets that apply. Describe the change someone will notice. Use th
 
 Keep artwork, downloads, and installation notes outside the version's changelog section, under their own headings. The trainer reads only `### vX.X.X Changelog`; this keeps GitHub's layout out of the in-game history.
 
-The workflow syncs the README's **What's new** section, checks documentation, runs the Linux logic/UI/mod-contract suite, and builds on Windows. It then checks the installer, updater, game launcher, and real private-release download. Only a successful run publishes the seven downloads together. The verified trainer is committed back to **bin/**. Published binaries and tags are not overwritten.
+The workflow syncs the README's **What's new** section, checks documentation, runs the Linux logic/UI/mod-contract suite, and builds on Windows. It then checks the installer, updater, game launcher, and real private-release download. A newer push cancels the obsolete build. Only a successful run publishes the seven downloads together. The verified trainer is committed back to **bin/**. Published binaries and tags are not overwritten.
 
 Release descriptions use the same changelog and download template. The workflow also refreshes the presentation of existing release pages without replacing their files. New versions need a new version number. A short-lived Actions token handles publication; no publishing token belongs in the source.
 

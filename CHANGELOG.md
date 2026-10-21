@@ -9,6 +9,7 @@ Changes by version. The full development history is in Git.
 - Improved release publishing by implementing shared notes and version checks that keep downloads and documentation together.
 - Improved project credits by implementing a clear AI disclosure that explains the reverse engineering, testing, and direction behind the code.
 - Fixed a bug caused by GitHub page formatting appearing in the in-game changelog.
+- Fixed a bug caused by the version change excluding compatible 7.12.1 replay packages.
 
 ### v7.12.1 Changelog
 

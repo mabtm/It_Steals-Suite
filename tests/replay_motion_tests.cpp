@@ -310,7 +310,7 @@ int main(int argc, char **argv)
     // Valid CRC and updated SHA list, but a conflicting manifest identity.
     for (const std::string version :
          {"7.3.0", "7.3.1",  "7.3.2",  "7.3.3",  "7.3.4",  "7.3.5",  "7.6.0",  "7.7.0",  "7.8.0",  "7.8.1",
-          "7.9.0", "7.10.0", "7.10.1", "7.11.0", "7.11.1", "7.11.2", "7.11.3", "7.11.4", "7.12.0", "7.11.5"})
+          "7.9.0", "7.10.0", "7.10.1", "7.11.0", "7.11.1", "7.11.2", "7.11.3", "7.11.4", "7.11.5", "7.12.0", "7.12.1"})
     {
         auto previousPackage = package;
         previousPackage["manifest.json"] = ReplayText(ReplayManifest(*map, true, true, version, true));
