@@ -183,6 +183,7 @@ def refresh_releases(repository):
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     versions = history()
     output = ROOT / "build/release-notes"

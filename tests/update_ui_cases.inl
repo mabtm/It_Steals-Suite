@@ -13,7 +13,10 @@ void UpdateUICases(const std::string &output)
     snapshot->latest.size = 20 * 1024 * 1024;
     snapshot->latest.sha256 = std::string(64, 'a');
     snapshot->latest.notes =
-        "### v7.12.2 Changelog\n\n- Improved replay tools with a verified release update.\n- Fixed a bug caused by a disconnected session.\n\nAuthor: mab\n";
+        "![Suite banner](banner.svg)\n\n[Download Setup](setup.exe)\n\n"
+        "### v7.12.2 Changelog\n\n- Improved replay tools with a verified release update.\n"
+        "- Fixed a bug caused by a disconnected session.\n\n"
+        "### Install\nClose the game.\n<details>\n| Download | File |\n</details>\n";
     snapshot->releases.push_back(snapshot->latest);
     suite_ui::preferences = {};
     g_pShared = &data;
@@ -68,6 +71,10 @@ void UpdateUICases(const std::string &output)
                 CheckHudRegions();
             }
             assert(suite_update_ui::history.size() == 3);
+            assert(suite_update_ui::history[0].notes.find("Improved replay tools") != std::string::npos &&
+                   suite_update_ui::history[0].notes.find("banner.svg") == std::string::npos &&
+                   suite_update_ui::history[0].notes.find("<details>") == std::string::npos &&
+                   suite_update_ui::history[0].notes.find("Close the game") == std::string::npos);
             assert(suite_update_ui::history[suite_update_ui::selected].version == suite_brand::Version);
             if (!output.empty() && size.x == 1920 && scale == 1)
                 Dump(output + "/update-changelog.draw");

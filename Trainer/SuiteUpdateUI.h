@@ -45,16 +45,22 @@ inline void RefreshHistory(std::shared_ptr<const suite_update::Snapshot> view)
     historySource = std::move(view);
     bundledCount = suite_update::service.bundled.size();
     history = suite_update::service.bundled;
-    // Use complete published release notes when online; retain all embedded
-    // older versions and the current changelog for offline first launch.
+    // GitHub pages include artwork and downloads. Show their changelog section
+    // here, retaining embedded history when the trainer is offline.
     for (const auto &release : snapshot.releases)
     {
+        auto display = release;
+        auto sections = suite_update::Changelog(release.notes);
+        auto changes = std::find_if(sections.begin(), sections.end(),
+                                    [&](const auto &r) { return r.version == release.version; });
+        if (changes != sections.end())
+            display.notes = changes->notes;
         auto existing = std::find_if(history.begin(), history.end(),
                                      [&](const auto &r) { return r.version == release.version; });
         if (existing == history.end())
-            history.push_back(release);
-        else if (!release.notes.empty())
-            *existing = release;
+            history.push_back(std::move(display));
+        else if (!display.notes.empty())
+            *existing = std::move(display);
     }
     std::sort(history.begin(), history.end(), [](const auto &a, const auto &b) {
         return suite_update::Version::Parse(a.version) > suite_update::Version::Parse(b.version);

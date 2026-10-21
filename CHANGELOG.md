@@ -8,6 +8,7 @@ Changes by version. The full development history is in Git.
 - Improved the GitHub page by implementing feature cards, an interface tour, and shorter guides that make the Suite easier to explore.
 - Improved release publishing by implementing shared notes and version checks that keep downloads and documentation together.
 - Improved project credits by implementing a clear AI disclosure that explains the reverse engineering, testing, and direction behind the code.
+- Fixed a bug caused by GitHub page formatting appearing in the in-game changelog.
 
 ### v7.12.1 Changelog
 

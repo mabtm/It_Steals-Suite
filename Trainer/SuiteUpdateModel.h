@@ -434,6 +434,7 @@ inline std::vector<Release> Releases(std::string_view bytes)
 inline std::vector<Release> Changelog(std::string_view text)
 {
     std::vector<Release> result;
+    bool collecting = false;
     for (size_t at = 0; at < text.size();)
     {
         auto next = text.find('\n', at);
@@ -442,15 +443,19 @@ inline std::vector<Release> Changelog(std::string_view text)
             line.remove_suffix(1);
         if (line.starts_with("### v") && line.ends_with(" Changelog"))
         {
+            collecting = false;
             auto v = line.substr(5, line.size() - 15);
             if (Version::Parse(v))
             {
                 Release r;
                 r.version = v;
                 result.push_back(std::move(r));
+                collecting = true;
             }
         }
-        else if (!result.empty())
+        else if (line.starts_with("#"))
+            collecting = false;
+        else if (collecting)
         {
             result.back().notes += line;
             result.back().notes += '\n';

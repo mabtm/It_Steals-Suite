@@ -83,6 +83,12 @@ int main(int argc, char **argv)
     assert(history.size() == 2 && history[0].version == "7.12.1" &&
            history[0].notes.find("Added updater.") != std::string::npos &&
            history[1].notes.find("Prior changes.") != std::string::npos);
+    auto page = Changelog(
+        "![Suite banner](banner.svg)\n\n[Download Setup](setup.exe)\n\n"
+        "### v7.12.2 Changelog\r\n\r\n- Improved the interface.\r\n\r\n"
+        "### Install\nClose the game.\n<details>\n| Download | File |\n</details>\n");
+    assert(page.size() == 1 && page[0].version == "7.12.2" &&
+           page[0].notes == "\n- Improved the interface.\n\n");
 
     Presentation p;
     assert(!p.Consider("7.12.1", "101:111", true, false, false, true, 0)); // intro
