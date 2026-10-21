@@ -99,7 +99,8 @@ int main()
     extended.planner.searchCount = 1000000;
     extended.planner.minimapRoute = false;
     extended.planner.searchCount = 1000000;
-    extended.planner.searchWorkers = 2;
+    // Two-core hosts reserve one core, so round-trip a supported worker count.
+    extended.planner.searchWorkers = std::min(2, SeedWorkerLimit());
     extended.planner.generationMs = 3.25f;
     extended.planner.searchFast = true;
     extended.planner.searchObjective = 1;
