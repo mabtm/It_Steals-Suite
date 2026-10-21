@@ -90,7 +90,7 @@ Trainer 7.12.0 by mab uses compatible mod 7.11.4.
 Documentation: https://github.com/mabtm/It_Steals-Suite
 '@
     [IO.File]::WriteAllText((Join-Path $portable 'README.txt'), $quickstart, (New-Object Text.UTF8Encoding($false)))
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
     foreach ($archive in @('ItStealsSuite-Portable.zip', 'Encoder-Sources.zip')) {
         $target = Join-Path $OutputDir $archive
         if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target }

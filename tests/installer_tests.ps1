@@ -93,7 +93,7 @@ try {
     Assert ([IO.File]::ReadAllText((Join-Path $game 'Mods/ItStealsHelper.dll')).StartsWith('second')) 'Mod rollback failed.'
     $passed.Add('interrupted updates restore previous files')
 
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
     $badZip = Join-Path $testRoot 'bad.zip'
     $zip=[IO.Compression.ZipFile]::Open($badZip,[IO.Compression.ZipArchiveMode]::Create)
     $null=$zip.CreateEntry('../escape')

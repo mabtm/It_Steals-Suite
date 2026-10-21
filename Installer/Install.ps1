@@ -164,7 +164,7 @@ function Receive-LoaderArchive([string]$Destination) {
 }
 
 function Expand-LoaderArchive([string]$Archive, [string]$Destination) {
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($Archive)
     try {
         if ($zip.Entries.Count -gt 2048) { throw 'Too many files in loader archive.' }
