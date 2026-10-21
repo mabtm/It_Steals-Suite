@@ -9,11 +9,14 @@ if (@(Get-Process -Name 'It Steals', 'ItStealsTrainer' -ErrorAction SilentlyCont
 $work = Join-Path ([IO.Path]::GetTempPath()) ('SuiteLauncher-' + [guid]::NewGuid().ToString('N'))
 $null = [IO.Directory]::CreateDirectory($work)
 $owned = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
+$fixtureExecutable = ''
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class SuiteSmokeWindow {
-    [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string name);
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern IntPtr FindWindow(string cls, string name);
+    // Keep the native null in C#: PowerShell can convert a null string to empty.
+    public static IntPtr FindControlWindow() { return FindWindow("ItStealsPracticeControl.v6", null); }
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr w, IntPtr l);
 }
@@ -35,11 +38,11 @@ function Start-ControlledTrainer([string]$Arguments = '') {
     $info.EnvironmentVariables['LOCALAPPDATA']=Join-Path $work 'LocalAppData'
     $process=[Diagnostics.Process]::Start($info)
     $owned.Add($process)
-    Wait-Until { $window=[SuiteSmokeWindow]::FindWindow('ItStealsPracticeControl.v6',$null); [uint32]$ownerId=0; if($window -ne [IntPtr]::Zero){$null=[SuiteSmokeWindow]::GetWindowThreadProcessId($window,[ref]$ownerId)}; $ownerId -eq $process.Id } 'Trainer control window did not appear.'
+    Wait-Until { if($process.HasExited){throw "Trainer exited before creating its control window (code $($process.ExitCode))."}; $window=[SuiteSmokeWindow]::FindControlWindow(); [uint32]$ownerId=0; if($window -ne [IntPtr]::Zero){$null=[SuiteSmokeWindow]::GetWindowThreadProcessId($window,[ref]$ownerId)}; $ownerId -eq $process.Id } 'Trainer control window did not appear.'
     return $process
 }
 function Close-ControlledTrainer($Process) {
-    $window=[SuiteSmokeWindow]::FindWindow('ItStealsPracticeControl.v6',$null)
+    $window=[SuiteSmokeWindow]::FindControlWindow()
     [uint32]$ownerId=0
     $null=[SuiteSmokeWindow]::GetWindowThreadProcessId($window,[ref]$ownerId)
     Assert ($ownerId -eq $Process.Id) 'Refusing to close another process window.'
@@ -58,6 +61,7 @@ function Read-StartedPid {
 }
 try {
     $game=Join-Path $work ('Game & caf' + [char]0xe9 + ' ' + [char]0x6e2c + [char]0x8a66)
+    $fixtureExecutable=Join-Path $game 'It Steals.exe'
     $null=[IO.Directory]::CreateDirectory((Join-Path $game 'It Steals_Data/Managed'))
     [IO.File]::WriteAllText((Join-Path $game 'It Steals_Data/Managed/Assembly-CSharp.dll'),'controlled test marker')
     $source=Join-Path $work 'Game.cs'
@@ -111,9 +115,23 @@ public class ControlledGame {
     @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','no automatic restart','one-time suppression','saved preference')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'summary.json') -Encoding UTF8
     Write-Output 'Windows native launcher smoke tests passed (controlled game, not Unity).'
+} catch {
+    Write-Output ("Launcher check failed: " + $_.Exception.Message)
+    throw
 } finally {
     foreach($process in $owned) {
         try { if(-not $process.HasExited){$process.Kill();$null=$process.WaitForExit(5000)};$process.Dispose() } catch {}
+    }
+    # Startup can fail before the child PID is registered; clean only our exact fixture image.
+    if ($fixtureExecutable) {
+        foreach ($candidate in @(Get-Process -Name 'It Steals' -ErrorAction SilentlyContinue)) {
+            try {
+                if ($candidate.MainModule.FileName -eq $fixtureExecutable) {
+                    $candidate.Kill()
+                    $null=$candidate.WaitForExit(5000)
+                }
+            } finally { $candidate.Dispose() }
+        }
     }
     Remove-Item -LiteralPath $work -Recurse -Force
 }
