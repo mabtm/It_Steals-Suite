@@ -2,7 +2,9 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <functional>
+#include <algorithm>
 #include <string>
+#include <string_view>
 #include "SuiteBranding.h"
 
 // A stable control window survives game/overlay recreation. It never covers
@@ -21,6 +23,13 @@ class TrainerTray
         L" / mab";
     static constexpr UINT callback = WM_APP + 42;
 
+    template <size_t N> static void CopyText(wchar_t (&destination)[N], std::wstring_view source)
+    {
+        size_t length = (std::min)(N - 1, source.size());
+        std::copy_n(source.data(), length, destination);
+        destination[length] = L'\0';
+    }
+
     NOTIFYICONDATAW Data() const
     {
         NOTIFYICONDATAW data{};
@@ -32,8 +41,7 @@ class TrainerTray
         data.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(101));
         if (!data.hIcon)
             data.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-        wcsncpy(data.szTip, tooltip.c_str(), 127);
-        data.szTip[127] = 0;
+        CopyText(data.szTip, tooltip);
         return data;
     }
 
@@ -159,9 +167,10 @@ class TrainerTray
         auto data = Data();
         data.uFlags = NIF_INFO;
         data.dwInfoFlags = NIIF_WARNING;
-        wcscpy(data.szInfoTitle, L"It Steals could not be started");
-        wcscpy(data.szInfo,
-               L"Run PracticeSuite Setup or start the game manually. Details are available in Diagnostics.");
+        CopyText(data.szInfoTitle, L"It Steals could not be started");
+        CopyText(
+            data.szInfo,
+            L"Run PracticeSuite Setup or start the game manually. Details are available in Diagnostics.");
         Shell_NotifyIconW(NIM_MODIFY, &data);
     }
 };

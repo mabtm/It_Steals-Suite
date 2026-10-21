@@ -57,7 +57,7 @@ function Read-StartedPid {
     return 0
 }
 try {
-    $game=Join-Path $work ('Game & caf' + [char]0xe9)
+    $game=Join-Path $work ('Game & caf' + [char]0xe9 + ' ' + [char]0x6e2c + [char]0x8a66)
     $null=[IO.Directory]::CreateDirectory((Join-Path $game 'It Steals_Data/Managed'))
     [IO.File]::WriteAllText((Join-Path $game 'It Steals_Data/Managed/Assembly-CSharp.dll'),'controlled test marker')
     $source=Join-Path $work 'Game.cs'

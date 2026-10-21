@@ -8,6 +8,7 @@ Selected release changes are summarized below; the original import remains in Gi
 - Improved startup by implementing optional one-time game launch with existing-process detection and a manual tray action.
 - Improved distribution by implementing verified Windows release packages, individual binaries, checksums, and a redesigned repository page.
 - Fixed a bug caused by a version bump excluding replay packages exported by the previous trainer.
+- Fixed a bug caused by missing ZIP assembly loading and deprecated API diagnostics in the Windows release build.
 
 ### v7.11.5 Changelog
 

@@ -38,6 +38,8 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <!-- Retain the tested C++20 shared_ptr atomic publication API with SDL checks enabled. -->
+      <PreprocessorDefinitions>_SILENCE_CXX20_OLD_SHARED_PTR_ATOMIC_SUPPORT_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(ProjectDir)imgui;$(ProjectDir)imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>

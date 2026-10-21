@@ -27,6 +27,17 @@ inline std::string Lower(std::string value)
     return value;
 }
 
+inline fs::path Utf8Path(const std::string &text)
+{
+    return fs::path(std::u8string(text.begin(), text.end()));
+}
+
+inline std::string PathKey(const fs::path &path)
+{
+    auto utf8 = path.generic_u8string();
+    return Lower(std::string(utf8.begin(), utf8.end()));
+}
+
 inline std::string Read(const fs::path &file)
 {
     std::error_code error;
@@ -171,9 +182,9 @@ inline void AddLibrary(std::vector<fs::path> &libraries, const fs::path &path)
     if (path.empty() || libraries.size() >= 32)
         return;
     auto normalized = path.lexically_normal();
-    auto key = Lower(normalized.generic_string());
+    auto key = PathKey(normalized);
     for (const auto &known : libraries)
-        if (Lower(known.generic_string()) == key)
+        if (PathKey(known) == key)
             return;
     libraries.push_back(std::move(normalized));
 }
@@ -194,7 +205,7 @@ inline std::vector<fs::path> Libraries(const fs::path &steam)
             auto *path = entry.Find("path");
             auto value = path ? path->text : entry.text;
             if (!value.empty())
-                AddLibrary(libraries, fs::u8path(value));
+                AddLibrary(libraries, Utf8Path(value));
         }
     return libraries;
 }
@@ -209,7 +220,7 @@ inline fs::path GameInLibrary(const fs::path &library)
     if (!id || id->text != AppId || !directory || directory->text.empty() || directory->text == "." ||
         directory->text == ".." || directory->text.find_first_of("/\\:") != std::string::npos)
         return {};
-    auto executable = library / "steamapps/common" / fs::u8path(directory->text) / "It Steals.exe";
+    auto executable = library / "steamapps/common" / Utf8Path(directory->text) / "It Steals.exe";
     return IsGame(executable) ? executable : fs::path{};
 }
 
@@ -225,7 +236,7 @@ inline fs::path ConfiguredGame(const fs::path &application)
             line.pop_back();
         if (line.starts_with("gameExecutable="))
         {
-            auto path = fs::u8path(line.substr(15));
+            auto path = Utf8Path(line.substr(15));
             if (path.is_absolute() && IsGame(path))
                 return path;
             return {};
@@ -249,8 +260,7 @@ inline Location Resolve(const fs::path &application, const std::vector<fs::path>
         for (const auto &library : Libraries(steam))
         {
             auto game = GameInLibrary(library);
-            if (game.empty() ||
-                (!configured.empty() && Lower(game.generic_string()) != Lower(configured.generic_string())))
+            if (game.empty() || (!configured.empty() && PathKey(game) != PathKey(configured)))
                 continue;
             std::error_code error;
             auto client = steam / "Steam.exe";

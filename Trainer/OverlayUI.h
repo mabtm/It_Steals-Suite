@@ -488,8 +488,14 @@ inline void RenderRunHistory(const GameData &d)
             ImGui::TableNextColumn();
             std::time_t stamp = static_cast<std::time_t>((r.startedUtc - 621355968000000000LL) / 10000000LL);
             char date[32] = "--";
-            if (auto utc = std::gmtime(&stamp))
-                std::strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", utc);
+            std::tm utc{};
+#ifdef _WIN32
+            bool hasUtc = ::gmtime_s(&utc, &stamp) == 0;
+#else
+            bool hasUtc = ::gmtime_r(&stamp, &utc) != nullptr;
+#endif
+            if (hasUtc)
+                std::strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", &utc);
             ImGui::TextUnformatted(date);
             ImGui::TableNextColumn();
             ImGui::Text("%d", r.scene);
