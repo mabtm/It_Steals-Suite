@@ -21,6 +21,14 @@ template <class Action> void Reject(Action action)
 
 int main(int argc, char **argv)
 {
+    assert(ValidToken("github_pat_example_123"));
+    assert(ValidToken("ghs_12345_eyJhbGciOiJIUzI1NiJ9.a-b_c.signature"));
+    assert(ValidToken("abc+/~=="));
+    assert(ValidToken(std::string(TokenLimit, 'a')));
+    for (auto bad : {"", "abc def", "abc\r\nAuthorization: x", "abc\t", "abc=def", "="})
+        assert(!ValidToken(bad));
+    assert(!ValidToken(std::string(TokenLimit + 1, 'a')));
+    assert(!ValidToken(std::string("abc\0def", 7)));
     assert(*Version::Parse("v7.12.10") > *Version::Parse("7.12.9"));
     assert(*Version::Parse("8.0.0") > *Version::Parse("7.999.999"));
     for (auto text : {"", "7.12", "7.12.1.0", "7.12.1-beta", "7.12.1+build", "7.012.1", "-7.12.1",
@@ -95,6 +103,15 @@ int main(int argc, char **argv)
     assert(!p.Consider("7.12.1", "", true, true, false, true, 42));
     assert(!p.Consider("7.12.1", "102:113", true, true, false, false, 43));
     assert(p.Consider("7.12.2", "102:113", true, true, false, false, 44) && p.changelog);
+
+    Presentation pending;
+    pending.seenVersion = "7.12.1";
+    assert(pending.Consider("7.12.1", "200:111", true, true, false, true, 1));
+    assert(pending.prompt);
+    assert(!pending.Consider("7.12.1", "", false, true, false, true, 2) && !pending.prompt);
+    assert(pending.Consider("7.12.1", "201:112", true, true, false, true, 3));
+    pending.prompt = false;
+    assert(!pending.Consider("7.12.1", "201:112", true, true, false, true, 4));
 
     if (argc > 1)
     {

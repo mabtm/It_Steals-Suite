@@ -87,11 +87,51 @@ function Get-UpdateProcess([long]$ProcessId,[string]$ExpectedImage,[string]$Crea
     } catch { $process.Dispose(); throw }
 }
 
+function Initialize-UpdateWindows {
+    if ('SuiteUpdateWindows' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public static class SuiteUpdateWindows {
+    private delegate bool Visit(IntPtr window, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(Visit callback, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint owner);
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder text, int maximum);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr w, IntPtr l);
+    public static void RequestClose(uint process) {
+        IntPtr control=IntPtr.Zero;
+        EnumWindows(delegate(IntPtr window,IntPtr parameter) {
+            uint owner;
+            GetWindowThreadProcessId(window,out owner);
+            if(owner==process) {
+                var name=new StringBuilder(256);
+                GetClassName(window,name,name.Capacity);
+                if(name.ToString()=="ItStealsPracticeControl.v6") { control=window; return false; }
+            }
+            return true;
+        },IntPtr.Zero);
+        if(control!=IntPtr.Zero) { PostMessage(control,0x10,IntPtr.Zero,IntPtr.Zero); return; }
+        EnumWindows(delegate(IntPtr window,IntPtr parameter) {
+            uint owner;
+            GetWindowThreadProcessId(window,out owner);
+            if(owner==process && IsWindowVisible(window)) PostMessage(window,0x10,IntPtr.Zero,IntPtr.Zero);
+            return true;
+        },IntPtr.Zero);
+    }
+}
+'@
+}
+
 function Close-UpdateProcess($Process) {
     if (-not $Process) { return }
     try {
         if ($Process.HasExited) { return }
-        $null=$Process.CloseMainWindow()
+        Initialize-UpdateWindows
+        # The trainer's stable control window is hidden and its overlay is
+        # owned by the game. Process.CloseMainWindow() cannot find it.
+        [SuiteUpdateWindows]::RequestClose([uint32]$Process.Id)
         if (-not $Process.WaitForExit(10000)) {
             # Install explicitly authorizes closing the two verified processes.
             # A held OS handle prevents a reused PID from identifying a new app.
@@ -130,6 +170,7 @@ function Invoke-UpdateApply([string]$File) {
         Assert-NoActiveEncoder $request.application
         $trainer=Get-UpdateProcess $request.trainerPid (Join-Path $request.application 'ItStealsTrainer.exe') $request.trainerCreated
         $game=Get-UpdateProcess $request.gamePid $request.game $request.gameCreated
+        if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { Initialize-UpdateWindows }
         Set-UpdateStatus $job 'Closing It Steals and PracticeSuite...'
         Close-UpdateProcess $game; $game=$null
         Close-UpdateProcess $trainer; $trainer=$null

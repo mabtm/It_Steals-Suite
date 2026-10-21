@@ -62,7 +62,7 @@ void Finish(suite_update::Service &service)
 int main()
 {
     using namespace suite_update;
-    std::string token(513, 0);
+    std::string token(TokenLimit + 1, 0);
     DWORD count = GetEnvironmentVariableA("SUITE_UPDATE_TEST_TOKEN", token.data(), DWORD(token.size()));
     if (!count || count >= token.size())
     {
@@ -86,8 +86,8 @@ int main()
         service.Init(root);
         Require(!service.bundled.empty() && service.bundled.front().version == suite_brand::Version,
                 "The embedded current changelog is missing.");
-        Require(service.StoreCredential(token),
-                "Windows Credential Manager could not save the test credential.");
+        if (!service.StoreCredential(token))
+            throw std::runtime_error(service.stateError);
         SecureZeroMemory(token.data(), token.size());
         token.clear();
         Require(ServiceContract::HasCredential(), "The release credential was not readable.");

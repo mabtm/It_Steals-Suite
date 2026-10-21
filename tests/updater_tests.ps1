@@ -110,7 +110,7 @@ try {
         # images. These fixtures do not launch or terminate the user's game.
         $csc=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
         $source=Join-Path $testRoot 'Fixture.cs'
-        Write-TestFile $source 'using System;using System.Windows.Forms;class Fixture{[STAThread]static void Main(){var w=new Form();w.Text="Suite update fixture";w.ShowInTaskbar=false;w.Opacity=0;Application.Run(w);}}'
+        Write-TestFile $source 'using System;using System.Windows.Forms;class Fixture{[STAThread]static void Main(){var w=new Form();w.Text="Suite update fixture";w.ShowInTaskbar=false;w.Opacity=0;w.FormClosed+=(s,e)=>System.IO.File.WriteAllText(Application.ExecutablePath+".closed","graceful");Application.Run(w);}}'
         $fixture=Join-Path $testRoot 'Fixture.exe'
         & $csc /nologo /target:winexe /platform:x64 /reference:System.Windows.Forms.dll /reference:System.Drawing.dll ("/out:"+$fixture) $source
         if($LASTEXITCODE -ne 0){throw 'Controlled process compilation failed.'}
@@ -130,6 +130,8 @@ try {
     Invoke-UpdateApply $requestFile | Out-Null
     if([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
         Assert ($trainer.HasExited -and $gameProcess.HasExited) 'Verified processes were not closed.'
+        Assert (Test-Path -LiteralPath (Join-Path $app 'ItStealsTrainer.exe.closed')) 'Trainer fixture was forced to exit instead of closing normally.'
+        Assert (Test-Path -LiteralPath (Join-Path $game 'It Steals.exe.closed')) 'Game fixture was forced to exit instead of closing normally.'
     }
     Assert ([IO.File]::ReadAllText((Join-Path $app 'ItStealsTrainer.exe')) -eq 'updated ItStealsTrainer.exe') 'Trainer update failed.'
     Assert ([IO.File]::ReadAllText((Join-Path $game 'Mods/ItStealsHelper.dll')) -eq 'updated ItStealsHelper.dll') 'Mod update failed.'

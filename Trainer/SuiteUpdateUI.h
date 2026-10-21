@@ -9,7 +9,7 @@ inline int selected = 0;
 inline std::vector<suite_update::Release> history;
 inline std::shared_ptr<const suite_update::Snapshot> historySource;
 inline size_t bundledCount = 0;
-inline char token[513]{};
+inline char token[suite_update::TokenLimit + 1]{};
 inline bool showAccess = false;
 inline std::string requestedVersion;
 inline double historyOpenedAt = -1;
@@ -233,7 +233,11 @@ inline void Page(const suite_update::Snapshot &snapshot, bool blocked)
             ShowHistory();
         ImGui::SameLine();
         if (suite_ui::Checkbox("Check automatically", &service.autoCheck))
+        {
             service.SaveState();
+            if (service.autoCheck)
+                service.Check();
+        }
     });
     ImGui::Spacing();
     suite_ui::Section("Release access", ImGuiTreeNodeFlags_DefaultOpen, [&] {
@@ -243,13 +247,18 @@ inline void Page(const suite_update::Snapshot &snapshot, bool blocked)
         ImGui::TextWrapped(
             "Private builds require repository access. Use a fine-grained GitHub token for this repository with Contents: read only.");
         if (suite_ui::Button(showAccess ? "Hide connection settings" : "Connect private releases"))
+        {
             showAccess = !showAccess;
+            if (!showAccess)
+                std::fill(std::begin(token), std::end(token), 0);
+        }
         if (showAccess)
         {
             ImGui::BeginDisabled(suite_update::Busy(snapshot.phase));
             ImGui::SetNextItemWidth(-1);
             ImGui::InputTextWithHint("##ReleaseToken", "GitHub token", token, sizeof(token),
                                      ImGuiInputTextFlags_Password);
+            ImGui::BeginDisabled(token[0] == 0);
             if (suite_ui::Button("Save & check"))
             {
                 if (service.StoreCredential(token))
@@ -263,6 +272,7 @@ inline void Page(const suite_update::Snapshot &snapshot, bool blocked)
                     service.Check();
                 }
             }
+            ImGui::EndDisabled();
             if (snapshot.credential)
             {
                 ImGui::SameLine();

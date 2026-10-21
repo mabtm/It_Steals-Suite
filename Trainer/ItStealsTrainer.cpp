@@ -1492,9 +1492,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         [] { g_quit = true; }, [&] { launchRequested = true; });
     uint32_t previousOptions = 0;
     HWND previousForeground = nullptr;
+    suite_update::Phase previousUpdatePhase = suite_update::Phase::Idle;
     DWORD updateSessionPid = 0;
     std::string updateSession;
     ULONGLONG nextUpdateCheck = GetTickCount64() + 20 * 60 * 1000;
+    ULONGLONG nextSessionUpdateCheck = GetTickCount64() + 60000;
     while (!g_quit)
     {
         if (launchRequested)
@@ -1671,7 +1673,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             g_commands.windowModeCmd = 1;
             nextExchange = 0;
         }
-        if (keyPressed(shiftT, 5) && !workspaceActive)
+        if (keyPressed(shiftT, 5) && !workspaceActive && !ImGui::GetIO().WantTextInput &&
+            !UpdateInputRequested())
             SetSpeedrunMode(!g_speedrunMode, true);
         if (keyPressed(f8, 6) && !workspaceActive &&
             suite_run::presentation.CanAnalyze(g_pShared, suite_ui::LifecycleNow()))
@@ -1771,8 +1774,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         {
             updateSessionPid = g_gamePid;
             updateSession = suite_update::Service::Session(g_gamePid);
-            if (g_gamePid && updater.autoCheck)
+            if (g_gamePid && updater.autoCheck && tick >= nextSessionUpdateCheck)
+            {
                 updater.Check();
+                nextSessionUpdateCheck = tick + 60000;
+            }
         }
         if (tick >= nextUpdateCheck)
         {
@@ -1781,6 +1787,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 updater.Check();
         }
         auto update = updater.View();
+        if (previousUpdatePhase == suite_update::Phase::Installing &&
+            update->phase != suite_update::Phase::Installing)
+            SetOverlayInteractive(MenuInputRequested());
+        previousUpdatePhase = update->phase;
         bool updateBlocked = (g_pShared && g_pShared->timerState == 1) || suite_clip::open ||
                              suite_clip::exporting || suite_hud::active || inspector::picking ||
                              inspector::dockInteractive || suite_replay::ControlsRequested(g_pShared) ||

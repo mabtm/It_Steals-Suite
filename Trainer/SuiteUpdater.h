@@ -105,15 +105,17 @@ class Service
         if (!CredReadW(CredentialName, CRED_TYPE_GENERIC, 0, &found))
             return {};
         std::string value;
-        if (found->CredentialBlobSize > 0 && found->CredentialBlobSize <= 512)
+        if (found->CredentialBlobSize > 0 && found->CredentialBlobSize <= TokenLimit)
             value.assign(reinterpret_cast<const char *>(found->CredentialBlob), found->CredentialBlobSize);
         if (found->CredentialBlobSize)
             SecureZeroMemory(found->CredentialBlob, found->CredentialBlobSize);
         CredFree(found);
-        if (!std::all_of(value.begin(), value.end(), [](unsigned char c) {
-                return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
-            }))
+        if (!ValidToken(value))
+        {
+            if (!value.empty())
+                SecureZeroMemory(value.data(), value.size());
             value.clear();
+        }
         return value;
     }
 
@@ -571,10 +573,7 @@ class Service
         }
         else
         {
-            if (token.size() > 512 || !std::all_of(token.begin(), token.end(), [](unsigned char c) {
-                    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-                           c == '_';
-                }))
+            if (!ValidToken(token))
             {
                 stateError = "Enter a valid GitHub token, without spaces.";
                 return false;
@@ -588,7 +587,8 @@ class Service
             entry.UserName = const_cast<wchar_t *>(L"GitHub");
             if (!CredWriteW(&entry, 0))
             {
-                stateError = "Windows Credential Manager could not save this token.";
+                stateError = "Windows Credential Manager could not save this token (Windows error " +
+                             std::to_string(GetLastError()) + ").";
                 return false;
             }
         }

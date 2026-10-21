@@ -18,6 +18,30 @@ inline constexpr char RepositoryUrl[] = "https://github.com/mabtm/It_Steals-Suit
 inline constexpr char PackageName[] = "ItStealsSuite-Portable.zip";
 inline constexpr uint64_t PackageLimit = 128ull * 1024 * 1024;
 
+// HTTP bearer tokens are opaque. GitHub also issues JWT-based installation
+// tokens; validation prevents header injection without assuming an old format.
+inline constexpr size_t TokenLimit = 2560;
+
+inline bool ValidToken(std::string_view token)
+{
+    if (token.empty() || token.size() > TokenLimit)
+        return false;
+    bool padding = false, base = false;
+    for (unsigned char c : token)
+    {
+        if (c == '=')
+        {
+            padding = true;
+            continue;
+        }
+        if (padding || !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                         c == '-' || c == '.' || c == '_' || c == '~' || c == '+' || c == '/'))
+            return false;
+        base = true;
+    }
+    return base;
+}
+
 struct Version
 {
     std::array<unsigned, 3> parts{};
@@ -463,13 +487,18 @@ inline bool Newer(const Release &r, std::string_view current)
 
 struct Presentation
 {
-    std::string seenVersion, promptedSession;
+    std::string seenVersion, promptedSession, observedSession;
     bool changelog = false, prompt = false, installRequested = false;
     double appeared = 0;
 
     bool Consider(std::string_view current, std::string_view session, bool ready, bool introDone,
                   bool blocked, bool available, double now)
     {
+        if (observedSession != session)
+        {
+            observedSession = session;
+            prompt = false; // A queued prompt belongs only to its game process.
+        }
         if (!ready || !introDone || blocked || changelog || prompt)
             return false;
         if (seenVersion != current)

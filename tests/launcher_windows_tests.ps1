@@ -115,9 +115,14 @@ public class ControlledGame {
     $restartedGame=[Diagnostics.Process]::GetProcessById((Read-StartedPid))
     $owned.Add($restartedGame)
     Close-ControlledTrainer $trainer
+    . (Join-Path $repo 'Installer/Update.ps1') -RequestFile 'unused-request.json'
+    $trainer=Start-ControlledTrainer '--no-launch'
+    $verified=Get-UpdateProcess $trainer.Id (Join-Path $work 'ItStealsTrainer.exe') $trainer.StartTime.ToUniversalTime().ToFileTimeUtc().ToString()
+    Close-UpdateProcess $verified
+    Assert ($trainer.WaitForExit(5000) -and $trainer.ExitCode -eq 0) 'The updater did not close the native hidden control window normally.'
     $output=Join-Path $repo 'build/windows-launcher-tests'
     $null=[IO.Directory]::CreateDirectory($output)
-    @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out')} |
+    @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out','updater gracefully closes actual hidden native control window')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'summary.json') -Encoding UTF8
     Write-Output 'Windows native launcher smoke tests passed (controlled game, not Unity).'
 } catch {
