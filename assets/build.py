@@ -211,12 +211,12 @@ def repository_artwork(folder, logo):
     draw.text((575, 523), "Seeds. Routes.", font=font(22, True), fill=MINT)
     draw.text((575, 556), "Replays. Clips.", font=font(22, True), fill=MINT)
     draw.text((575, 603), "UI previews / test data", font=font(16), fill=MUTED)
-    social.save(ROOT / "social-preview.png", optimize=True)
-    if (ROOT / "social-preview.png").stat().st_size >= 1_000_000:
+    social_path = ROOT.parent / "build" / "branding" / "social-preview.png"
+    social_path.parent.mkdir(parents=True, exist_ok=True)
+    social.save(social_path, optimize=True)
+    if social_path.stat().st_size >= 1_000_000:
         raise ValueError("Social preview exceeds GitHub's size limit")
-    print(
-        "Repository cards, comparisons, interface tour, and social preview generated."
-    )
+    print("Repository artwork generated; social preview saved to build/branding/.")
 
 
 def main():

@@ -42,7 +42,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "InspectorClient.h"
 #include "SeedSearch.h"
 #include "MovementTelemetry.h"
-#include "FrameCost.h"
+#include "PerformanceTiming.h"
 #include "SuiteExperience.h"
 #include "InterfaceAudio.h"
 #include "DiagnosticScan.h"

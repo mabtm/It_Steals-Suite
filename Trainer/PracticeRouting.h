@@ -1,6 +1,6 @@
 #pragma once
 #include "PracticeMapData.h"
-#include "RecordedTiming.h"
+#include "MovementTiming.h"
 #include "PhysicalNavigation.h"
 #include <array>
 #include <bit>

@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.12.3](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.3)**
+**[v7.12.4](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.4)**
 
-- Fixed a bug caused by a PowerShell startup error that stopped automatic game detection.
-- Improved game detection by checking saved paths, Windows installation entries, running processes, and Steam libraries.
-- Improved setup with a Detect button to search again without restarting the installer.
+- Improved code readability with named replay jobs and smaller menu and camera sections.
+- Removed duplicate validation code, redundant interface work, and an unused preview; related timing and input helpers now share fewer files.
+- Improved replay-package maintenance by keeping exporter and annotation compatibility in one table.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

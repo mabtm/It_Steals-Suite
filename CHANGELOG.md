@@ -2,6 +2,12 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.12.4 Changelog
+
+- Improved code readability with named replay jobs and smaller menu and camera sections.
+- Removed duplicate validation code, redundant interface work, and an unused preview; related timing and input helpers now share fewer files.
+- Improved replay-package maintenance by keeping exporter and annotation compatibility in one table.
+
 ### v7.12.3 Changelog
 
 - Fixed a bug caused by a PowerShell startup error that stopped automatic game detection.

@@ -1,6 +1,6 @@
 #pragma once
 #include "SharedProtocol.h"
-#include "RecordedTiming.h"
+#include "MovementTiming.h"
 
 inline void ObserveMovementSnapshot(const GameData &d)
 {

@@ -4,7 +4,7 @@
 #include "PlannerRandom.h"
 #include "SeedSearchOptions.h"
 #include "SeedBatch.h"
-#include "SearchTiming.h"
+#include "PerformanceTiming.h"
 #include "PortableRandom.h"
 #include <atomic>
 #include <chrono>

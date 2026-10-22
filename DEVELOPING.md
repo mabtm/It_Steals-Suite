@@ -20,6 +20,10 @@ The game mod talks to the trainer through bounded shared-memory channels. Unity 
 
 Follow the owning component rather than adding a new layer for every change. Keep separate models, file formats, algorithms, and platform code where that separation makes them easier to understand or test.
 
+**ReplayArchive.h** queues named disk operations on one worker; **ReplayPackage.h** owns package formats and exporter compatibility. **TrainerUI.h** groups menu pages and settings, while **ClipUI.h** groups camera, layer, keypoint, and export controls. These sections share the existing state and UI identifiers.
+
+**PerformanceTiming.h** contains frame-cost and search-progress measurements. **MovementTiming.h** contains recorded movement analysis and travel-time estimates. Input colors live with their drawing helpers in **InputModules.h**.
+
 <details>
 <summary><strong>Where to find the main systems</strong></summary>
 
@@ -67,7 +71,7 @@ Tests use fixed captures and synthetic fixtures. Some fixtures contain non-Engli
 
 ## Ship a release
 
-1. Change **SUITE_VERSION** and **SUITE_VERSION_COMPONENTS** in **Trainer/SuiteBranding.h** together; keep the previous exporter version supported in **ReplayArchive.h** and its package-import regression test.
+1. Change **SUITE_VERSION** and **SUITE_VERSION_COMPONENTS** in **Trainer/SuiteBranding.h** together; keep the previous exporter version in **ReplayPackage.h**'s compatibility table and its package-import regression test.
 2. Add a short entry at the top of **CHANGELOG.md**, using the format below.
 3. Run `python repository.py sync`, check the changes, and push to **main**.
 4. Watch **Actions → Build and publish PracticeSuite**. Resolve failures before publishing another version.
@@ -121,7 +125,7 @@ Run **assets/build.py** with Pillow and CairoSVG to regenerate the logo, Setup a
 
 When real recordings are ready, replace the tour with a short sequence of seed search, replay playback, Inspector selection, and the finish screen. Keep the cards readable on mobile and check captions against the image. Use real footage for normal-game/collider and editor/export comparisons. Retain only assets used by the page.
 
-**assets/social-preview.png** is the prepared 1280 × 640 link preview. GitHub requires uploading it under **Settings → Social preview**; adding the file to Git does not activate it. For a private repository, GitHub only permits this if a preview was uploaded before. It can be set when the repository becomes public. The Suite's own licensing should also be decided before public distribution; bundled dependencies retain their existing licenses.
+The artwork generator also writes a 1280 × 640 social preview to **build/branding/social-preview.png**. Generated previews stay out of Git. Upload it under **Settings → Social preview** when the repository becomes public. The Suite's own licensing should also be decided before public distribution; bundled dependencies retain their existing licenses.
 
 ## Update boundaries
 
