@@ -36,7 +36,7 @@
 
 ## Install
 
-1. Download **[Setup](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsSuite-Setup.exe)** and close the game and trainer.
+1. Download **[Setup](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/ItStealsSuite-Setup.exe)** and close the game.
 2. Run it, confirm your **It Steals** folder, and choose where to install the Suite.
 3. Open the desktop shortcut. The trainer starts the game; press **F3** for the menu.
 
