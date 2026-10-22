@@ -538,72 +538,8 @@ inline void CameraModes()
     ModeButton("Free", 2, w);
 }
 
-inline void CameraPanel(bool &changed)
+inline void CameraPointSpeedControls(bool &changed)
 {
-    bool can3d = content.motion && !content.motion->frames.empty() && g_pShared;
-    ImGui::BeginDisabled(!can3d && !options.scene3d);
-    changed |= suite_ui::Checkbox("3D scene", &options.scene3d);
-    ImGui::EndDisabled();
-    if (!options.scene3d)
-    {
-        ImGui::TextDisabled("Map composition");
-        Help("Enable the recorded 3D scene to compose a camera shot.");
-        return;
-    }
-    if (suite_ui::Checkbox("Simplified graphics", &options.simplified))
-    {
-        ChangedCamera();
-        changed = true;
-    }
-    Help("Off: original scene materials, textures, lighting, shadows and camera "
-         "effects. On: the previous "
-         "lightweight analysis style. Changing this reloads the replay scene. "
-         "Recorded model animation "
-         "requires a new visual recording.");
-    if (!EditingPoint())
-        changed |= suite_ui::Checkbox("Fullbright", &options.fullbright);
-    Help("Brighten this replay without replacing original materials. While "
-         "editing a point, use Scene layers "
-         "to change Fullbright at that exact time. This is a display setting; "
-         "run validity stays unchanged.");
-    bool timeline = options.camera == 3;
-    ImGui::BeginDisabled(content.track.keys.empty());
-    if (suite_ui::Checkbox("Use keypoints", &timeline))
-    {
-        if (timeline)
-            SetCameraMode(3);
-        else
-        {
-            cameraEditing = false;
-            SetCameraMode(2);
-        }
-    }
-    ImGui::EndDisabled();
-    if (EditingPoint())
-    {
-        ImGui::TextColored(g_headerCol, "SHOT %s / %.6f s", PointLabel(selectedKey).c_str(), previewAt);
-        CameraModes();
-        Help("Mode and camera edits are saved on this output point. The timeline "
-             "remains enabled for preview "
-             "and export.");
-        if (suite_ui::Button("Done editing"))
-        {
-            cameraEditing = false;
-            cameraDrag = cameraPanDrag = false;
-            changed = true;
-        }
-    }
-    else if (options.camera == 3)
-    {
-        auto frame = ResolveFrame(options, content, previewAt);
-        ImGui::TextColored(g_headerCol, "TIMELINE / %s", ShotModeNames[frame.options.camera]);
-        ImGui::TextDisabled("Select a point to edit its camera");
-    }
-    else
-        CameraModes();
-    Help("Free: hold RMB to look; WASD moves, Q/E lowers/raises, Shift moves "
-         "faster. Wheel travels, MMB pans. "
-         "Follow: RMB orbits, wheel zooms.");
     if (selectedKey >= 0 && selectedKey < int(content.track.keys.size()))
     {
         auto &speedKey = content.track.keys[selectedKey];
@@ -646,6 +582,10 @@ inline void CameraPanel(bool &changed)
             }
         }
     }
+}
+
+inline void CameraLayerControls(bool &changed)
+{
     if (ImGui::TreeNode("Scene layers"))
     {
         bool point = EditingPoint();
@@ -682,6 +622,10 @@ inline void CameraPanel(bool &changed)
         }
         ImGui::TreePop();
     }
+}
+
+inline void CameraPoseControls(bool &changed)
+{
     int mode = EditorMode();
     if (mode == 2)
     {
@@ -742,18 +686,10 @@ inline void CameraPanel(bool &changed)
             changed = true;
         }
     }
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-    ImGui::TextColored(g_headerCol, "CAMERA SHOTS");
-    ImGui::BeginDisabled(!CurrentCameraPose());
-    if (suite_ui::Button("Add keypoint", {-1, 0}))
-        SaveKey(false);
-    ImGui::EndDisabled();
-    Help("Seek to an exact time, capture a point, then choose Recorded, Follow "
-         "or Free. Cut changes mode at "
-         "the next point; easing blends between modes. Before the first point, "
-         "the original recording plays.");
+}
+
+inline void CameraShotList()
+{
     if (content.track.keys.empty())
         ImGui::TextDisabled("Time  >  K  >  choose camera mode");
     float rowHeight = 30 * suite_ui::Unit() + ImGui::GetStyle().ItemSpacing.y;
@@ -776,6 +712,10 @@ inline void CameraPanel(bool &changed)
         ImGui::PopID();
     }
     ImGui::EndChild();
+}
+
+inline void CameraSelectedShotControls(bool &changed)
+{
     if (selectedKey >= 0 && selectedKey < int(content.track.keys.size()))
     {
         auto &key = content.track.keys[selectedKey];
@@ -853,12 +793,102 @@ inline void CameraPanel(bool &changed)
             ChangedCamera();
         }
     }
+}
+
+inline void CameraShotsPanel(bool &changed)
+{
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::TextColored(g_headerCol, "CAMERA SHOTS");
+    ImGui::BeginDisabled(!CurrentCameraPose());
+    if (suite_ui::Button("Add keypoint", {-1, 0}))
+        SaveKey(false);
+    ImGui::EndDisabled();
+    Help("Seek to an exact time, capture a point, then choose Recorded, Follow "
+         "or Free. Cut changes mode at "
+         "the next point; easing blends between modes. Before the first point, "
+         "the original recording plays.");
+    CameraShotList();
+    CameraSelectedShotControls(changed);
     changed |= suite_ui::Checkbox("Show camera path", &showCameraPath);
     if (suite_ui::Button("Path overview"))
         pathOverview = true;
     Help("Editor guides show the path, point labels and look directions. They "
          "are excluded from the exported "
          "video.");
+}
+
+inline void CameraPanel(bool &changed)
+{
+    bool can3d = content.motion && !content.motion->frames.empty() && g_pShared;
+    ImGui::BeginDisabled(!can3d && !options.scene3d);
+    changed |= suite_ui::Checkbox("3D scene", &options.scene3d);
+    ImGui::EndDisabled();
+    if (!options.scene3d)
+    {
+        ImGui::TextDisabled("Map composition");
+        Help("Enable the recorded 3D scene to compose a camera shot.");
+        return;
+    }
+    if (suite_ui::Checkbox("Simplified graphics", &options.simplified))
+    {
+        ChangedCamera();
+        changed = true;
+    }
+    Help("Off: original scene materials, textures, lighting, shadows and camera "
+         "effects. On: the previous "
+         "lightweight analysis style. Changing this reloads the replay scene. "
+         "Recorded model animation "
+         "requires a new visual recording.");
+    if (!EditingPoint())
+        changed |= suite_ui::Checkbox("Fullbright", &options.fullbright);
+    Help("Brighten this replay without replacing original materials. While "
+         "editing a point, use Scene layers "
+         "to change Fullbright at that exact time. This is a display setting; "
+         "run validity stays unchanged.");
+    bool timeline = options.camera == 3;
+    ImGui::BeginDisabled(content.track.keys.empty());
+    if (suite_ui::Checkbox("Use keypoints", &timeline))
+    {
+        if (timeline)
+            SetCameraMode(3);
+        else
+        {
+            cameraEditing = false;
+            SetCameraMode(2);
+        }
+    }
+    ImGui::EndDisabled();
+    if (EditingPoint())
+    {
+        ImGui::TextColored(g_headerCol, "SHOT %s / %.6f s", PointLabel(selectedKey).c_str(), previewAt);
+        CameraModes();
+        Help("Mode and camera edits are saved on this output point. The timeline "
+             "remains enabled for preview "
+             "and export.");
+        if (suite_ui::Button("Done editing"))
+        {
+            cameraEditing = false;
+            cameraDrag = cameraPanDrag = false;
+            changed = true;
+        }
+    }
+    else if (options.camera == 3)
+    {
+        auto frame = ResolveFrame(options, content, previewAt);
+        ImGui::TextColored(g_headerCol, "TIMELINE / %s", ShotModeNames[frame.options.camera]);
+        ImGui::TextDisabled("Select a point to edit its camera");
+    }
+    else
+        CameraModes();
+    Help("Free: hold RMB to look; WASD moves, Q/E lowers/raises, Shift moves "
+         "faster. Wheel travels, MMB pans. "
+         "Follow: RMB orbits, wheel zooms.");
+    CameraPointSpeedControls(changed);
+    CameraLayerControls(changed);
+    CameraPoseControls(changed);
+    CameraShotsPanel(changed);
 }
 
 inline void OverlaysPanel(bool &changed)
