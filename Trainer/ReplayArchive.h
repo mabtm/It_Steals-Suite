@@ -3,6 +3,7 @@
 #include "ReplayPackage.h"
 #include "ReplayAudioIO.h"
 #include "ReplayHealth.h"
+#include "ReplayTextValidation.h"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -74,9 +75,24 @@ struct ReplayArchiveState
 // sleeping IO worker. The UI receives immutable snapshots, never file handles.
 class ReplayArchive
 {
+    enum class JobKind
+    {
+        Initialize,
+        Refresh,
+        ChangeSource,
+        LoadRecording,
+        SaveRecording,
+        ExportPackage,
+        LoadMotion,
+        ImportPackage,
+        Stage3D,
+        LoadAnnotations,
+        SaveAnnotations,
+    };
+
     struct Job
     {
-        int kind = 0;
+        JobKind kind = JobKind::Initialize;
         int64_t id = 0;
         std::filesystem::path path;
         std::shared_ptr<const MapData> data;
@@ -108,17 +124,6 @@ class ReplayArchive
     std::thread worker;
     bool stopping = false, scanQueued = false;
     std::string problem;
-
-    static uint64_t Hash(const std::vector<uint8_t> &bytes, size_t n)
-    {
-        uint64_t h = 14695981039346656037ull;
-        for (size_t i = 0; i < n; i++)
-        {
-            h ^= bytes[i];
-            h *= 1099511628211ull;
-        }
-        return h;
-    }
 
     static std::vector<uint8_t> Read(const std::filesystem::path &p, size_t limit)
     {
@@ -168,43 +173,13 @@ class ReplayArchive
 #endif
     }
 
-    static bool ValidText(const std::string &text, size_t limit)
-    {
-        if (text.size() > limit || text.find('\0') != std::string::npos)
-            return false;
-        // Strict UTF-8, including overlong encodings, surrogates and > U+10FFFF.
-        for (size_t i = 0; i < text.size();)
-        {
-            uint32_t c = uint8_t(text[i++]);
-            if (c < 128)
-                continue;
-            int n = c >= 0xc2 && c <= 0xdf ? 1 : c >= 0xe0 && c <= 0xef ? 2 : c >= 0xf0 && c <= 0xf4 ? 3 : -1;
-            if (n < 0 || i + size_t(n) > text.size())
-                return false;
-            uint32_t value = c & ((1u << (6 - n)) - 1);
-            for (int k = 0; k < n; k++)
-            {
-                c = uint8_t(text[i++]);
-                if ((c & 0xc0) != 0x80)
-                    return false;
-                value = (value << 6) | (c & 63);
-            }
-            if (value < (n == 1   ? 128u
-                         : n == 2 ? 2048u
-                                  : 65536u) ||
-                value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff))
-                return false;
-        }
-        return true;
-    }
-
     static std::vector<uint8_t> Meta(const ReplayInfo &row)
     {
         auto single = [](const std::string &s) {
             return std::none_of(s.begin(), s.end(), [](unsigned char c) { return c < 32 || c == 127; });
         };
-        if (row.name.empty() || !single(row.name) || !single(row.category) || !ValidText(row.name, 160) ||
-            !ValidText(row.category, 128) || !ValidText(row.notes, 8192))
+        if (row.name.empty() || !single(row.name) || !single(row.category) || !ReplayUtf8(row.name, 160) ||
+            !ReplayUtf8(row.category, 128) || !ReplayUtf8(row.notes, 8192))
             throw std::runtime_error("Replay text is invalid or too long");
         std::vector<uint8_t> b;
         auto put = [&](auto v) {
@@ -219,7 +194,7 @@ class ReplayArchive
             put(int32_t(s.size()));
             b.insert(b.end(), s.begin(), s.end());
         }
-        put(Hash(b, b.size()));
+        put(ReplayHash(b, b.size()));
         return b;
     }
 
@@ -230,8 +205,8 @@ class ReplayArchive
         if (r.Read<uint32_t>() != 0x524d4554 || r.Read<int32_t>() != 1 || r.Read<int64_t>() != row.id)
             throw std::runtime_error("Replay notes identity mismatch");
         auto name = r.Text(160), category = r.Text(128), notes = r.Text(8192);
-        if (!ValidText(name, 160) || !ValidText(category, 128) || !ValidText(notes, 8192) || b.size() < 8 ||
-            r.Read<uint64_t>() != Hash(b, b.size() - 8) || !r.Done())
+        if (!ReplayUtf8(name, 160) || !ReplayUtf8(category, 128) || !ReplayUtf8(notes, 8192) ||
+            b.size() < 8 || r.Read<uint64_t>() != ReplayHash(b, b.size() - 8) || !r.Done())
             throw std::runtime_error("Replay notes are damaged");
         row.name = name;
         row.category = category;
@@ -574,9 +549,8 @@ class ReplayArchive
         return files;
     }
 
-    void Import(const std::filesystem::path &path)
+    static void VerifyPackageChecksums(const ReplayFiles &files)
     {
-        auto files = DecodeReplayZip(Read(path, ReplayPackageCapacity));
         auto sums = files.find("SHA256SUMS.txt");
         if (sums == files.end() || sums->second.size() > 4096)
             throw std::runtime_error("Package has no checksum manifest");
@@ -596,6 +570,12 @@ class ReplayArchive
         }
         if (verified.size() + 1 != files.size())
             throw std::runtime_error("Unverified package entry");
+    }
+
+    void Import(const std::filesystem::path &path)
+    {
+        auto files = DecodeReplayZip(Read(path, ReplayPackageCapacity));
+        VerifyPackageChecksums(files);
         std::shared_ptr<const MapData> d;
         std::string error;
         for (const auto &[name, bytes] : files)
@@ -636,48 +616,9 @@ class ReplayArchive
             if (!a->Matches(*d))
                 throw std::runtime_error("Package annotation identity mismatch");
         }
-        bool manifest = false;
-        for (const std::string &version : {std::string(suite_brand::Version),
-                                           std::string("7.12.2"),
-                                           std::string("7.12.1"),
-                                           std::string("7.12.0"),
-                                           std::string("7.11.5"),
-                                           std::string("7.11.4"),
-                                           std::string("7.11.3"),
-                                           std::string("7.11.2"),
-                                           std::string("7.11.1"),
-                                           std::string("7.11.0"),
-                                           std::string("7.10.1"),
-                                           std::string("7.10.0"),
-                                           std::string("7.9.0"),
-                                           std::string("7.8.1"),
-                                           std::string("7.8.0"),
-                                           std::string("7.7.0"),
-                                           std::string("7.6.0"),
-                                           std::string("7.5.2"),
-                                           std::string("7.5.1"),
-                                           std::string("7.5.0"),
-                                           std::string("7.4.0"),
-                                           std::string("7.3.5"),
-                                           std::string("7.3.4"),
-                                           std::string("7.3.3"),
-                                           std::string("7.3.2"),
-                                           std::string("7.3.1"),
-                                           std::string("7.3.0"),
-                                           std::string("7.2.1"),
-                                           std::string("7.2.0")})
-            if ((!hasMarks || version == suite_brand::Version || version == "7.12.2" || version == "7.12.1" || version == "7.12.0" || version == "7.11.5" ||
-                 version == "7.11.4" || version == "7.11.3" || version == "7.11.2" || version == "7.11.1" ||
-                 version == "7.11.0" || version == "7.10.1" || version == "7.10.0" || version == "7.9.0" ||
-                 version == "7.8.1" || version == "7.8.0" || version == "7.7.0" || version == "7.6.0" ||
-                 version == "7.5.2" || version == "7.5.1" || version == "7.5.0" || version == "7.4.0" ||
-                 version == "7.3.5" || version == "7.3.4" || version == "7.3.3" || version == "7.3.2" ||
-                 version == "7.3.1" || version == "7.3.0") &&
-                files.count("manifest.json") &&
-                files["manifest.json"] ==
-                    ReplayText(ReplayManifest(*d, hasInput, hasReport, version, hasMarks)))
-                manifest = true;
-        if (!manifest)
+        auto manifest = files.find("manifest.json");
+        if (manifest == files.end() ||
+            !ReplayManifestMatches(manifest->second, *d, hasInput, hasReport, hasMarks))
             throw std::runtime_error("Package manifest identity mismatch");
         for (const auto &[name, bytes] : files)
         {
@@ -723,6 +664,245 @@ class ReplayArchive
         Scan();
     }
 
+    void InitializeLibrary(const Job &job)
+    {
+        root = job.path;
+        std::filesystem::create_directories(root);
+        auto config = root / "source.txt";
+        if (std::filesystem::exists(config))
+        {
+            auto b = Read(config, 32768);
+            source = std::filesystem::path(std::u8string(b.begin(), b.end()));
+        }
+        Scan();
+    }
+
+    void ChangeSourceDirectory(const Job &job)
+    {
+        source = job.path;
+        stagedRun = 0;
+        auto text = source.u8string();
+        Atomic(root / "source.txt", std::vector<uint8_t>(text.begin(), text.end()), true);
+        Scan();
+    }
+
+    void LoadRecording(const Job &job)
+    {
+        auto snapshot = Get();
+        auto row = std::find_if(snapshot->runs.begin(), snapshot->runs.end(),
+                                [&](const auto &r) { return r.id == job.id; });
+        if (row == snapshot->runs.end())
+            throw std::runtime_error("Replay no longer available");
+        std::string error;
+        auto data = DecodeMap(Read(row->file, MapCapacity - 64), error);
+        if (!data || !data->review || data->review->id != job.id)
+            throw std::runtime_error(error);
+        std::atomic_store(&loaded, data);
+    }
+
+    void SaveRecording(const Job &job)
+    {
+        if (!job.data || !job.data->review || job.data->bytes.empty())
+            throw std::runtime_error("Replay contains no saved recording");
+        ReplayInfo row;
+        row.id = job.data->review->id;
+        row.name = job.name;
+        row.category = job.category;
+        row.notes = job.notes;
+        auto metadata = Meta(row);
+        if (root.empty())
+            throw std::runtime_error("Replay directory unavailable");
+        auto original = Canonical(*job.data);
+        const auto &bytes = original ? original->bytes : job.data->bytes;
+        if (std::filesystem::exists(File(row.id, ".isrun")) &&
+            Read(File(row.id, ".isrun"), MapCapacity - 64) != bytes)
+            throw std::runtime_error("Existing replay preserved; identity conflict");
+        auto input = ReadMotion(*job.data);
+        if (input)
+        {
+            CopyAudio(*input, File(row.id, ".isaudio"));
+            Atomic(File(row.id, ".isinput"), input->bytes, false);
+        }
+        auto report = Companion(*job.data, ".validation.json");
+        if (!report.empty())
+            Atomic(File(row.id, ".validation.json"), Read(report, 65536), false);
+        Atomic(File(row.id, ".isrun"), bytes, false);
+        auto target = File(row.id, ".meta");
+        bool preserve = false;
+        if (std::filesystem::exists(target))
+            try
+            {
+                auto previous = row;
+                ReadMeta(target, previous);
+            }
+            catch (...)
+            {
+                preserve = true;
+                auto damaged = target;
+                auto damagedBytes = Read(target, 16384);
+                damaged += ".corrupt-" + std::to_string(ReplayHash(damagedBytes, damagedBytes.size()));
+                std::filesystem::copy_file(target, damaged, std::filesystem::copy_options::skip_existing);
+            }
+        Atomic(target, metadata, true, !preserve);
+        savedRun = row.id;
+        savedRevision++;
+        Scan();
+    }
+
+    void ExportRecording(const Job &job)
+    {
+        auto files = Package(*job.data);
+        auto p = root / "Exports" / ("run-" + std::to_string(job.data->review->id) + ".zip");
+        auto bytes = EncodeReplayZip(files);
+        if (std::filesystem::exists(p) && Read(p, ReplayPackageCapacity) != bytes)
+        {
+            auto stamp = std::chrono::system_clock::now().time_since_epoch().count();
+            p = root / "Exports" /
+                ("run-" + std::to_string(job.data->review->id) + "-" + std::to_string(stamp) + ".zip");
+        }
+        Atomic(p, bytes, false);
+        exportedRun = job.data->review->id;
+        exportPath = p.string();
+        Publish();
+    }
+
+    void LoadRecordedMotion(const Job &job)
+    {
+        motionRun = job.data->review->id;
+        motionError.clear();
+        std::atomic_store(&motion, std::shared_ptr<const ReplayMotion>{});
+        Publish(true);
+        auto value = ReadMotion(*job.data);
+        std::atomic_store(&motion, value);
+        Publish();
+    }
+
+    void StageRecording3D(const Job &job)
+    {
+        stagedRun = 0;
+        Publish(true);
+        if (source.empty())
+            throw std::runtime_error("Connect to the game before opening 3D replay");
+        auto input = ReadMotion(*job.data);
+        if (!input || input->frames.empty())
+            throw std::runtime_error("This replay has no camera recording");
+        auto folder = source / "ReplayInbox";
+        auto prefix = "run-" + std::to_string(input->id);
+        auto original = Canonical(*job.data);
+        if (!input->audioFile.empty())
+            CopyAudio(*input, folder / (prefix + ".isaudio"));
+        Atomic(folder / (prefix + ".isinput"), input->bytes, false);
+        Atomic(folder / (prefix + ".isrun"), original ? original->bytes : job.data->bytes, false);
+        stagedRun = input->id;
+        Publish();
+    }
+
+    void LoadRecordedAnnotations(const Job &job)
+    {
+        annotationRun = job.data->review->id;
+        annotationError.clear();
+        std::atomic_store(&annotations, std::shared_ptr<const ReplayAnnotations>{});
+        Publish(true);
+        auto p = File(annotationRun, ".ismarks");
+        std::shared_ptr<const ReplayAnnotations> a;
+        if (std::filesystem::exists(p))
+        {
+            try
+            {
+                a = DecodeAnnotations(Read(p, 65536));
+            }
+            catch (const std::exception &e)
+            {
+                annotationError = e.what();
+                auto backup = p;
+                backup += ".bak";
+                a = DecodeAnnotations(Read(backup, 65536));
+            }
+        }
+        else
+        {
+            auto fresh = std::make_shared<ReplayAnnotations>();
+            fresh->run = annotationRun;
+            fresh->duration = job.data->review->seconds;
+            a = fresh;
+        }
+        if (!a->Matches(*job.data))
+            throw std::runtime_error("Annotation identity mismatch");
+        std::atomic_store(&annotations, a);
+        annotationRevision++;
+        Publish();
+    }
+
+    void SaveRecordedAnnotations(const Job &job)
+    {
+        if (!job.annotations || !job.annotations->Matches(*job.data))
+            throw std::runtime_error("Annotation identity mismatch");
+        auto original = Canonical(*job.data);
+        if (!original)
+            throw std::runtime_error("Retain the recording before saving markers");
+        auto bytes = EncodeAnnotations(*job.annotations);
+        auto p = File(job.annotations->run, ".ismarks");
+        bool backup = true;
+        if (std::filesystem::exists(p))
+            try
+            {
+                DecodeAnnotations(Read(p, 65536));
+            }
+            catch (...)
+            {
+                backup = false;
+                auto damaged = p;
+                damaged += ".corrupt";
+                std::filesystem::copy_file(p, damaged, std::filesystem::copy_options::overwrite_existing);
+            }
+        Atomic(p, bytes, true, backup);
+        annotationRun = job.annotations->run;
+        annotationError.clear();
+        std::atomic_store(&annotations, job.annotations);
+        annotationRevision++;
+        Publish();
+    }
+
+    void Process(const Job &job)
+    {
+        switch (job.kind)
+        {
+        case JobKind::Initialize:
+            InitializeLibrary(job);
+            break;
+        case JobKind::Refresh:
+            Scan();
+            break;
+        case JobKind::ChangeSource:
+            ChangeSourceDirectory(job);
+            break;
+        case JobKind::LoadRecording:
+            LoadRecording(job);
+            break;
+        case JobKind::SaveRecording:
+            SaveRecording(job);
+            break;
+        case JobKind::ExportPackage:
+            ExportRecording(job);
+            break;
+        case JobKind::LoadMotion:
+            LoadRecordedMotion(job);
+            break;
+        case JobKind::ImportPackage:
+            Import(job.path);
+            break;
+        case JobKind::Stage3D:
+            StageRecording3D(job);
+            break;
+        case JobKind::LoadAnnotations:
+            LoadRecordedAnnotations(job);
+            break;
+        case JobKind::SaveAnnotations:
+            SaveRecordedAnnotations(job);
+            break;
+        }
+    }
+
     void Work()
     {
 #ifdef _WIN32
@@ -738,215 +918,19 @@ class ReplayArchive
                     return;
                 job = std::move(jobs.front());
                 jobs.pop_front();
-                if (job.kind == 1)
+                if (job.kind == JobKind::Refresh)
                     scanQueued = false;
             }
             try
             {
                 problem.clear();
-                if (job.kind == 0)
-                {
-                    root = job.path;
-                    std::filesystem::create_directories(root);
-                    auto config = root / "source.txt";
-                    if (std::filesystem::exists(config))
-                    {
-                        auto b = Read(config, 32768);
-                        source = std::filesystem::path(std::u8string(b.begin(), b.end()));
-                    }
-                    Scan();
-                }
-                else if (job.kind == 1)
-                    Scan();
-                else if (job.kind == 2)
-                {
-                    source = job.path;
-                    stagedRun = 0;
-                    auto text = source.u8string();
-                    Atomic(root / "source.txt", std::vector<uint8_t>(text.begin(), text.end()), true);
-                    Scan();
-                }
-                else if (job.kind == 3)
-                {
-                    auto snapshot = Get();
-                    auto row = std::find_if(snapshot->runs.begin(), snapshot->runs.end(),
-                                            [&](const auto &r) { return r.id == job.id; });
-                    if (row == snapshot->runs.end())
-                        throw std::runtime_error("Replay no longer available");
-                    std::string error;
-                    auto data = DecodeMap(Read(row->file, MapCapacity - 64), error);
-                    if (!data || !data->review || data->review->id != job.id)
-                        throw std::runtime_error(error);
-                    std::atomic_store(&loaded, data);
-                }
-                else if (job.kind == 4)
-                {
-                    if (!job.data || !job.data->review || job.data->bytes.empty())
-                        throw std::runtime_error("Replay contains no saved recording");
-                    ReplayInfo row;
-                    row.id = job.data->review->id;
-                    row.name = job.name;
-                    row.category = job.category;
-                    row.notes = job.notes;
-                    auto metadata = Meta(row);
-                    if (root.empty())
-                        throw std::runtime_error("Replay directory unavailable");
-                    auto original = Canonical(*job.data);
-                    const auto &bytes = original ? original->bytes : job.data->bytes;
-                    if (std::filesystem::exists(File(row.id, ".isrun")) &&
-                        Read(File(row.id, ".isrun"), MapCapacity - 64) != bytes)
-                        throw std::runtime_error("Existing replay preserved; identity conflict");
-                    auto input = ReadMotion(*job.data);
-                    if (input)
-                    {
-                        CopyAudio(*input, File(row.id, ".isaudio"));
-                        Atomic(File(row.id, ".isinput"), input->bytes, false);
-                    }
-                    auto report = Companion(*job.data, ".validation.json");
-                    if (!report.empty())
-                        Atomic(File(row.id, ".validation.json"), Read(report, 65536), false);
-                    Atomic(File(row.id, ".isrun"), bytes, false);
-                    auto target = File(row.id, ".meta");
-                    bool preserve = false;
-                    if (std::filesystem::exists(target))
-                        try
-                        {
-                            auto previous = row;
-                            ReadMeta(target, previous);
-                        }
-                        catch (...)
-                        {
-                            preserve = true;
-                            auto damaged = target;
-                            auto damagedBytes = Read(target, 16384);
-                            damaged += ".corrupt-" + std::to_string(Hash(damagedBytes, damagedBytes.size()));
-                            std::filesystem::copy_file(target, damaged,
-                                                       std::filesystem::copy_options::skip_existing);
-                        }
-                    Atomic(target, metadata, true, !preserve);
-                    savedRun = row.id;
-                    savedRevision++;
-                    Scan();
-                }
-                else if (job.kind == 5)
-                {
-                    auto files = Package(*job.data);
-                    auto p = root / "Exports" / ("run-" + std::to_string(job.data->review->id) + ".zip");
-                    auto bytes = EncodeReplayZip(files);
-                    if (std::filesystem::exists(p) && Read(p, ReplayPackageCapacity) != bytes)
-                    {
-                        auto stamp = std::chrono::system_clock::now().time_since_epoch().count();
-                        p = root / "Exports" /
-                            ("run-" + std::to_string(job.data->review->id) + "-" + std::to_string(stamp) +
-                             ".zip");
-                    }
-                    Atomic(p, bytes, false);
-                    exportedRun = job.data->review->id;
-                    exportPath = p.string();
-                    Publish();
-                }
-                else if (job.kind == 6)
-                {
-                    motionRun = job.data->review->id;
-                    motionError.clear();
-                    std::atomic_store(&motion, std::shared_ptr<const ReplayMotion>{});
-                    Publish(true);
-                    auto value = ReadMotion(*job.data);
-                    std::atomic_store(&motion, value);
-                    Publish();
-                }
-                else if (job.kind == 7)
-                    Import(job.path);
-                else if (job.kind == 8)
-                {
-                    stagedRun = 0;
-                    Publish(true);
-                    if (source.empty())
-                        throw std::runtime_error("Connect to the game before opening 3D replay");
-                    auto input = ReadMotion(*job.data);
-                    if (!input || input->frames.empty())
-                        throw std::runtime_error("This replay has no camera recording");
-                    auto folder = source / "ReplayInbox";
-                    auto prefix = "run-" + std::to_string(input->id);
-                    auto original = Canonical(*job.data);
-                    if (!input->audioFile.empty())
-                        CopyAudio(*input, folder / (prefix + ".isaudio"));
-                    Atomic(folder / (prefix + ".isinput"), input->bytes, false);
-                    Atomic(folder / (prefix + ".isrun"), original ? original->bytes : job.data->bytes, false);
-                    stagedRun = input->id;
-                    Publish();
-                }
-                else if (job.kind == 9)
-                {
-                    annotationRun = job.data->review->id;
-                    annotationError.clear();
-                    std::atomic_store(&annotations, std::shared_ptr<const ReplayAnnotations>{});
-                    Publish(true);
-                    auto p = File(annotationRun, ".ismarks");
-                    std::shared_ptr<const ReplayAnnotations> a;
-                    if (std::filesystem::exists(p))
-                    {
-                        try
-                        {
-                            a = DecodeAnnotations(Read(p, 65536));
-                        }
-                        catch (const std::exception &e)
-                        {
-                            annotationError = e.what();
-                            auto backup = p;
-                            backup += ".bak";
-                            a = DecodeAnnotations(Read(backup, 65536));
-                        }
-                    }
-                    else
-                    {
-                        auto fresh = std::make_shared<ReplayAnnotations>();
-                        fresh->run = annotationRun;
-                        fresh->duration = job.data->review->seconds;
-                        a = fresh;
-                    }
-                    if (!a->Matches(*job.data))
-                        throw std::runtime_error("Annotation identity mismatch");
-                    std::atomic_store(&annotations, a);
-                    annotationRevision++;
-                    Publish();
-                }
-                else if (job.kind == 10)
-                {
-                    if (!job.annotations || !job.annotations->Matches(*job.data))
-                        throw std::runtime_error("Annotation identity mismatch");
-                    auto original = Canonical(*job.data);
-                    if (!original)
-                        throw std::runtime_error("Retain the recording before saving markers");
-                    auto bytes = EncodeAnnotations(*job.annotations);
-                    auto p = File(job.annotations->run, ".ismarks");
-                    bool backup = true;
-                    if (std::filesystem::exists(p))
-                        try
-                        {
-                            DecodeAnnotations(Read(p, 65536));
-                        }
-                        catch (...)
-                        {
-                            backup = false;
-                            auto damaged = p;
-                            damaged += ".corrupt";
-                            std::filesystem::copy_file(p, damaged,
-                                                       std::filesystem::copy_options::overwrite_existing);
-                        }
-                    Atomic(p, bytes, true, backup);
-                    annotationRun = job.annotations->run;
-                    annotationError.clear();
-                    std::atomic_store(&annotations, job.annotations);
-                    annotationRevision++;
-                    Publish();
-                }
+                Process(job);
             }
             catch (const std::exception &e)
             {
-                if (job.kind == 9 || job.kind == 10)
+                if (job.kind == JobKind::LoadAnnotations || job.kind == JobKind::SaveAnnotations)
                     annotationError = e.what();
-                else if (job.kind == 6)
+                else if (job.kind == JobKind::LoadMotion)
                     motionError = e.what();
                 else
                     problem = e.what();
@@ -960,9 +944,9 @@ class ReplayArchive
         std::lock_guard lock(gate);
         if (stopping)
             return;
-        if (job.kind == 1 && scanQueued)
+        if (job.kind == JobKind::Refresh && scanQueued)
             return;
-        if (job.kind == 1)
+        if (job.kind == JobKind::Refresh)
             scanQueued = true;
         jobs.push_back(std::move(job));
         if (!worker.joinable())
@@ -992,92 +976,61 @@ class ReplayArchive
 
     void SetDirectory(std::filesystem::path path)
     {
-        Job j;
-        j.path = std::move(path);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::Initialize, .path = std::move(path)});
     }
 
     void SetSourceDirectory(std::filesystem::path path)
     {
-        Job j;
-        j.kind = 2;
-        j.path = std::move(path);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::ChangeSource, .path = std::move(path)});
     }
 
     void Refresh()
     {
-        Job j;
-        j.kind = 1;
-        Queue(std::move(j));
+        Queue({.kind = JobKind::Refresh});
     }
 
     void Load(int64_t id)
     {
-        Job j;
-        j.kind = 3;
-        j.id = id;
-        Queue(std::move(j));
+        Queue({.kind = JobKind::LoadRecording, .id = id});
     }
 
     void LoadMotion(std::shared_ptr<const MapData> data)
     {
-        Job j;
-        j.kind = 6;
-        j.data = std::move(data);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::LoadMotion, .data = std::move(data)});
     }
 
     void Export(std::shared_ptr<const MapData> data)
     {
-        Job j;
-        j.kind = 5;
-        j.data = std::move(data);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::ExportPackage, .data = std::move(data)});
     }
 
     void ImportPackage(std::filesystem::path path)
     {
-        Job j;
-        j.kind = 7;
-        j.path = std::move(path);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::ImportPackage, .path = std::move(path)});
     }
 
     void Stage3D(std::shared_ptr<const MapData> data)
     {
-        Job j;
-        j.kind = 8;
-        j.data = std::move(data);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::Stage3D, .data = std::move(data)});
     }
 
     void Save(std::shared_ptr<const MapData> data, std::string name, std::string category, std::string notes)
     {
-        Job j;
-        j.kind = 4;
-        j.data = std::move(data);
-        j.name = std::move(name);
-        j.category = std::move(category);
-        j.notes = std::move(notes);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::SaveRecording,
+               .data = std::move(data),
+               .name = std::move(name),
+               .category = std::move(category),
+               .notes = std::move(notes)});
     }
 
     void LoadAnnotations(std::shared_ptr<const MapData> data)
     {
-        Job j;
-        j.kind = 9;
-        j.data = std::move(data);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::LoadAnnotations, .data = std::move(data)});
     }
 
     void SaveAnnotations(std::shared_ptr<const MapData> data, std::shared_ptr<const ReplayAnnotations> value)
     {
-        Job j;
-        j.kind = 10;
-        j.data = std::move(data);
-        j.annotations = std::move(value);
-        Queue(std::move(j));
+        Queue({.kind = JobKind::SaveAnnotations, .data = std::move(data), .annotations = std::move(value)});
     }
 
     std::shared_ptr<const ReplayAnnotations> Annotations() const

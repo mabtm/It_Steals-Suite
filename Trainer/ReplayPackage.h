@@ -147,6 +147,57 @@ inline std::string ReplayManifest(const MapData &d, bool inputs, bool validation
     return o.str();
 }
 
+// Explicit exporter compatibility: 7.2 packages predate replay annotations.
+// Keep each version and its format support together when adding a release.
+struct ReplayPackageExporter
+{
+    const char *version;
+    bool annotations;
+};
+
+inline constexpr ReplayPackageExporter ReplayPackageExporters[] = {
+    {suite_brand::Version, true},
+    {"7.12.3", true},
+    {"7.12.2", true},
+    {"7.12.1", true},
+    {"7.12.0", true},
+    {"7.11.5", true},
+    {"7.11.4", true},
+    {"7.11.3", true},
+    {"7.11.2", true},
+    {"7.11.1", true},
+    {"7.11.0", true},
+    {"7.10.1", true},
+    {"7.10.0", true},
+    {"7.9.0", true},
+    {"7.8.1", true},
+    {"7.8.0", true},
+    {"7.7.0", true},
+    {"7.6.0", true},
+    {"7.5.2", true},
+    {"7.5.1", true},
+    {"7.5.0", true},
+    {"7.4.0", true},
+    {"7.3.5", true},
+    {"7.3.4", true},
+    {"7.3.3", true},
+    {"7.3.2", true},
+    {"7.3.1", true},
+    {"7.3.0", true},
+    {"7.2.1", false},
+    {"7.2.0", false},
+};
+
+inline bool ReplayManifestMatches(const std::vector<uint8_t> &manifest, const MapData &data, bool inputs,
+                                  bool validation, bool annotations)
+{
+    for (const auto &exporter : ReplayPackageExporters)
+        if ((!annotations || exporter.annotations) &&
+            manifest == ReplayText(ReplayManifest(data, inputs, validation, exporter.version, annotations)))
+            return true;
+    return false;
+}
+
 // Stored ZIP avoids platform-specific codecs and permits inspection with any
 // ordinary ZIP reader. Work runs exclusively on the archive IO worker.
 inline std::vector<uint8_t> EncodeReplayZip(const ReplayFiles &files)

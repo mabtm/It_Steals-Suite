@@ -307,10 +307,10 @@ int main(int argc, char **argv)
         assert(archive.Get()->error.empty());
         archive.Shutdown();
     }
-    // Valid CRC and updated SHA list, but a conflicting manifest identity.
     for (const std::string version :
-         {"7.3.0", "7.3.1",  "7.3.2",  "7.3.3",  "7.3.4",  "7.3.5",  "7.6.0",  "7.7.0",  "7.8.0",  "7.8.1",
-          "7.9.0", "7.10.0", "7.10.1", "7.11.0", "7.11.1", "7.11.2", "7.11.3", "7.11.4", "7.11.5", "7.12.0", "7.12.1", "7.12.2"})
+         {"7.3.0",  "7.3.1",  "7.3.2",  "7.3.3",  "7.3.4",  "7.3.5",  "7.4.0",  "7.5.0",  "7.5.1",
+          "7.5.2",  "7.6.0",  "7.7.0",  "7.8.0",  "7.8.1",  "7.9.0",  "7.10.0", "7.10.1", "7.11.0",
+          "7.11.1", "7.11.2", "7.11.3", "7.11.4", "7.11.5", "7.12.0", "7.12.1", "7.12.2", "7.12.3"})
     {
         auto previousPackage = package;
         previousPackage["manifest.json"] = ReplayText(ReplayManifest(*map, true, true, version, true));
@@ -331,6 +331,29 @@ int main(int argc, char **argv)
             archive.Shutdown();
         }
     }
+    // Recomputed ZIP/checksums must not let unsupported exporters or formats through.
+    for (const auto &[version, withMarkers] :
+         {std::pair{"7.2.0", true}, {"7.2.1", true}, {"7.3.6", false}, {"7.12.99", true}, {"99.0.0", false}})
+    {
+        auto rejected = package;
+        if (!withMarkers)
+            rejected.erase(prefix + ".ismarks");
+        rejected["manifest.json"] = ReplayText(ReplayManifest(*map, true, true, version, withMarkers));
+        Checksums(rejected);
+        auto rejectedPath = test / ("rejected-" + std::string(version) + ".zip");
+        auto rejectedRoot = test / ("rejected-" + std::string(version));
+        Write(rejectedPath, EncodeReplayZip(rejected));
+        ReplayArchive archive;
+        archive.SetDirectory(rejectedRoot);
+        archive.ImportPackage(rejectedPath);
+        Until([&] { return !archive.Get()->error.empty(); });
+        assert(archive.Get()->error == "Package manifest identity mismatch" &&
+               archive.Get()->savedRevision == 0 &&
+               !std::filesystem::exists(rejectedRoot / (prefix + ".isrun")) &&
+               !std::filesystem::exists(rejectedRoot / (prefix + ".isinput")));
+        archive.Shutdown();
+    }
+    // Valid CRC and updated SHA list, but a conflicting manifest identity.
     auto fake = package;
     fake["manifest.json"] = ReplayText("{\"runId\":\"wrong\"}");
     Checksums(fake);
