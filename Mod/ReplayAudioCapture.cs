@@ -106,6 +106,7 @@ public static class ReplayAudioCapture
     private static ReplayAudioSession current;
     private static ReplayMotionData recording;
     private static readonly Dictionary<int, AudioSource> enabledTaps = new Dictionary<int, AudioSource>();
+    private static readonly Dictionary<int, AudioSource> unobservable = new Dictionary<int, AudioSource>();
     private static readonly HashSet<int> missingSources = new HashSet<int>();
     private static ReplayAudioTap.Clock clock;
     private static readonly Dictionary<int, Source> sources = new Dictionary<int, Source>();
@@ -183,6 +184,7 @@ public static class ReplayAudioCapture
             // listener bypass for routes that cannot be observed faithfully.
             if (!MakeReadable(source))
             {
+                unobservable[source.GetInstanceID()] = source;
                 if (audible)
                     Missing(source, "listener bypass with a spatial mix or source filter");
                 return;
@@ -192,6 +194,7 @@ public static class ReplayAudioCapture
             if (source.GetComponent<AudioListener>() != null ||
                 source.GetComponents<AudioSource>().Length != 1)
             {
+                unobservable[source.GetInstanceID()] = source;
                 if (audible)
                     Missing(source, "source shares a listener or another AudioSource");
                 return;
@@ -207,6 +210,7 @@ public static class ReplayAudioCapture
             var entry =
                 new Source { Audio = source, Tap = tap, Lane = lane, Gain = source.mute ? 0 : source.volume };
             sources.Add(source.GetInstanceID(), entry);
+            unobservable.Remove(source.GetInstanceID());
             tap.Current = new ReplayAudioTap.Route { Timeline = clock, Lane = lane, Gain = entry.Gain };
         }
         catch (Exception)
@@ -337,6 +341,9 @@ public static class ReplayAudioCapture
         if (Math.Abs(dsp - binding.Origin - seconds) > .05)
             clock.Current =
                 new ReplayAudioTap.Binding { Session = current, Origin = dsp - seconds, Rate = binding.Rate };
+        foreach (var source in unobservable.Values)
+            if (source != null && Bypasses(source) && source.isPlaying && !source.mute && source.volume > 0)
+                Missing(source, "listener bypass became audible on an unobservable route");
         foreach (var entry in sources.Values)
         {
             var source = entry.Audio;
@@ -381,6 +388,7 @@ public static class ReplayAudioCapture
         current = null;
         clock = null;
         sources.Clear();
+        unobservable.Clear();
         if (session != null)
             session.Discard();
     }

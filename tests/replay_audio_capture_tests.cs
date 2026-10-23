@@ -363,6 +363,11 @@ public static class ReplayAudioCaptureTests
         ReplayAudioCapture.Track(silent);
         Check(warmSession.Info.Flags == 0 && warm.AudioNotes.Length == 0,
               "inaudible unsupported sources do not claim recording gaps");
+        silent.volume = .5f;
+        silent.isPlaying = true;
+        ReplayAudioCapture.Sync(.005);
+        Check(warmSession.Info.Flags == 4 && warm.AudioNotes.Contains("became audible"),
+              "a previously silent unsupported route is reported when it fades in");
         ReplayAudioCapture.Stop();
         Check(effectsOff.bypassEffects && filtered.bypassEffects && custom.bypassEffects,
               "prepared source flags are restored without enabling existing DSP");
