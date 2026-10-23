@@ -114,6 +114,44 @@ class AdaptiveCaptureTests
         Check(rate.Interval(.02) == AdaptivePoseSampler.FastInterval &&
                   rate.Interval(1) == AdaptivePoseSampler.NormalInterval,
               "detail escalates for actual angular motion and decays");
+        var still = new ReplayVisualData();
+        var stillTrack = still.Track(still.Owner(1, 0, 0, ""), 1, "");
+        var stillSampler = new AdaptivePoseSampler(still, stillTrack, Health());
+        for (int n = 0; n <= 12000; n++)
+        {
+            var f = Pose(n / 120.0, 20);
+            f.Rotation.y *= .9999f;
+            f.Rotation.w *= .9999f;
+            stillSampler.Push(f, n == 12000);
+        }
+        Check(stillTrack.Frames.Count == 2,
+              "quaternion normalization noise does not inflate stationary tracks");
+        var longCapture = new ReplayVisualData { Recorded = true };
+        var longTrack = longCapture.Track(longCapture.Owner(1, 0, 0, ""), 1, "");
+        for (int n = 0; n < 400000; n++)
+            longCapture.Add(longTrack, Pose(n / 120.0, n % 180));
+        Check(!longCapture.Full && longCapture.Count == 400000,
+              "capture continues past the former sample limit");
+        using (var memory = new MemoryStream())
+        {
+            using (var writer = new BinaryWriter(memory, System.Text.Encoding.UTF8, true))
+                longCapture.Write(writer);
+            memory.Position = 0;
+            using (var reader = new BinaryReader(memory, System.Text.Encoding.UTF8, true)) Check(
+                ReplayVisualData.Read(reader, 4000, 7).Count == 400000, "larger v7 recording roundtrip");
+            memory.Position = 0;
+            bool legacyRejected = false;
+            try
+            {
+                using (var reader = new BinaryReader(memory, System.Text.Encoding.UTF8, true))
+                    ReplayVisualData.Read(reader, 4000, 6);
+            }
+            catch (InvalidDataException)
+            {
+                legacyRejected = true;
+            }
+            Check(legacyRejected, "legacy input versions retain their original bounds");
+        }
         var coverage = new ReplayCoverage();
         coverage.Start(0);
         coverage.Source(0);
@@ -155,5 +193,77 @@ class AdaptiveCaptureTests
         Console.WriteLine(
             "Adaptive production capture: bounded positional/angular interpolation error, high-frequency motion, constant-pose compression, exact boundaries/endpoints, adaptive detail, strict heartbeat coverage and late-callback isolation: PASS");
         return 0;
+    }
+}
+
+// Value-only engine contracts; the production sampling and binary validation run unchanged.
+namespace UnityEngine
+{
+public struct Vector3
+{
+    public float x, y, z;
+
+    public Vector3(float a, float b, float c)
+    {
+        x = a;
+        y = b;
+        z = c;
+    }
+
+    public static Vector3 one
+    {
+        get {
+            return new Vector3(1, 1, 1);
+        }
+    }
+}
+
+public struct Quaternion
+{
+    public float x, y, z, w;
+
+    public Quaternion(float a, float b, float c, float d)
+    {
+        x = a;
+        y = b;
+        z = c;
+        w = d;
+    }
+}
+
+public struct Color
+{
+    public float r, g, b, a;
+
+    public Color(float red, float green, float blue, float alpha)
+    {
+        r = red;
+        g = green;
+        b = blue;
+        a = alpha;
+    }
+}
+}
+
+public static class ReplayMotionData
+{
+    private static readonly System.Text.UTF8Encoding Utf8 = new System.Text.UTF8Encoding(false, true);
+
+    public static void Text(BinaryWriter writer, string text)
+    {
+        byte[] bytes = Utf8.GetBytes(text);
+        writer.Write(bytes.Length);
+        writer.Write(bytes);
+    }
+
+    public static string Text(BinaryReader reader, int maximum)
+    {
+        int count = reader.ReadInt32();
+        if (count < 0 || count > maximum)
+            throw new InvalidDataException("Invalid text length");
+        byte[] bytes = reader.ReadBytes(count);
+        if (bytes.Length != count)
+            throw new EndOfStreamException();
+        return Utf8.GetString(bytes);
     }
 }

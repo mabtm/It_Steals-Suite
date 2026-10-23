@@ -26,21 +26,70 @@ public sealed class ReplayAudioTap : MonoBehaviour
         public float Gain = 1;
     }
 
+    // Four DSP blocks cover the run-start boundary without inventing silence.
+    // Allocated on the main thread; the DSP thread alone reads/writes history.
+    public sealed class History
+    {
+        private readonly float[][] samples = { new float[65536], new float[65536], new float[65536],
+                                               new float[65536] };
+        private readonly double[] times = new double[4];
+        private readonly int[] counts = new int[4], channels = new int[4];
+        private int next, available;
+
+        public void Store(float[] data, int countChannels, double dsp)
+        {
+            if (data == null || data.Length > 65536 || countChannels < 1 || countChannels > 8)
+                return;
+            Array.Copy(data, samples[next], data.Length);
+            counts[next] = data.Length;
+            channels[next] = countChannels;
+            times[next] = dsp;
+            next = (next + 1) % 4;
+            available = Math.Min(4, available + 1);
+        }
+
+        public void Replay(Route route, Binding binding)
+        {
+            for (int n = available; n > 0; n--)
+            {
+                int i = (next - n + 4) % 4;
+                long first = (long)Math.Round((times[i] - binding.Origin) * binding.Rate);
+                if (first + counts[i] / channels[i] <= 0)
+                    continue;
+                if (route.Lane == null)
+                    binding.Session.Push(samples[i], channels[i], first, counts[i]);
+                else if (route.Gain > 0)
+                    route.Lane.Push(samples[i], channels[i], first, route.Gain, counts[i]);
+            }
+        }
+    }
+
     public volatile Route Current;
+    public volatile History Recent;
+    private ReplayAudioSession attached;
 
     private void OnAudioFilterRead(float[] data, int channels)
     {
+        double dsp = AudioSettings.dspTime;
         var route = Current;
-        if (route == null)
-            return;
-        var b = route.Timeline.Current;
-        if (b == null || b.Session.Done)
-            return;
-        long first = (long)Math.Round((AudioSettings.dspTime - b.Origin) * b.Rate);
-        if (route.Lane == null)
-            b.Session.Push(data, channels, first);
-        else if (route.Gain > 0)
-            route.Lane.Push(data, channels, first, route.Gain);
+        var binding = route == null ? null : route.Timeline.Current;
+        var history = Recent;
+        if (binding != null && !binding.Session.Done)
+        {
+            if (attached != binding.Session)
+            {
+                if (history != null)
+                    history.Replay(route, binding);
+                attached = binding.Session;
+            }
+            long first = (long)Math.Round((dsp - binding.Origin) * binding.Rate);
+            if (route.Lane == null)
+                binding.Session.Push(data, channels, first);
+            else if (route.Gain > 0)
+                route.Lane.Push(data, channels, first, route.Gain);
+        }
+        if (history != null)
+            history.Store(data, channels, dsp);
     }
 }
 
@@ -55,6 +104,9 @@ public static class ReplayAudioCapture
     }
 
     private static ReplayAudioSession current;
+    private static ReplayMotionData recording;
+    private static readonly Dictionary<int, AudioSource> enabledTaps = new Dictionary<int, AudioSource>();
+    private static readonly HashSet<int> missingSources = new HashSet<int>();
     private static ReplayAudioTap.Clock clock;
     private static readonly Dictionary<int, Source> sources = new Dictionary<int, Source>();
     public static int BypassSources
@@ -75,6 +127,45 @@ public static class ReplayAudioCapture
                source.panStereo == 0;
     }
 
+    private static bool MakeReadable(AudioSource source)
+    {
+        if (source.spatialize || source.spatialBlend != 0 || source.panStereo != 0)
+            return false;
+        if (!source.bypassEffects)
+            return true;
+        // With no source filters, bypassing source effects and passing through
+        // our unchanged PCM are equivalent. Keep listener bypass unchanged.
+        foreach (var component in source.GetComponents<Component>())
+        {
+            if (component == null || component is ReplayAudioTap)
+                continue;
+            var type = component.GetType();
+            if (type.Name.StartsWith("Audio", StringComparison.Ordinal) &&
+                type.Name.EndsWith("Filter", StringComparison.Ordinal))
+                return false;
+            if (type.GetMethod("OnAudioFilterRead", System.Reflection.BindingFlags.Instance |
+                                                        System.Reflection.BindingFlags.Public |
+                                                        System.Reflection.BindingFlags.NonPublic) != null)
+                return false;
+        }
+        enabledTaps[source.GetInstanceID()] = source;
+        source.bypassEffects = false;
+        return true;
+    }
+
+    private static void Missing(AudioSource source, string reason)
+    {
+        if (current == null)
+            return;
+        current.MissingRoute();
+        if (recording == null || missingSources.Count >= 4 || !missingSources.Add(source.GetInstanceID()))
+            return;
+        string name = source.name ?? "Audio source";
+        if (name.Length > 48)
+            name = name.Substring(0, 48);
+        recording.AudioNotes += name + ": " + reason + "\n";
+    }
+
     // Called before original Play/PlayOneShot, including newly created sources.
     // A mixer-routed source is already in the listener mix; never add it twice.
     public static void Track(AudioSource source, bool playRequested = true)
@@ -85,15 +176,15 @@ public static class ReplayAudioCapture
         {
             if (!Bypasses(source))
                 return;
-            bool audible = playRequested || source.isPlaying;
+            bool audible = !source.mute && source.volume > 0 && (playRequested || source.isPlaying);
             // The supplied GetPoints source is centered 2D, with listener
             // bypass enabled and source effects enabled. A source tap observes
             // that exact PCM. Do not estimate a 3D/HRTF mix or change gameplay
-            // bypass settings for routes that cannot be observed faithfully.
-            if (!Readable(source))
+            // listener bypass for routes that cannot be observed faithfully.
+            if (!MakeReadable(source))
             {
                 if (audible)
-                    current.MissingRoute();
+                    Missing(source, "listener bypass with a spatial mix or source filter");
                 return;
             }
             if (sources.ContainsKey(source.GetInstanceID()))
@@ -102,7 +193,7 @@ public static class ReplayAudioCapture
                 source.GetComponents<AudioSource>().Length != 1)
             {
                 if (audible)
-                    current.MissingRoute();
+                    Missing(source, "source shares a listener or another AudioSource");
                 return;
             }
             if (!audible && sources.Count >= 64)
@@ -121,32 +212,66 @@ public static class ReplayAudioCapture
         catch (Exception)
         {
             if (current != null)
-                current.MissingRoute();
+                Missing(source, "source tap setup failed");
+        }
+    }
+
+    private static AudioListener Listener(MouseLook player)
+    {
+        AudioListener listener = null;
+        var camera = player == null ? null : PlayerContext.View(player);
+        if (camera != null)
+            listener = camera.GetComponent<AudioListener>();
+        if (listener == null || !listener.enabled)
+            foreach (var candidate in UnityEngine.Object.FindObjectsOfType<AudioListener>())
+                if (candidate.enabled)
+                {
+                    if (listener != null && listener.enabled)
+                        return null;
+                    listener = candidate;
+                }
+        return listener;
+    }
+
+    private static ReplayAudioTap Warm(GameObject target)
+    {
+        var tap = target.GetComponent<ReplayAudioTap>();
+        if (tap == null)
+            tap = target.AddComponent<ReplayAudioTap>();
+        if (tap.Recent == null)
+            tap.Recent = new ReplayAudioTap.History();
+        return tap;
+    }
+
+    public static void Prepare(MouseLook player = null)
+    {
+        try
+        {
+            var listener = Listener(player);
+            if (listener != null)
+                Warm(listener.gameObject);
+            foreach (var source in UnityEngine.Object.FindObjectsOfType<AudioSource>(true))
+                if (Bypasses(source) && MakeReadable(source) &&
+                    source.GetComponent<AudioListener>() == null &&
+                    source.GetComponents<AudioSource>().Length == 1)
+                    Warm(source.gameObject);
+        }
+        catch (Exception)
+        {
+            // A failed warm-up must never interfere with scene loading.
         }
     }
 
     public static void Begin(ReplayMotionData motion, MouseLook player)
     {
-        Stop();
+        Stop(true);
+        missingSources.Clear();
+        recording = motion;
         if (motion == null || player == null)
             return;
         try
         {
-            AudioListener listener = null;
-            var camera = PlayerContext.View(player);
-            if (camera != null)
-                listener = camera.GetComponent<AudioListener>();
-            if (listener == null || !listener.enabled)
-                foreach (var l in UnityEngine.Object.FindObjectsOfType<AudioListener>())
-                    if (l.enabled)
-                    {
-                        if (listener != null && listener.enabled)
-                        {
-                            listener = null;
-                            break;
-                        }
-                        listener = l;
-                    }
+            var listener = Listener(player);
             if (listener == null)
             {
                 motion.Experience.Audio.Flags = 4;
@@ -222,8 +347,8 @@ public static class ReplayAudioCapture
             {
                 if (Readable(source))
                     gain = source.mute ? 0 : source.volume;
-                else if (source.isPlaying)
-                    current.MissingRoute();
+                else if (source.isPlaying && !source.mute && source.volume > 0)
+                    Missing(source, "source route changed to an unobservable mix");
             }
             if (gain != entry.Gain)
             {
@@ -242,8 +367,16 @@ public static class ReplayAudioCapture
             session.End(seconds);
     }
 
-    public static void Stop()
+    public static void Stop(bool keepPrepared = false)
     {
+        if (!keepPrepared)
+        {
+            foreach (var source in enabledTaps.Values)
+                if (source != null && !source.bypassEffects)
+                    source.bypassEffects = true;
+            enabledTaps.Clear();
+        }
+        recording = null;
         var session = current;
         current = null;
         clock = null;

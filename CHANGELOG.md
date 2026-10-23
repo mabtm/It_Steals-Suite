@@ -2,6 +2,20 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.12.5 Changelog
+
+- Improved Hide & Seek routing in both variants with captured collision floors, so gaps in the enemy NavMesh no longer cut off walkable connections.
+- Improved recorded-audio exports with one encoding pass, RGB UtVideo, and an AVI timing check before the file is saved. Export reports now include the container's frame count, FPS, and audio duration.
+- Fixed a bug caused by animation changes forcing pose samples across the whole scene; unchanged rotations now compress correctly, and the bounded visual recording can hold longer runs.
+- Improved audio capture at run start with a short PCM buffer and support for filterless 2D bypass sources. Remaining missing routes include source names and reasons in Recording check.
+- Improved the replay input panel with separate keyboard, mouse, controller, and player tabs.
+- Improved HUD customization with a preview drawn by the actual overlay renderer, using the selected fields and current settings.
+- Improved diagnostics with route, recording, export, and mod-version checks, clearer evidence, and suggested next steps.
+- Improved the Speedrun menu with focused setup and statistics cards, a counter reset that preserves personal bests and replays, and an exclusion for empty resets under one second.
+- Removed the Recent runs table from the Speedrun menu.
+- Improved route previews by keeping the full route visible when the selected seed changes; animation is optional and starts disabled.
+- Improved shutdown so the trainer closes with the game and can show its exit graphic afterward.
+
 ### v7.12.4 Changelog
 
 - Improved code readability with named replay jobs and smaller menu and camera sections.

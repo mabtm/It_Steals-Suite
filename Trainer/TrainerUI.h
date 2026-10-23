@@ -269,151 +269,148 @@ inline void RenderCheatsPage(bool cheatRestricted)
 
 inline void RenderSpeedrunPage()
 {
-    ImGui::BeginDisabled(!g_pShared || !g_pShared->reviewReady || g_pShared->timerState == 1 ||
-                         HasPendingRequest());
-    if (suite_ui::Button("Analyze previous run"))
-        RequestRunReview();
-    ImGui::EndDisabled();
     ImGui::BeginChild("SpeedrunScroll", ImVec2(0, 0));
-    ImGui::TextDisabled("Clean speedruns / Practice training");
-    Help(
-        "Clean mode records a separate PB for each level. Practice mode enables training aids and fixed seeds.");
-    ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
-    if (suite_ui::Checkbox("Speedrun Mode [Shift+T]", &g_speedrunMode))
-        SetSpeedrunMode(g_speedrunMode);
-    ImGui::BeginDisabled(!g_speedrunMode);
-    {
-        const char *const *levels = kMapLevelNames;
-        if (ImGui::Combo("Level", &g_selectedSpeedrunLevel, levels, kMapLevelCount))
+    ImGui::TextColored(g_headerCol, "SPEEDRUN");
+    ImGui::TextDisabled("Clean runs, focused practice, and your progress.");
+    suite_ui::Section("Run setup", ImGuiTreeNodeFlags_DefaultOpen, [&]() {
+        ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
+        if (suite_ui::Checkbox("Speedrun Mode [Shift+T]", &g_speedrunMode))
+            SetSpeedrunMode(g_speedrunMode);
+        ImGui::BeginDisabled(!g_speedrunMode);
         {
-            if (g_pShared && g_speedrunMode)
+            const char *const *levels = kMapLevelNames;
+            if (ImGui::Combo("Level", &g_selectedSpeedrunLevel, levels, kMapLevelCount))
             {
-                g_commands.speedrunLevelIndex = (byte)g_selectedSpeedrunLevel;
-                g_commands.speedrunLoadLevelCmd = 1;
-            }
-        }
-
-        if (suite_ui::Checkbox("Practice Mode", &g_practiceMode))
-        {
-            if (g_pShared)
-            {
-                g_commands.practiceModeActive = g_practiceMode ? 1 : 0;
-                g_commands.speedrunLoadLevelCmd = 1;
-            }
-        }
-        if (g_practiceMode)
-        {
-            ImGui::BeginDisabled(!g_pShared || !g_pShared->rngPatchComplete);
-            if (suite_ui::Checkbox("Use fixed seed", &g_seededPractice) && g_pShared)
-            {
-                g_commands.practiceSeed = g_practiceSeed;
-                g_commands.speedrunLoadLevelCmd = 1;
-            }
-            if (ImGui::InputInt("Seed", &g_practiceSeed))
-            {
-                int type = KnownPracticeSeedType(g_practiceSeed, g_selectedSpeedrunLevel);
-                if (type)
-                    g_rawPracticeSpawn = type == 1;
-            }
-            suite_ui::Checkbox("Use captured spawn seed", &g_rawPracticeSpawn);
-            Help(
-                "Only for replaying the Seed Map's captured Random spawn RNG seed. Leave off for existing Practice base seeds. Both variants are always SET PRACTICE.");
-            if (suite_ui::Button("Apply Seed & Reload"))
-            {
-                if (g_pShared)
+                if (g_pShared && g_speedrunMode)
                 {
-                    g_commands.practiceSeed = g_practiceSeed;
-                    g_seededPractice = true;
-                    g_commands.setSeedCmd = 1;
+                    g_commands.speedrunLevelIndex = (byte)g_selectedSpeedrunLevel;
                     g_commands.speedrunLoadLevelCmd = 1;
                 }
             }
+
+            if (suite_ui::Checkbox("Practice Mode", &g_practiceMode))
+            {
+                if (g_pShared)
+                {
+                    g_commands.practiceModeActive = g_practiceMode ? 1 : 0;
+                    g_commands.speedrunLoadLevelCmd = 1;
+                }
+            }
+            if (g_practiceMode)
+            {
+                ImGui::BeginDisabled(!g_pShared || !g_pShared->rngPatchComplete);
+                if (suite_ui::Checkbox("Use fixed seed", &g_seededPractice) && g_pShared)
+                {
+                    g_commands.practiceSeed = g_practiceSeed;
+                    g_commands.speedrunLoadLevelCmd = 1;
+                }
+                if (ImGui::InputInt("Seed", &g_practiceSeed))
+                {
+                    int type = KnownPracticeSeedType(g_practiceSeed, g_selectedSpeedrunLevel);
+                    if (type)
+                        g_rawPracticeSpawn = type == 1;
+                }
+                suite_ui::Checkbox("Use captured spawn seed", &g_rawPracticeSpawn);
+                Help(
+                    "Only for replaying the Seed Map's captured Random spawn RNG seed. Leave off for existing Practice base seeds. Both variants are always SET PRACTICE.");
+                if (suite_ui::Button("Apply Seed & Reload"))
+                {
+                    if (g_pShared)
+                    {
+                        g_commands.practiceSeed = g_practiceSeed;
+                        g_seededPractice = true;
+                        g_commands.setSeedCmd = 1;
+                        g_commands.speedrunLoadLevelCmd = 1;
+                    }
+                }
+                ImGui::EndDisabled();
+            }
             ImGui::EndDisabled();
         }
-        ImGui::Separator();
-
-        byte tState = 0;
-        double runTime = 0, pb = 0;
-        if (g_pShared)
-        {
-            tState = g_pShared->timerState;
-            runTime = g_pShared->currentRunTimeSeconds;
-            pb = g_pShared->personalBestSeconds;
-        }
-
-        if (tState == 1)
-            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Running: %.3f", runTime);
-        else if (tState == 2)
-        {
-            ImGui::TextColored(ImVec4(0.3f, 0.6f, 1.0f, 1.0f), "Final: %.3f", runTime);
-            if (pb > 0)
-            {
-                double diff = runTime - pb;
-                if (diff < 0)
-                    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "(-%.3f)", -diff);
-                else
-                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "(+%.3f)", diff);
-            }
-            if (g_practiceMode || (g_pShared && g_pShared->practiceModeActive))
-                ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "PRACTICE RUN");
-        }
-        else
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 1.0f), "0.000");
-
-        ImGui::Text("Personal Best:");
-        if (pb > 0)
-            ImGui::TextColored(ImVec4(0.3f, 0.6f, 1.0f, 1.0f), "%.3f", pb);
-        else
-            ImGui::TextDisabled("No PB yet");
-
-        ImGui::Separator();
-
-        // Lifetime totals across levels and modes.
-        if (g_pShared)
-        {
-            int totalRuns = g_pShared->totalRuns;
-            int totalFinished = g_pShared->totalFinishedRuns;
-            int totalDeaths = g_pShared->totalDeaths;
-            double avg = g_pShared->averagePace;
-            ImGui::Text("Total attempts: %d", totalRuns);
-            ImGui::Text("Finished: %d", totalFinished);
-            ImGui::Text("Deaths: %d", totalDeaths);
-            ImGui::TextDisabled("Lifetime totals include all levels and Practice runs.");
-            if (totalFinished > 0)
-                ImGui::Text("Avg. Pace: %.3f", avg);
-            else
-                ImGui::Text("Avg. Pace: --");
-        }
-    }
-    ImGui::EndDisabled();
-    ImGui::EndDisabled();
-    ImGui::TextDisabled("T restarts the selected speedrun level while the game has focus.");
-    if (g_practiceMode)
-    {
-        ImGui::TextDisabled("SET PRACTICE");
-        Help(
-            "A fixed seed controls all verified reseed sites. Timing, physics and input can still change a run.");
-        ImGui::TextDisabled("Reseed hooks: %s",
-                            g_pShared && g_pShared->rngPatchComplete ? "22 / 22 ready" : "unavailable");
-    }
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("T restarts the selected level while the game has focus.");
+    });
     if (g_pShared)
     {
-        ImGui::Separator();
-        ImGui::TextColored(g_pShared->seedKind == 2 ? g_accentCol : g_headerCol, "%s",
-                           SeedTypeLabel(*g_pShared));
-        if (g_pShared->seedKnown)
-            ImGui::Text("%s: %d", g_pShared->seedKind == 2 ? "Practice base seed" : "Initial RNG seed",
-                        g_pShared->runSeed);
-        ImGui::TextDisabled("Seed and validity information");
-        Help(
-            "RANDOM is the observed spawn RNG seed. The game reseeds repeatedly. VALID reports completed local checks; external changes cannot be fully ruled out.");
-        if (g_pShared->statsSaveStatus == 2)
-            ImGui::TextColored(g_accentCol, "Run data could not be saved: %s", g_pShared->statsError);
-        if (g_pShared->statsWarning[0])
-            ImGui::TextWrapped("Data recovery: %s", g_pShared->statsWarning);
-        RenderVerification(*g_pShared);
-        RenderRunHistory(*g_pShared);
+        const auto &data = *g_pShared;
+        suite_ui::Section("Current attempt", ImGuiTreeNodeFlags_DefaultOpen, [&]() {
+            ImGui::TextColored(g_headerCol, "%s / %s", kMapLevelNames[g_selectedSpeedrunLevel],
+                               RunStatusLabel(data));
+            if (g_timerFont)
+                ImGui::PushFont(g_timerFont);
+            ImGui::TextUnformatted(FormatRunTime(DisplayRunTime(data, SnapshotAge())).c_str());
+            if (g_timerFont)
+                ImGui::PopFont();
+            if (data.personalBestSeconds > 0)
+                ImGui::Text("Personal best  %s", FormatRunTime(data.personalBestSeconds).c_str());
+            else
+                ImGui::TextDisabled("Personal best  --");
+            if (data.timerState == 1 || data.timerState == 2)
+                ImGui::ProgressBar(std::clamp(data.runProgress, 0.f, 1.f), {-1, 5 * suite_ui::Unit()}, "");
+            ImGui::BeginDisabled(!data.reviewReady || data.timerState == 1 || HasPendingRequest());
+            if (suite_ui::Button("Analyze previous run"))
+                RequestRunReview();
+            ImGui::EndDisabled();
+        });
+        suite_ui::Section("Statistics", ImGuiTreeNodeFlags_DefaultOpen, [&]() {
+            int columns = ImGui::GetContentRegionAvail().x > 580 * suite_ui::Unit() ? 3 : 2;
+            float cell = std::max(
+                80.f, (ImGui::GetContentRegionAvail().x - (columns - 1) * ImGui::GetStyle().ItemSpacing.x) /
+                          columns);
+            int metric = 0;
+            auto value = [&](const char *id, const char *label, const std::string &text, const char *note) {
+                if (metric++ % columns)
+                    ImGui::SameLine();
+                suite_ui::Metric(id, label, text.c_str(), note, cell);
+            };
+            value("Attempts", "ATTEMPTS", std::to_string(data.totalRuns), "All counted runs");
+            value("Completed", "COMPLETED", std::to_string(data.totalFinishedRuns), "Finished runs");
+            value("Resets", "RESETS", std::to_string(data.totalResets), "Restarts and deaths");
+            value("Completion rate", "COMPLETION", OverlayValue(OverlayField::CompletionRate, data, "", 0),
+                  "Completed / attempts");
+            value("Average pace", "AVERAGE FINISH", OverlayValue(OverlayField::AverageRun, data, "", 0),
+                  "Completed runs");
+            value("Deaths", "DEATHS", std::to_string(data.totalDeaths), "Observed deaths");
+            ImGui::TextWrapped("Resets under 1 second with no progress stay out of statistics.");
+            ImGui::BeginDisabled(data.timerState == 1 || HasPendingRequest());
+            if (suite_ui::Button("Reset statistics"))
+                ImGui::OpenPopup("Reset statistics?");
+            ImGui::EndDisabled();
+            if (ImGui::BeginPopupModal("Reset statistics?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                ImGui::TextWrapped(
+                    "Clear attempt, finish, reset, death, daily and session counters, and averages?");
+                ImGui::TextWrapped("Personal bests and saved replays stay in place.");
+                ImGui::BeginDisabled(data.timerState == 1 || HasPendingRequest());
+                if (suite_ui::Button("Reset counters"))
+                {
+                    g_commands.runReviewRequest = 3;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndDisabled();
+                SameLineIfFits("Cancel");
+                if (suite_ui::Button("Cancel"))
+                    ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+            }
+        });
+        if (data.statsSaveStatus == 2)
+            ImGui::TextColored(g_accentCol, "Run data could not be saved: %s", data.statsError);
+        if (data.statsWarning[0])
+            ImGui::TextWrapped("Data recovery: %s", data.statsWarning);
+        if (suite_ui::CollapsingHeader("Seed and run checks"))
+        {
+            ImGui::TextColored(g_headerCol, "%s", SeedTypeLabel(data));
+            if (data.seedKnown)
+                ImGui::Text("%s: %d", data.seedKind == 2 ? "Practice base seed" : "Initial RNG seed",
+                            data.runSeed);
+            ImGui::TextDisabled("Reseed hooks: %s", data.rngPatchComplete ? "22 / 22 ready" : "unavailable");
+            RenderVerification(data);
+        }
     }
+    else
+        suite_ui::EmptyState("Speedrun disconnected", suite_ui::Icon::Replay, "Waiting for It Steals",
+                             "Start the game to choose a level and record runs.");
     ImGui::EndChild();
 }
 
@@ -488,7 +485,7 @@ inline void RenderSystemSettings()
     ImGui::TextColored(g_headerCol, "Startup");
     suite_ui::Checkbox("Start It Steals with PracticeSuite", &g_autoStartGame);
     Help(
-        "Start the installed game once when the trainer opens. An existing game is reused. Closing the game does not restart it. Use --no-launch to skip this once.");
+        "Start the installed game once when the trainer opens. An existing game is reused. The trainer closes when that game exits. Use --no-launch to skip automatic startup once.");
     ImGui::Separator();
     ImGui::TextColored(g_headerCol, "Interface");
     suite_ui::Checkbox("UI sounds", &suite_ui::preferences.sounds);
@@ -506,7 +503,7 @@ inline void RenderSystemSettings()
         "Short hover, switch, tab and appearance transitions. Turn off for immediate static controls. HUD timers and validity remain steady.");
     suite_ui::Checkbox("Start / exit graphic", &suite_ui::preferences.launchGraphic);
     Help(
-        "A 2.6-second animated introduction on the first visible game overlay, plus a short exit graphic. Skipped during active speedruns and when the game is hidden; no input is captured.");
+        "A 2.6-second animated introduction on the first visible game overlay, plus a brief standalone exit graphic after the game closes. The introduction is skipped during active runs; neither graphic captures input.");
     suite_ui::Checkbox("Blur behind intro", &suite_ui::appearance.introBlur);
     Help(
         "A one-time, locally blurred game image behind the intro card. No continuous capture or full-screen effect. If capture is unavailable, the card uses its normal background.");

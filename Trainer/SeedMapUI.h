@@ -615,6 +615,8 @@ inline void RenderSeedCanvas(const practice::MapAnalysis &analysis, float reques
         static std::vector<ImVec2> polygon;
         for (const auto &part : d.physicalParts)
         {
+            if (part.flags & 8)
+                continue;
             polygon.clear();
             for (auto p : part.points)
                 polygon.push_back(project(p));
@@ -817,7 +819,13 @@ inline void BindSeedRoutePreview(const practice::MapAnalysis &analysis)
     static uint32_t session = 0;
     if (!bound || !analysis.data || session != analysis.session ||
         !practice::SameSeedPreviewLayout(*bound, *analysis.data))
+    {
+        bool visible = g_seedPreviewPlayback.suggested, animate = g_seedPreviewPlayback.playing;
         g_seedPreviewPlayback = {};
+        g_seedPreviewPlayback.suggested = visible;
+        g_seedPreviewPlayback.playing = animate;
+        g_seedPreviewPlayback.ShowAll();
+    }
     bound = analysis.data;
     session = analysis.session;
 }
@@ -827,19 +835,11 @@ inline void RenderSeedRouteControls(practice::SeedRoutePlayback &replay)
     suite_ui::Checkbox("Optimal route", &replay.suggested);
     if (replay.suggested)
     {
-        SameLineIfFits("Show full route");
-        if (suite_ui::Button("Show full route"))
-            replay.ShowAll();
-        Help(
-            "Show the whole verified route immediately. Otherwise it draws from spawn to finish in five seconds and stays visible. The white pulse follows the route direction; animation speed is not the estimated run time.");
-        SameLineIfFits("Restart drawing");
-        if (suite_ui::Button("Restart drawing"))
-            replay.Restart();
+        replay.seconds = practice::SeedRoutePlayback::DrawSeconds;
         if (suite_ui::preferences.motion)
         {
-            SameLineIfFits(replay.playing ? "Pause animation" : "Resume animation");
-            if (suite_ui::Button(replay.playing ? "Pause animation" : "Resume animation"))
-                replay.playing = !replay.playing;
+            SameLineIfFits("Animate route");
+            suite_ui::Checkbox("Animate route", &replay.playing);
         }
     }
     replay.Advance(ImGui::GetIO().DeltaTime, suite_ui::preferences.motion);
@@ -993,7 +993,7 @@ inline void RenderSeedMapTab(bool restricted)
             RenderSeedRouteControls(replay);
             auto slice = replay.suggested ? practice::SuggestedSlice(analysis->route, replay.Fraction(), 1.)
                                           : practice::PlaybackSlice{};
-            auto pulse = replay.suggested && suite_ui::preferences.motion
+            auto pulse = replay.suggested && replay.playing && suite_ui::preferences.motion
                              ? practice::SuggestedSlice(analysis->route, replay.Pulse(), .035)
                              : practice::PlaybackSlice{};
             SeedCanvasPlayback canvas;

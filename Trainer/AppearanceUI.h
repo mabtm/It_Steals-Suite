@@ -147,45 +147,29 @@ inline void RenderHudColors()
 
 inline void RenderHudPreview(const OverlayLayout &layout, bool speedrun)
 {
-    float u = std::min(g_dpiScale * layout.scale, ImGui::GetContentRegionAvail().x / layout.width);
-    auto p = ImGui::GetCursorScreenPos();
-    float w = layout.width * u, h = (speedrun ? 224.f : 174.f) * u;
-    auto *d = ImGui::GetWindowDrawList();
-    ImGui::TextDisabled("Style preview / example values");
-    p = ImGui::GetCursorScreenPos();
-    // Checkerboard makes the saved panel alpha directly visible in the editor.
-    for (float y = 0; y < h; y += 12 * u)
-        for (float x = 0; x < w; x += 12 * u)
-        {
-            bool light = (int(x / (12 * u)) + int(y / (12 * u))) % 2;
-            d->AddRectFilled({p.x + x, p.y + y},
-                             {p.x + std::min(w, x + 12 * u), p.y + std::min(h, y + 12 * u)},
-                             light ? IM_COL32(33, 39, 44, 255) : IM_COL32(21, 27, 32, 255));
-        }
-    d->AddRectFilled(p, {p.x + w, p.y + h},
-                     ImGui::ColorConvertFloat4ToU32(suite_ui::HudBackground(layout.opacity)), 10 * u);
-    suite_ui::DrawCardEdge(d, p, {p.x + w, p.y + h}, u);
-    ImFont *font = suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont();
-    auto text = [&](float x, float y, float size, ImVec4 c, const char *value, ImFont *f = nullptr) {
-        ImVec4 clip(p.x, p.y, p.x + w, p.y + h);
-        d->AddText(f ? f : font, size * u, {p.x + x * u, p.y + y * u}, ImGui::ColorConvertFloat4ToU32(c),
-                   value, nullptr, 0, &clip);
-    };
-    text(14, 12, 16, suite_ui::HudAccent(), speedrun ? "SPEEDRUN  /  READY" : "PRACTICE  /  CLASSIC");
-    if (speedrun)
+    ImGui::TextDisabled(g_pShared ? "Style preview / live values" : "Style preview / example values");
+    GameData sample{};
+    const GameData *data = g_pShared;
+    if (!data)
     {
-        text(14, 42, 16, suite_ui::HudMuted(), "RUN TIME");
-        text(14, 68, 40, suite_ui::HudInk(), "01:24.386", g_timerFont);
-        text(14, 124, 16, suite_ui::HudMuted(), "LOCAL PB                 ATTEMPTS");
-        text(14, 151, 19, suite_ui::HudInk(), "01:21.094                128");
+        sample.gameFps = 144;
+        sample.speedrunModeActive = speedrun;
+        sample.timerState = 1;
+        sample.currentRunTimeSeconds = 84.386;
+        sample.personalBestSeconds = 81.094;
+        sample.totalRuns = 128;
+        sample.totalFinishedRuns = 32;
+        sample.totalResets = 96;
+        sample.runProgress = .5f;
+        sample.totalObjectives = 24;
+        sample.objectives = 12;
+        sample.seedKnown = sample.seedKind = 1;
+        sample.runSeed = 2112625;
+        data = &sample;
     }
-    else
-    {
-        text(14, 48, 16, suite_ui::HudMuted(), "PROGRESS               GAME FPS");
-        text(14, 82, 24, suite_ui::HudInk(), "12 / 24                  190");
-    }
-    text(14, speedrun ? 194 : 144, 16, suite_ui::HudMuted(), suite_brand::Credit);
-    ImGui::Dummy({w, h});
+    int level = MapLevelIndex(data->currentSceneIndex);
+    RenderOverlayPanel(speedrun ? "Speedrun style preview" : "Compact style preview", *data, layout, speedrun,
+                       level >= 0 ? kMapLevelNames[level] : "Classic", 0, false, true);
 }
 
 inline void RenderMinimapColors()

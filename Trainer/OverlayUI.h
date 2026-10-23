@@ -193,25 +193,42 @@ inline bool HudFieldAllowed(OverlayField f, bool speedrunProfile, bool clean)
 }
 
 inline void RenderOverlayPanel(const char *name, const GameData &d, const OverlayLayout &layout,
-                               bool speedrun, const std::string &mode, double age, bool compactConfig = false)
+                               bool speedrun, const std::string &mode, double age, bool compactConfig = false,
+                               bool inlinePreview = false)
 {
-    if (!layout.enabled && !speedrun && !suite_hud::canvas.active)
+    if (!layout.enabled && !speedrun && !suite_hud::canvas.active && !inlinePreview)
         return;
     const bool compact = compactConfig || !speedrun, clean = d.speedrunModeActive && !d.practiceModeActive;
-    const float preview = suite_hud::canvas.active ? suite_hud::canvas.scale : 1.f;
+    const float preview = inlinePreview
+                              ? std::min(1.f, ImGui::GetContentRegionAvail().x /
+                                                  (std::max(220.f, layout.width) * layout.scale * g_dpiScale))
+                          : suite_hud::canvas.active ? suite_hud::canvas.scale
+                                                     : 1.f;
     const float scale = std::max(.85f, layout.scale), u = scale * g_dpiScale * preview,
                 ratio = scale / suite_ui::loadedHudScale * preview;
     auto viewport = suite_hud::canvas.active ? ImVec2(suite_hud::canvas.w, suite_hud::canvas.h)
                                              : ImGui::GetIO().DisplaySize;
+    if (inlinePreview)
+    {
+        viewport.x *= preview;
+        viewport.y *= preview;
+    }
     float width = std::min(std::max(220.f, layout.width) * u, std::max(60.f, viewport.x - 24 * preview));
     ImGui::PushStyleColor(ImGuiCol_WindowBg, suite_ui::HudBackground(layout.opacity));
     ImGui::PushStyleColor(ImGuiCol_Border, suite_ui::Color(AppearancePreferences::Outline, .65f));
     ImGui::PushStyleColor(ImGuiCol_Text, suite_ui::HudInk());
+    if (inlinePreview)
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, suite_ui::HudBackground(layout.opacity));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {layout.padding * u, layout.padding * u});
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {10 * u, std::max(4.f, layout.gap) * u});
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 12 * u);
-    ImGui::SetNextWindowSize({width, 0}, ImGuiCond_Always);
-    ImGui::SetNextWindowSizeConstraints({width, 1}, {width, std::max(40.f, viewport.y - 24 * preview)});
+    if (inlinePreview)
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12 * u);
+    if (!inlinePreview)
+    {
+        ImGui::SetNextWindowSize({width, 0}, ImGuiCond_Always);
+        ImGui::SetNextWindowSizeConstraints({width, 1}, {width, std::max(40.f, viewport.y - 24 * preview)});
+    }
     ImVec2 pivot(0, 0);
     if (layout.anchor == 1 || layout.anchor == 3)
         pivot.x = 1;
@@ -219,17 +236,24 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
         pivot.y = 1;
     if (layout.anchor == 4)
         pivot = {layout.x, layout.y};
-    ImGui::SetNextWindowPos({(suite_hud::canvas.active ? suite_hud::canvas.x : 0) + 12 * preview +
-                                 (viewport.x - 24 * preview) * pivot.x,
-                             (suite_hud::canvas.active ? suite_hud::canvas.y : 0) + 12 * preview +
-                                 (viewport.y - 24 * preview) * pivot.y},
-                            ImGuiCond_Always, pivot);
+    if (!inlinePreview)
+        ImGui::SetNextWindowPos({(suite_hud::canvas.active ? suite_hud::canvas.x : 0) + 12 * preview +
+                                     (viewport.x - 24 * preview) * pivot.x,
+                                 (suite_hud::canvas.active ? suite_hud::canvas.y : 0) + 12 * preview +
+                                     (viewport.y - 24 * preview) * pivot.y},
+                                ImGuiCond_Always, pivot);
     if (suite_ui::hudFont)
         ImGui::PushFont(suite_ui::hudFont);
-    ImGui::Begin(name, nullptr,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
-                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
+    if (inlinePreview)
+        ImGui::BeginChild(name, {width, 0},
+                          ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize |
+                              ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings);
+    else
+        ImGui::Begin(name, nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
+                         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
     ImGui::SetWindowFontScale(ratio);
     auto start = ImGui::GetWindowPos();
     auto ink = suite_ui::HudInk(), muted = suite_ui::HudMuted(), accent = suite_ui::HudAccent();
@@ -258,7 +282,7 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
         at.y = ImGui::GetItemRectMin().y;
         if (!ImGui::GetCurrentWindow()->Hidden)
         {
-            auto *fg = ImGui::GetForegroundDrawList();
+            auto *fg = inlinePreview ? ImGui::GetWindowDrawList() : ImGui::GetForegroundDrawList();
             fg->AddRectFilled({at.x - 4 * u, at.y - 3 * u},
                               {at.x + extent.x + 4 * u, at.y + extent.y + 3 * u}, IM_COL32(14, 20, 26, 250),
                               4 * u);
@@ -266,10 +290,13 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
                         ImGui::ColorConvertFloat4ToU32(valid ? ImVec4(.30f, .94f, .40f, 1)
                                                              : ImVec4(1, .23f, .23f, 1)),
                         text);
-            g_validityBadgeBounds = {int(at.x - 4 * u), int(at.y - 3 * u),
-                                     int(std::ceil(at.x + extent.x + 4 * u)),
-                                     int(std::ceil(at.y + extent.y + 3 * u))};
-            g_validityBadgeDrawn = true;
+            if (!inlinePreview)
+            {
+                g_validityBadgeBounds = {int(at.x - 4 * u), int(at.y - 3 * u),
+                                         int(std::ceil(at.x + extent.x + 4 * u)),
+                                         int(std::ceil(at.y + extent.y + 3 * u))};
+                g_validityBadgeDrawn = true;
+            }
         }
     }
     if (wanted(OverlayField::Mode))
@@ -370,11 +397,15 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
               ImVec4(1, .69f, .38f, 1));
     label(suite_brand::Credit, muted);
     auto size = ImGui::GetWindowSize();
-    suite_hud::bounds[compact ? 0 : 1] = {start.x, start.y, size.x, size.y};
+    if (!inlinePreview)
+        suite_hud::bounds[compact ? 0 : 1] = {start.x, start.y, size.x, size.y};
     suite_ui::DrawCardEdge(ImGui::GetWindowDrawList(), start, {start.x + size.x, start.y + size.y}, u);
-    ImGui::End();
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(3);
+    if (inlinePreview)
+        ImGui::EndChild();
+    else
+        ImGui::End();
+    ImGui::PopStyleVar(inlinePreview ? 4 : 3);
+    ImGui::PopStyleColor(inlinePreview ? 4 : 3);
     if (suite_ui::hudFont)
         ImGui::PopFont();
 }
@@ -465,66 +496,4 @@ inline void RenderOverlaySettings(OverlayLayout &layout, bool speedrun, bool sta
         }
     });
     ImGui::PopID();
-}
-
-inline void RenderRunHistory(const GameData &d)
-{
-    if (!suite_ui::CollapsingHeader("Recent runs"))
-        return;
-    ImGui::TextDisabled("Latest 16 here; last 64 stored. Dates are UTC.");
-    if (ImGui::BeginTable("RunHistory", 12,
-                          ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit))
-    {
-        for (const char *name : {"Run", "Started (UTC)", "Level", "Time", "Seed", "Type", "Result",
-                                 "Progress", "PB", "Local validity", "Aids used", "Warnings"})
-            ImGui::TableSetupColumn(name);
-        ImGui::TableHeadersRow();
-        for (int i = 0; i < d.historyCount && i < 16; i++)
-        {
-            auto r = ReadHistory(d, i);
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::Text("#%lld", static_cast<long long>(r.id));
-            ImGui::TableNextColumn();
-            std::time_t stamp = static_cast<std::time_t>((r.startedUtc - 621355968000000000LL) / 10000000LL);
-            char date[32] = "--";
-            std::tm utc{};
-#ifdef _WIN32
-            bool hasUtc = ::gmtime_s(&utc, &stamp) == 0;
-#else
-            bool hasUtc = ::gmtime_r(&stamp, &utc) != nullptr;
-#endif
-            if (hasUtc)
-                std::strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", &utc);
-            ImGui::TextUnformatted(date);
-            ImGui::TableNextColumn();
-            ImGui::Text("%d", r.scene);
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(FormatRunTime(r.seconds).c_str());
-            ImGui::TableNextColumn();
-            if (r.seedKnown)
-                ImGui::Text("%d", r.seed);
-            else
-                ImGui::TextUnformatted("UNKNOWN");
-            ImGui::TableNextColumn();
-            ImGui::TextColored(r.seedKind == 2 ? g_accentCol : g_textCol, "%s",
-                               r.seedKind == 2   ? "SET"
-                               : r.seedKind == 1 ? "RANDOM"
-                                                 : "UNKNOWN");
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(OutcomeLabel(r.outcome));
-            ImGui::TableNextColumn();
-            ImGui::Text("%.0f%%", r.progress * 100);
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(r.pb ? "Local PB" : "--");
-            ImGui::TableNextColumn();
-            ImGui::TextColored(r.Valid() ? ImVec4(.30f, .94f, .40f, 1) : ImVec4(1, .23f, .23f, 1), "%s",
-                               r.Valid() ? "VALID" : "UNVALID");
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(FeatureNames(r.aids).c_str());
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(WarningNames(r.Warnings()).c_str());
-        }
-        ImGui::EndTable();
-    }
 }

@@ -152,6 +152,25 @@ int main(int argc, char **argv)
         if (format != 0)
             args << LosslessArguments(o);
     }
+    {
+        Options clock;
+        clock.a = 16.039872630928851;
+        clock.b = 26.909847730928828;
+        clock.width = 1920;
+        clock.height = 1080;
+        clock.fps = 60;
+        clock.format = 4;
+        clock.audio = true;
+        assert(clock.Frames() == 653);
+        auto codec = AudioCodecArguments(clock.format);
+        std::ofstream plan(out / "clock-arguments.json");
+        plan << "{\"width\":" << clock.width << ",\"height\":" << clock.height << ",\"fps\":" << clock.fps
+             << ",\"frames\":" << clock.Frames()
+             << ",\"input\":" << std::quoted(StreamInputArguments(clock, true)) << ",\"output\":"
+             << std::quoted(VideoCodecArguments(clock) + std::string(codec.begin(), codec.end()) +
+                            AudioDurationArguments(clock))
+             << "}";
+    }
     // Full worker path: preserve the companion through Save, ZIP import and staging.
     auto original = out / "original";
     Write(original / (prefix + ".isinput"), bytes);

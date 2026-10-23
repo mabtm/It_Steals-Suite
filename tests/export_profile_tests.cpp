@@ -6,6 +6,79 @@
 #include <iostream>
 using namespace suite_clip;
 
+static void AviClockCases(const std::filesystem::path &folder)
+{
+    std::vector<char> bytes(12);
+    std::memcpy(bytes.data(), "RIFF", 4);
+    std::memcpy(bytes.data() + 8, "AVI ", 4);
+    auto word = [&](size_t at, uint32_t value) { std::memcpy(bytes.data() + at, &value, 4); };
+    auto stream = [&](const char *type, uint32_t scale, uint32_t rate, uint32_t count) {
+        size_t at = bytes.size();
+        bytes.resize(at + 64);
+        std::memcpy(bytes.data() + at, "strh", 4);
+        word(at + 4, 56);
+        std::memcpy(bytes.data() + at + 8, type, 4);
+        word(at + 28, scale);
+        word(at + 32, rate);
+        word(at + 40, count);
+    };
+    stream("vids", 1, 60, 60);
+    stream("auds", 1, 48000, 48000);
+    auto path = folder / "clock-header.avi";
+    auto save = [&]() {
+        word(4, uint32_t(bytes.size() - 8));
+        std::ofstream file(path, std::ios::binary);
+        file.write(bytes.data(), bytes.size());
+    };
+    Options clock;
+    clock.a = 0;
+    clock.b = 1;
+    clock.fps = 60;
+    clock.format = 4;
+    clock.audio = true;
+    save();
+    VerifyAviTiming(path, clock);
+    for (int fault = 0; fault < 4; fault++)
+    {
+        word(44, fault == 0 ? 30 : 60);        // Video rate.
+        word(52, fault == 1 ? 59 : 60);        // Video frames.
+        word(116, fault == 2 ? 47000 : 48000); // Audio frames.
+        word(112, fault == 3 ? 240 : 0);       // Audio start.
+        save();
+        bool rejected = false;
+        try
+        {
+            VerifyAviTiming(path, clock);
+        }
+        catch (const std::runtime_error &)
+        {
+            rejected = true;
+        }
+        assert(rejected);
+    }
+    word(112, 0);
+    word(52, 30); // An OpenDML file may carry the full count in dmlh.
+    auto at = bytes.size();
+    bytes.resize(at + 12);
+    std::memcpy(bytes.data() + at, "dmlh", 4);
+    word(at + 4, 4);
+    word(at + 8, 60);
+    save();
+    VerifyAviTiming(path, clock);
+    bytes.resize(10);
+    save();
+    bool rejected = false;
+    try
+    {
+        ReadAviTiming(path);
+    }
+    catch (const std::runtime_error &)
+    {
+        rejected = true;
+    }
+    assert(rejected);
+}
+
 int main(int argc, char **argv)
 {
     Options source;
@@ -46,7 +119,8 @@ int main(int argc, char **argv)
     normal.speedKeys = false;
     assert(normal.Frames() == 1200 && normal.At(600) == 5 && normal.OutputDuration() == 10);
     auto args = LosslessArguments(normal);
-    assert(args.find("setpts=N") != std::string::npos && args.find("-r 120") != std::string::npos);
+    assert(args.find("setpts=N") != std::string::npos && args.find("-r:v 120") != std::string::npos &&
+           args.find("-enc_time_base:v 1:120") != std::string::npos);
     Options capped;
     capped.a = 0;
     capped.b = 4;
@@ -87,6 +161,7 @@ int main(int argc, char **argv)
     {
         std::filesystem::path dir = argv[1];
         std::filesystem::create_directories(dir);
+        AviClockCases(dir);
         std::ofstream json(dir / "codec-cases.json");
         json << "[\n";
         bool first = true;

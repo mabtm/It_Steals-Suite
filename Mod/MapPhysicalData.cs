@@ -5,7 +5,7 @@ using UnityEngine;
 
 public sealed class MapFootprint
 {
-    // 1 wall appearance, 2 collides with the actual player, 4 tessellated curve.
+    // 1 wall appearance, 2 collides with the actual player, 4 tessellated curve, 8 captured floor triangle.
     public uint Flags;
     public Vector3[] Points = new Vector3[0];
 }
@@ -128,10 +128,12 @@ public static class MapPhysicalData
         return Hull(points);
     }
 
-    private static void Validate(MapFootprint p)
+    private static void Validate(MapFootprint p, int format = 14)
     {
-        if (p.Points.Length < 2 || p.Points.Length > 64 || (p.Flags & ~7u) != 0)
+        if (p.Points.Length < 2 || p.Points.Length > 64 || (p.Flags & ~(format >= 14 ? 15u : 7u)) != 0)
             throw new InvalidDataException("Invalid physical footprint");
+        if ((p.Flags & 8) != 0 && (p.Flags != 8 || p.Points.Length != 3))
+            throw new InvalidDataException("Invalid physical floor triangle");
         foreach (var v in p.Points)
             foreach (float n in new[] { v.x, v.y, v.z })
                 if (float.IsNaN(n) || float.IsInfinity(n) || Math.Abs(n) > 100000)
@@ -264,7 +266,7 @@ public static class MapPhysicalData
         }
     }
 
-    public static void Read(BinaryReader r, PracticeMapData d)
+    public static void Read(BinaryReader r, PracticeMapData d, int format = 14)
     {
         byte yes = r.ReadByte();
         if (yes > 1)
@@ -281,12 +283,12 @@ public static class MapPhysicalData
             var p = new MapFootprint { Flags = r.ReadUInt32() };
             int count = r.ReadInt32();
             total += count;
-            if (count < 2 || count > 64 || total > 60000 || (p.Flags & ~7u) != 0)
+            if (count < 2 || count > 64 || total > 60000 || (p.Flags & ~(format >= 14 ? 15u : 7u)) != 0)
                 throw new InvalidDataException("Invalid physical footprint");
             p.Points = new Vector3[count];
             for (int j = 0; j < count; j++)
                 p.Points[j] = new Vector3(Number(r), Number(r), Number(r));
-            Validate(p);
+            Validate(p, format);
             parts[i] = p;
         }
         n = r.ReadInt32();

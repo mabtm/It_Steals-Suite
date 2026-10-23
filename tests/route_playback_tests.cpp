@@ -47,6 +47,8 @@ int main()
     seed.Advance(1, true);
     assert(seed.seconds == 0);
     seed.suggested = true;
+    assert(!seed.playing);
+    seed.Restart();
     for (int i = 0; i < 25; i++)
         seed.Advance(.1, true);
     assert(std::abs(seed.Fraction() - .5) < 1e-6);

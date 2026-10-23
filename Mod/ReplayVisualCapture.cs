@@ -295,7 +295,9 @@ public static class ReplayVisualCapture
         for (int i = 0; i < entries.Count; i++)
         {
             var e = entries[i];
-            if (!force && at < e.Next && !(animationBoundary && e.Track.Kind == 1))
+            bool boundary = animationBoundary && e.Track.Kind == 1 && e.Pose != null &&
+                            ReplayExperienceCapture.PoseBoundary(e.Pose);
+            if (!force && at < e.Next && !boundary)
                 continue;
             if (e.Track.Kind != 1)
                 e.Next = AdaptivePoseSampler.Next(e.Next, at,
@@ -365,7 +367,7 @@ public static class ReplayVisualCapture
                 {
                     if (e.Sampler == null)
                         e.Sampler = new AdaptivePoseSampler(data, e.Track, coverage);
-                    e.Sampler.Push(f, force || animationBoundary, ReplayExperienceCapture.HighDetail);
+                    e.Sampler.Push(f, force || boundary, ReplayExperienceCapture.HighDetail);
                     e.Next = AdaptivePoseSampler.Next(e.Next, at, e.Sampler.Interval(at));
                     continue;
                 }

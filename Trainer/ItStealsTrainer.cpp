@@ -1106,6 +1106,30 @@ DiagnosticInputs CaptureDiagnosticInputs()
     auto map = g_mapWorker.Get(g_pShared ? MapLevelIndex(g_pShared->currentSceneIndex) : -1);
     in.mapReady = map && map->data && g_pShared && map->live &&
                   map->data->epoch == int(g_pShared->sceneEpoch) && map->session == g_session;
+    auto displayed = DisplayedPlanner(g_plannerOptions.level);
+    if (displayed && displayed->data)
+    {
+        in.routeKnown = displayed->data->spawn >= 0 && !displayed->data->selected.empty();
+        in.routeWorking = displayed->working;
+        in.routeComplete = displayed->route.complete;
+        in.routeEstimated = displayed->route.estimated;
+        in.routeDetail = displayed->error.empty() ? displayed->route.message : displayed->error;
+        in.omittedGeometry = displayed->data->physicalOmitted;
+        for (const auto &part : displayed->data->physicalParts)
+            in.floorTriangles += (part.flags & 8) != 0;
+    }
+    auto search = g_seedSearch.Get();
+    in.searchActive = search->Busy();
+    in.checkedSeeds = search->evaluated;
+    in.searchResults = int(search->top.size());
+    in.searchRate = search->recentChecked;
+    auto motion = practice::g_replayArchive.Motion();
+    if (motion)
+    {
+        in.recordingRun = motion->id;
+        in.recording = practice::RecordingCheckFor(*motion);
+    }
+    in.exportError = suite_clip::error;
     return in;
 }
 
@@ -1497,6 +1521,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     std::string updateSession;
     ULONGLONG nextUpdateCheck = GetTickCount64() + 20 * 60 * 1000;
     ULONGLONG nextSessionUpdateCheck = GetTickCount64() + 60000;
+    bool gameExited = false;
     while (!g_quit)
     {
         if (launchRequested)
@@ -1530,27 +1555,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             lost = GetProcessIdByName(L"It Steals.exe") != g_gamePid;
         if (lost)
         {
-            ClearTrainerCommands();
-            CloseSharedMemory();
-            ReleaseSurface();
-            process.Reset();
-            g_gamePid = 0;
-            g_gameWnd = nullptr;
-            binding.BindProcess(0);
-            g_commands = {};
-            g_sentSerial = g_ackSerial = 0;
-            g_nextConnectTick = 0;
-            g_brightnessOn = g_hitboxCheck = g_hidePlayerHitbox = false;
-            g_rawPracticeSpawn = false;
-            g_speedrunMode = g_practiceMode = g_seededPractice = false;
-            g_overlayInteractive = false;
-            g_runReviewOpen = g_selectRunReview = false;
-            g_reviewTarget = 0;
-            g_reviewLevel = -1;
-            suite_replay::controls = false;
-            g_overlayVisible = g_compactMode;
-            nextSurface = 0;
-            occluded = false;
+            gameExited = true;
+            g_quit = true;
+            break;
         }
         if (tick >= nextProcessCheck)
         {
@@ -2198,6 +2205,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     if (io.IniFilename)
         ImGui::SaveIniSettingsToDisk(io.IniFilename);
     ReleaseSurface();
+    if (gameExited)
+    {
+        auto rgb = [](ImVec4 color) {
+            return RGB(int(std::clamp(color.x, 0.f, 1.f) * 255), int(std::clamp(color.y, 0.f, 1.f) * 255),
+                       int(std::clamp(color.z, 0.f, 1.f) * 255));
+        };
+        ShowSuiteExitGraphic(suite_ui::preferences.launchGraphic, suite_ui::preferences.motion,
+                             rgb(g_mainBgCol), rgb(g_headerCol), rgb(g_textCol),
+                             std::clamp(g_dpiScale, .75f, 2.f));
+    }
     ImGui::DestroyContext();
     UnregisterClassW(g_wc.lpszClassName, g_wc.hInstance);
     g_binding = nullptr;

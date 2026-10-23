@@ -195,6 +195,8 @@ inline void RenderMinimapWindow(float px, float pz, float rotY, float monX, floa
             static std::vector<float> points;
             for (const auto &part : geometry->data->physicalParts)
             {
+                if (part.flags & 8)
+                    continue;
                 points.clear();
                 for (auto v : part.points)
                 {

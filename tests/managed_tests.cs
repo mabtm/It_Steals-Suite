@@ -288,6 +288,7 @@ public static class ManagedTests
         CheckSeedMaps(args[0]);
         CheckPortable(args[0]);
         CheckTracking(args[0]);
+        CheckStatisticsReset(args[0]);
         CheckRunReviewsAndValidity(args[0]);
         Console.WriteLine(
             "Managed persistence, run transitions, seed evidence, crash recovery and DLL scan: PASS (" +
@@ -1500,6 +1501,51 @@ public static class ManagedTests
               "verification report preserves menu interruption");
         Console.WriteLine(
             "Real speedrun manager menu abort / stopped snapshot / duplicate load / next run / persistence: PASS");
+    }
+
+    private static void CheckStatisticsReset(string root)
+    {
+        string folder = Path.Combine(root, "statistics-reset-test");
+        if (Directory.Exists(folder))
+            Directory.Delete(folder, true);
+        var seed = new SeedEvidence();
+        seed.Reset(true);
+        seed.Observe(1, 1, false, 0);
+        long now = DateTime.UtcNow.Ticks;
+        using (var store = new RunStore(folder))
+        {
+            var tracker = new RunTracker(store);
+            tracker.Begin(3, now, RunAids.None, seed);
+            Check(!tracker.ResetStatistics(), "statistics cannot reset during an active run");
+            tracker.End(RunOutcome.Reset, now + 5000000, .5, 0);
+            Check(store.Runs == 0 && store.Resets == 0 && tracker.SessionAttempts == 0 && store.Today(0) == 0,
+                  "quick empty resets stay out of lifetime, daily and session counters");
+            store.Save();
+        }
+        using (var store = new RunStore(folder))
+        {
+            Check(store.Runs == 0 && store.Resets == 0,
+                  "restart does not restore ignored attempts from history");
+            var tracker = new RunTracker(store);
+            tracker.Begin(3, now, RunAids.None, seed);
+            tracker.End(RunOutcome.Reset, now + 20000000, 2, 0);
+            Check(store.Runs == 1 && store.Resets == 1 && tracker.SessionResets == 1,
+                  "regular reset still counts");
+            tracker.Begin(3, now + 30000000, RunAids.None, seed);
+            tracker.End(RunOutcome.Reset, now + 35000000, .5, .1f);
+            Check(store.Runs == 2 && store.Resets == 2, "short attempts with progress still count");
+            store.RecordBest(3, 45.123);
+            File.WriteAllText(Path.Combine(folder, "retained-replay"), "keep");
+            Check(tracker.ResetStatistics(), "reset stored statistics");
+            Check(store.Runs == 0 && store.Finished == 0 && store.Resets == 0 && store.TimedResets == 0 &&
+                      store.Today(0) == 0 && tracker.SessionAttempts == 0,
+                  "counter views reset together");
+            Check(store.Best(3) == 45.123 && File.Exists(Path.Combine(folder, "retained-replay")),
+                  "statistics reset preserves personal bests and replay files");
+            store.Save();
+        }
+        using (var store = new RunStore(folder))
+            Check(store.Runs == 0 && store.Best(3) == 45.123, "statistics reset survives restart");
     }
 
     private static void CheckTracking(string root)

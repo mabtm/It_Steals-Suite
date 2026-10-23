@@ -97,6 +97,70 @@ public static class SceneGeometry
     private static MapFootprint[] parts = new MapFootprint[0];
     private static int omitted;
 
+    private static readonly int[] BoxFaces = { 0, 1, 5, 4, 2, 6, 7, 3, 0, 2, 3, 1,
+                                               4, 5, 7, 6, 0, 4, 6, 2, 1, 3, 7, 5 };
+
+    private static void FloorTriangle(Vector3 a, Vector3 b, Vector3 c, PracticeMapData profile,
+                                      List<MapFootprint> output, ref int points)
+    {
+        if (output.Count >= 20000 || points + 3 > 60000)
+            return;
+        var normal = Vector3.Cross(b - a, c - a);
+        if (normal.sqrMagnitude < 1e-10f ||
+            normal.normalized.y < Mathf.Cos(profile.AgentSlope * Mathf.Deg2Rad) ||
+            Mathf.Max(a.y, Mathf.Max(b.y, c.y)) >
+                profile.AgentFloor + Mathf.Max(.1f, profile.AgentStep + .05f) ||
+            Mathf.Min(a.y, Mathf.Min(b.y, c.y)) < profile.AgentFloor - 4)
+            return;
+        // Footprints use positive X/Z winding; floor samples retain their Y.
+        output.Add(new MapFootprint { Flags = 8, Points = new[] { a, c, b } });
+        points += 3;
+    }
+
+    private static void CaptureFloor(Collider collider, PracticeMapData profile, List<MapFootprint> output,
+                                     ref int points)
+    {
+        var box = collider as BoxCollider;
+        var mesh = collider as MeshCollider;
+        if (box != null)
+        {
+            var h = box.size * .5f;
+            var center = box.transform.TransformPoint(box.center);
+            var corners = new Vector3[8];
+            for (int i = 0; i < 8; i++)
+                corners[i] = box.transform.TransformPoint(
+                    box.center + new Vector3((i & 1) == 0 ? -h.x : h.x, (i & 2) == 0 ? -h.y : h.y,
+                                             (i & 4) == 0 ? -h.z : h.z));
+            for (int i = 0; i < BoxFaces.Length; i += 4)
+            {
+                var a = corners[BoxFaces[i]];
+                var b = corners[BoxFaces[i + 1]];
+                var c = corners[BoxFaces[i + 2]];
+                var d = corners[BoxFaces[i + 3]];
+                if (Vector3.Dot(Vector3.Cross(b - a, c - a), (a + b + c) / 3 - center) < 0)
+                {
+                    var swap = b;
+                    b = d;
+                    d = swap;
+                }
+                FloorTriangle(a, b, c, profile, output, ref points);
+                FloorTriangle(a, c, d, profile, output, ref points);
+            }
+        }
+        else if (mesh != null && mesh.sharedMesh != null && mesh.sharedMesh.isReadable)
+        {
+            var vertices = mesh.sharedMesh.vertices;
+            var indices = mesh.sharedMesh.triangles;
+            if (indices.Length > 180000)
+                return;
+            for (int i = 0; i + 2 < indices.Length; i += 3)
+                FloorTriangle(mesh.transform.TransformPoint(vertices[indices[i]]),
+                              mesh.transform.TransformPoint(vertices[indices[i + 1]]),
+                              mesh.transform.TransformPoint(vertices[indices[i + 2]]), profile, output,
+                              ref points);
+        }
+    }
+
     public static void Capture(MouseLook player, PracticeMapData data = null, bool force = false)
     {
         int handle = SceneManager.GetActiveScene().handle;
@@ -199,6 +263,8 @@ public static class SceneGeometry
                         trace.Reason = "Neither wall appearance nor static player collision";
                         continue;
                     }
+                    if (obstacle)
+                        CaptureFloor(collider, profile, output, ref pointCount);
                     var polygons = new List<Vector3[]>();
                     bool approximate = false;
                     var box = collider as BoxCollider;

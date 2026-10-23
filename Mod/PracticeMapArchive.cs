@@ -126,7 +126,7 @@ public static class PracticeMapArchive
             if (b.ReadUInt32() != 0x504D5349u)
                 throw new InvalidDataException("Unsupported recorded run format");
             int format = b.ReadInt32();
-            if (format < 7 || format > 13)
+            if (format < 7 || format > 14)
                 throw new InvalidDataException("Unsupported recorded run format");
             var d = new PracticeMapData {
                 Pid = b.ReadInt32(),         Scene = b.ReadInt32(),         Epoch = b.ReadInt32(),
@@ -299,7 +299,7 @@ public static class PracticeMapArchive
             if (format >= 12)
                 review.Motion = ReplayMotionInfo.Read(b);
             if (format >= 13)
-                MapPhysicalData.Read(b, d);
+                MapPhysicalData.Read(b, d, format);
             if (format >= 8)
             {
                 if (bytes.Length < 8 || b.ReadUInt64() != PracticeMapData.Checksum(bytes, bytes.Length - 8))

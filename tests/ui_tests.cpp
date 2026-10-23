@@ -388,7 +388,7 @@ void ExperienceCases(const std::string &output)
     g_runReviewOpen = false;
     Frame();
     g_resetLayout = false;
-    for (int tab : {0, 1, 3})
+    for (int tab : {0, 1, 2, 3})
     {
         suite_ui::navigation.Select(suite_ui::Page(tab), ImGui::GetTime());
         for (int frame = 0; frame < 18; frame++)
@@ -398,6 +398,60 @@ void ExperienceCases(const std::string &output)
     }
     std::cout
         << "Experience interaction: mouse/keyboard toggles fire once; disabled controls/hover silent; copied acknowledgement keeps button ID/size; cue priority/mute; section reduced motion; start/exit no-input graphics, active-run suppression and real menus: PASS\n";
+}
+
+void FeedbackRevisionCases(const std::string &output)
+{
+    auto saved = data;
+    auto &io = ImGui::GetIO();
+    io.DisplaySize = {1120, 960};
+    ApplyTheme(1);
+    io.Fonts->Build();
+    io.Fonts->SetTexID(1);
+    data.currentSceneIndex = 3;
+    data.timerState = 0;
+    data.totalRuns = 128;
+    data.totalFinishedRuns = 32;
+    data.totalResets = 96;
+    data.totalDeaths = 14;
+    data.personalBestSeconds = 81.094;
+    data.averagePace = 95;
+    g_speedrunMode = true;
+    g_pShared = &data;
+    for (int n = 0; n < 3; n++)
+    {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos({18, 18});
+        ImGui::SetNextWindowSize({650, 920});
+        ImGui::Begin("Speedrun page QA", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        RenderSpeedrunPage();
+        ImGui::End();
+        ImGui::Render();
+    }
+    if (!output.empty())
+        Dump(output + "/feedback-speedrun-page.draw");
+    auto layout = g_speedrunLayout;
+    layout.scale = 1;
+    layout.width = 360;
+    auto before = suite_hud::bounds[1];
+    for (int n = 0; n < 3; n++)
+    {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos({18, 18});
+        ImGui::SetNextWindowSize({650, 700});
+        ImGui::Begin("HUD preview QA", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        g_validityBadgeDrawn = false;
+        RenderHudPreview(layout, true);
+        assert(!g_validityBadgeDrawn && suite_hud::bounds[1].x == before.x &&
+               suite_hud::bounds[1].y == before.y && suite_hud::bounds[1].w == before.w &&
+               suite_hud::bounds[1].h == before.h);
+        ImGui::End();
+        ImGui::Render();
+    }
+    if (!output.empty())
+        Dump(output + "/feedback-live-hud-preview.draw");
+    data = saved;
+    g_speedrunMode = false;
 }
 
 void AppearanceCases(const std::string &output)
@@ -457,7 +511,7 @@ void AppearanceCases(const std::string &output)
                 {
                     auto *profiles = findTabs("Compact HUD", 3);
                     assert(profiles && profiles->Tabs.Size == 3);
-                    profiles->NextSelectedTabId = profiles->Tabs[1].ID;
+                    profiles->NextSelectedTabId = profiles->Tabs[2].ID;
                     for (int frame = 0; frame < 14; frame++)
                         Frame();
                     if (!output.empty() && size.x == 1000 && dpi == 1)
@@ -766,7 +820,7 @@ void MilestoneCases(const std::string &output)
         g_seedPreviewPlayback.suggested = true;
         for (int frame = 0; frame < 3; frame++)
             previewFrame();
-        assert(!g_selectSeedPreview && !g_seedPreviewPlayback.suggested);
+        assert(!g_selectSeedPreview && g_seedPreviewPlayback.suggested && g_seedPreviewPlayback.Complete());
     }
     if (!output.empty())
         Dump(output + "/milestone-seed-preview.draw");
@@ -1556,7 +1610,7 @@ void SeedRouteUICases(const std::string &output)
                 auto line = preview.suggested
                                 ? practice::SuggestedSlice(analysis.route, preview.Fraction(), 1.)
                                 : practice::PlaybackSlice{};
-                auto pulse = preview.suggested && suite_ui::preferences.motion
+                auto pulse = preview.suggested && preview.playing && suite_ui::preferences.motion
                                  ? practice::SuggestedSlice(analysis.route, preview.Pulse(), .035)
                                  : practice::PlaybackSlice{};
                 SeedCanvasPlayback canvas;
@@ -1577,9 +1631,10 @@ void SeedRouteUICases(const std::string &output)
             ImGui::ActivateItemByID(w->GetID("Optimal route"));
             frame();
             assert(preview.suggested);
-            ImGui::ActivateItemByID(w->GetID("Show full route"));
+            assert(preview.Complete() && !preview.playing);
+            ImGui::ActivateItemByID(w->GetID("Animate route"));
             frame();
-            assert(preview.Complete());
+            assert(preview.playing);
             for (int i = 0; i < 330; i++)
             {
                 frame();
@@ -1595,24 +1650,16 @@ void SeedRouteUICases(const std::string &output)
             assert(white && cyan);
             if (dpi == 1 && size.x == 1280)
                 Dump(output + "/seed-route-full.draw");
-            ImGui::ActivateItemByID(w->GetID("Restart drawing"));
+            ImGui::ActivateItemByID(w->GetID("Animate route"));
             frame();
-            assert(preview.seconds < .1 && preview.playing);
-            ImGui::ActivateItemByID(w->GetID("Pause animation"));
-            frame();
-            assert(!preview.playing);
-            double stopped = preview.seconds;
+            assert(!preview.playing && preview.Complete());
+            double stopped = preview.pulseSeconds;
             for (int i = 0; i < 3; i++)
                 frame();
-            assert(preview.seconds == stopped);
-            ImGui::ActivateItemByID(w->GetID("Resume animation"));
+            assert(preview.pulseSeconds == stopped && preview.Complete());
+            ImGui::ActivateItemByID(w->GetID("Animate route"));
             frame();
-            assert(preview.playing && preview.seconds > stopped);
-            preview.seconds = 2.5;
-            preview.playing = false;
-            frame();
-            if (dpi == 1 && size.x == 1280)
-                Dump(output + "/seed-route-growing.draw");
+            assert(preview.playing && preview.Complete() && preview.pulseSeconds > stopped);
             suite_ui::preferences.motion = false;
             frame();
             assert(preview.Complete());
@@ -1662,11 +1709,12 @@ void SeedRouteReliabilityUICases(const std::string &output)
     next->seed++;
     done.data = next;
     BindSeedRoutePreview(done);
-    assert(!g_seedPreviewPlayback.suggested && g_seedPreviewPlayback.seconds == 0);
+    assert(g_seedPreviewPlayback.suggested && g_seedPreviewPlayback.Complete() &&
+           !g_seedPreviewPlayback.playing);
     g_seedPreviewPlayback.suggested = true;
     done.session++;
     BindSeedRoutePreview(done);
-    assert(!g_seedPreviewPlayback.suggested);
+    assert(g_seedPreviewPlayback.suggested && g_seedPreviewPlayback.Complete());
     for (auto viewport : {ImVec2(480, 700), ImVec2(1280, 900)})
         for (float dpi : {1.f, 1.5f})
         {
@@ -2898,6 +2946,7 @@ int main(int argc, char **argv)
     UpdateUICases(argc > 1 ? argv[1] : "");
     ExperienceCases(argc > 1 ? argv[1] : "");
     AppearanceCases(argc > 1 ? argv[1] : "");
+    FeedbackRevisionCases(argc > 1 ? argv[1] : "");
     MilestoneCases(argc > 1 ? argv[1] : "");
     PersistentFeedbackCases(argc > 1 ? argv[1] : "");
     FinishVerificationCases(argc > 1 ? argv[1] : "");

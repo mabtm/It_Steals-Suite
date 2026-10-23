@@ -210,6 +210,13 @@ class PhysicalNavigation
     PhysicalNavigation(const MapData &d, std::vector<std::array<Vec3, 3>> floor)
         : triangles(std::move(floor)), enabled(d.physicalCaptured), radius(d.agentRadius + .008)
     {
+        std::vector<std::array<Vec3, 3>> ground;
+        for (const auto &part : d.physicalParts)
+            if ((part.flags & 8) && part.points.size() >= 3)
+                for (size_t i = 2; i < part.points.size(); i++)
+                    ground.push_back({part.points[0], part.points[i - 1], part.points[i]});
+        if (!ground.empty())
+            triangles = std::move(ground);
         if (enabled)
             for (const auto &p : d.physicalParts)
                 if ((p.flags & 2) && p.points.size() >= 2)

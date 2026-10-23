@@ -117,8 +117,11 @@ int main(int argc, char **argv)
     auto partialAudio = Complete();
     partialAudio.experience.audio.flags = 1 | 4;
     partialAudio.experience.audio.frames = 24000;
+    partialAudio.audioNotes = "Begin: listener bypass with a spatial mix or source filter";
     check = BuildRecordingCheck(partialAudio);
     assert(check->channels[5].status == RecordingStatus::Partial && check->channels[5].gaps[0].begin == .5);
+    assert(check->channels[5].detail.find("Begin: listener bypass") != std::string::npos &&
+           check->channels[5].detail.find("No reported gaps") == std::string::npos);
     auto gapOnly = Complete();
     gapOnly.experience.audio.gaps = 1;
     check = BuildRecordingCheck(gapOnly);
@@ -144,6 +147,26 @@ int main(int argc, char **argv)
         auto motion = DecodeMotion(bytes, reason);
         assert(motion && motion->inputFormat == 6 && motion->coverage.recorded &&
                motion->coverage.spans[0].through == motion->seconds);
+        auto v7 = bytes;
+        v7.resize(v7.size() - 8);
+        v7[4] = 7;
+        std::string note = "Begin: listener bypass with a spatial mix or source filter\n";
+        uint32_t length = uint32_t(note.size());
+        auto atNote = v7.size();
+        v7.resize(v7.size() + 4);
+        std::memcpy(v7.data() + atNote, &length, 4);
+        v7.insert(v7.end(), note.begin(), note.end());
+        auto hash7 = ReplayHash(v7, v7.size());
+        v7.resize(v7.size() + 8);
+        std::memcpy(v7.data() + v7.size() - 8, &hash7, 8);
+        auto newMotion = DecodeMotion(v7, reason);
+        assert(newMotion && newMotion->inputFormat == 7 && newMotion->audioNotes == note &&
+               newMotion->coverage.recorded);
+        length = 4097;
+        std::memcpy(v7.data() + atNote, &length, 4);
+        hash7 = ReplayHash(v7, v7.size() - 8);
+        std::memcpy(v7.data() + v7.size() - 8, &hash7, 8);
+        assert(!DecodeMotion(v7, reason));
         // Corrupt the v6 coverage, then recompute the outer checksum: the new
         // structural checks, not only the existing file hash, must reject it.
         constexpr size_t coverageBytes = 5 + 6 * 45;

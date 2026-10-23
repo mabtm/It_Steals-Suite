@@ -75,16 +75,31 @@ inline void RenderReplayInputs(const practice::ReplayMotion &motion, practice::R
     if (!motion.devices.empty())
     {
         auto f = suite_input::ReplayFrame(motion, replay.seconds);
-        auto p = suite_input::preferences;
-        p.keyboard = p.controller = true;
-        auto size = suite_input::Size(p);
-        float w = ImGui::GetContentRegionAvail().x;
-        auto a = ImGui::GetCursorScreenPos();
-        suite_input::Draw(ImGui::GetWindowDrawList(), a, {a.x + w, a.y + w * size.y / size.x},
-                          f ? &*f : nullptr, p, suite_input::ReplayChanges(motion, replay.seconds),
-                          replay.seconds, suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont(),
-                          suite_input::Colors(.9f));
-        ImGui::Dummy({w, w * size.y / size.x});
+        if (ImGui::BeginTabBar("Recorded input devices"))
+        {
+            const char *tabs[] = {"Keyboard", "Mouse", "Controller", "Player"};
+            for (int device = 0; device < 4; device++)
+                if (suite_ui::BeginTabItem(tabs[device]))
+                {
+                    auto p = suite_input::preferences;
+                    p.keyboard = device == 0;
+                    p.mouse = device == 1;
+                    p.controller = device == 2;
+                    p.states = device == 3;
+                    p.events = false;
+                    p.fullKeyboard = false;
+                    auto size = suite_input::Size(p);
+                    float w = std::min(ImGui::GetContentRegionAvail().x, size.x * suite_ui::Unit());
+                    auto a = ImGui::GetCursorScreenPos();
+                    suite_input::Draw(ImGui::GetWindowDrawList(), a, {a.x + w, a.y + w * size.y / size.x},
+                                      f ? &*f : nullptr, p, {}, replay.seconds,
+                                      suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont(),
+                                      suite_input::Colors(.9f));
+                    ImGui::Dummy({w, w * size.y / size.x});
+                    suite_ui::EndTabItem();
+                }
+            ImGui::EndTabBar();
+        }
     }
     const auto *input = practice::ReplayInputAt(motion, replay.seconds);
     const auto *frame = practice::ReplayViewAt(motion, replay.seconds);

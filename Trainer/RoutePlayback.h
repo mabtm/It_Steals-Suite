@@ -180,7 +180,7 @@ struct SeedRoutePlayback
 {
     static constexpr double DrawSeconds = 5., PulseSeconds = 4.;
     double seconds = 0, pulseSeconds = 0;
-    bool suggested = false, playing = true;
+    bool suggested = false, playing = false;
 
     void Advance(double delta, bool motion)
     {

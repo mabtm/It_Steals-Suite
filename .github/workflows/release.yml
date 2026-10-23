@@ -52,6 +52,7 @@ jobs:
           path: |
             build/verification/summary.json
             build/verification/**/*.log
+            build/verification/replay_experience_tests/work/clock-arguments.json
           retention-days: 14
           if-no-files-found: warn
 
@@ -62,6 +63,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: write
+      actions: read
     defaults:
       run:
         shell: powershell
@@ -85,6 +87,16 @@ jobs:
         run: |
           & .\Installer\Release.ps1 -PlatformToolset v143 -SourceCommit $env:GITHUB_SHA
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Release packaging failed.' }
+      - name: Verify 1080p60 AVI timing and recorded audio with the shipped encoder
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download $env:GITHUB_RUN_ID --repo $env:GITHUB_REPOSITORY --name production-verification --dir build/export-input
+          if ($LASTEXITCODE -ne 0) { throw 'Could not retrieve the production export arguments.' }
+          $plan = Get-ChildItem build/export-input -Filter clock-arguments.json -Recurse | Select-Object -First 1
+          if (-not $plan) { throw 'Production export arguments are missing.' }
+          python tests/verify_audio_exports.py $plan.Directory.FullName bin/PracticeSuiteEncoder.exe --avi-only
+          if ($LASTEXITCODE -ne 0) { throw 'The shipped encoder failed the 653-frame audio/video timing check.' }
       - name: Test the real Windows launcher against a controlled executable
         run: |
           & .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
@@ -106,6 +118,8 @@ jobs:
             build/windows-launcher-tests/summary.json
             build/updater-tests/summary.json
             build/windows-updater-tests/summary.json
+            build/export-input/**/verified-export-clock.json
+            build/export-input/**/clock-encoder.log
           retention-days: 14
           if-no-files-found: warn
       - name: Refresh the supplied trainer from the verified Windows build

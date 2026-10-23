@@ -92,6 +92,11 @@ def check():
         0,
     ):
         raise ValueError("SUITE_VERSION_COMPONENTS does not match SUITE_VERSION")
+    expected_mod = re.search(r'#define SUITE_MOD_VERSION "(' + VERSION + r')"', header)
+    mod_source = (ROOT / "Mod/ItStealsMod.cs").read_text(encoding="utf-8")
+    mod = re.search(r'public const string Version = "(' + VERSION + r')"', mod_source)
+    if not expected_mod or not mod or mod[1] != expected_mod[1]:
+        raise ValueError("The game mod source does not match SUITE_MOD_VERSION")
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     if spotlight() not in readme:
         raise ValueError("Release spotlight is stale; run python repository.py sync")

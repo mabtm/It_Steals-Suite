@@ -2,17 +2,21 @@
 """Build and run portable production-logic tests without the game SDK."""
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import time
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 MANAGED = {
+    "adaptive_capture_tests": [
+        "ReplayVisualData.cs",
+        "AdaptivePoseSampler.cs",
+        "ReplayCoverage.cs",
+    ],
     "fullbright_tests": ["SceneBrightness.cs"],
     "replay_renderer_tests": ["ReplayRendererScope.cs", "ReplayPlaybackClock.cs"],
     "replay_visual_tests": [

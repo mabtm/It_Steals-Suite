@@ -97,7 +97,7 @@ public class ControlledGame {
     Remove-Item -LiteralPath $script:started
     Start-Sleep -Milliseconds 1500
     Assert (-not (Test-Path -LiteralPath $script:started)) 'Trainer restarted a closed game.'
-    Close-ControlledTrainer $trainer
+    Assert ($trainer.WaitForExit(10000) -and $trainer.ExitCode -eq 0) 'Trainer did not close after the game exited.'
 
     $trainer=Start-ControlledTrainer '--no-launch'
     Start-Sleep -Milliseconds 1500
@@ -122,7 +122,7 @@ public class ControlledGame {
     Assert ($trainer.WaitForExit(5000) -and $trainer.ExitCode -eq 0) 'The updater did not close the native hidden control window normally.'
     $output=Join-Path $repo 'build/windows-launcher-tests'
     $null=[IO.Directory]::CreateDirectory($output)
-    @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out','updater gracefully closes actual hidden native control window')} |
+    @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','trainer closes with the game','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out','updater gracefully closes actual hidden native control window')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'summary.json') -Encoding UTF8
     Write-Output 'Windows native launcher smoke tests passed (controlled game, not Unity).'
 } catch {

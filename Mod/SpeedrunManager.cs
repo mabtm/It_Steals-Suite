@@ -407,6 +407,14 @@ public sealed class SpeedrunManager
             NeedsDeathReload = false;
     }
 
+    public void ResetStatistics()
+    {
+        if (Running || !tracker.ResetStatistics())
+            return;
+        timerState = 0;
+        finalTime = 0;
+    }
+
     public void WriteSnapshot(SnapshotBuffer data, TrainerCommands commands)
     {
         RunRecord record = timerState == 0 ? tracker.Active : Record;

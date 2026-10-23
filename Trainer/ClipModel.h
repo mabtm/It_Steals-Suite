@@ -159,13 +159,13 @@ inline const char *X264Preset(int quality)
     return quality == 0 ? "veryfast" : quality == 2 ? "slow" : "medium";
 }
 
-inline std::string StreamInputArguments(const Options &o)
+inline std::string StreamInputArguments(const Options &o, bool withAudio = false)
 {
     return "-hide_banner -nostdin -loglevel error -y -filter_threads 1 -xerror "
            "-f rawvideo -pixel_format bgra "
            "-video_size " +
            std::to_string(o.width) + "x" + std::to_string(o.height) + " -framerate " + std::to_string(o.fps) +
-           " -i pipe:0 -an ";
+           " -i pipe:0 " + (withAudio ? std::string() : "-an ");
 }
 
 inline std::string FrameClockArguments(const Options &o)
@@ -176,7 +176,7 @@ inline std::string FrameClockArguments(const Options &o)
                            ? "scale=in_range=full:out_range=tv:out_color_matrix=bt709,setparams=range="
                              "limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709,"
                            : "") +
-           "settb=1/" + fps + ",setpts=N -fps_mode cfr -r " + fps + " -enc_time_base 1:" + fps +
+           "settb=1/" + fps + ",setpts=N -fps_mode:v cfr -r:v " + fps + " -enc_time_base:v 1:" + fps +
            " -frames:v " + std::to_string(o.Frames()) + " ";
 }
 
@@ -184,7 +184,7 @@ inline std::string VideoCodecArguments(const Options &o)
 {
     auto common = FrameClockArguments(o) + "-threads 4 ";
     if (o.format == 4)
-        return common + "-c:v utvideo -pix_fmt gbrap -pred left -f avi ";
+        return common + "-c:v utvideo -pix_fmt gbrp -pred left -f avi ";
     if (o.format == 5)
         return common +
                "-c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le -color_range tv "

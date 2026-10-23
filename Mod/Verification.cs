@@ -28,7 +28,7 @@ public enum RunWarnings : uint
 
 public sealed class RunEnvironment
 {
-    public string ToolVersion = "7.11.4", GameVersion = "UNKNOWN", UnityVersion = "UNKNOWN",
+    public string ToolVersion = ItStealsMod.Version, GameVersion = "UNKNOWN", UnityVersion = "UNKNOWN",
                   GameHash = "UNKNOWN";
 
     public RunEnvironment Copy()

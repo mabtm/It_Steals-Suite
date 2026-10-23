@@ -27,30 +27,52 @@ inline void RenderDiagnosticScan()
             184);
     else
     {
-        int issues = 0;
-        for (auto r : findings)
-            issues += r.severity >= 2;
-        ImGui::TextColored(issues ? g_accentCol : g_headerCol, "%d checks / %d need attention",
-                           int(findings.size()), issues);
-        ImGui::TextDisabled("Snapshot: %.0f s ago", ImGui::GetTime() - scanned);
-        for (const auto &r : findings)
-            if (r.severity)
+        int errors = 0, warnings = 0, passed = 0;
+        for (const auto &finding : findings)
+        {
+            errors += finding.severity == 3;
+            warnings += finding.severity == 2;
+            passed += finding.severity == 0;
+        }
+        float gap = ImGui::GetStyle().ItemSpacing.x;
+        float width = std::max(60.f, (ImGui::GetContentRegionAvail().x - 2 * gap) / 3);
+        auto count = [&](const char *id, const char *label, int value, const char *note) {
+            auto text = std::to_string(value);
+            suite_ui::Metric(id, label, text.c_str(), note, width);
+        };
+        count("Diagnostic errors", "ERRORS", errors, "Action needed");
+        ImGui::SameLine();
+        count("Diagnostic warnings", "WARNINGS", warnings, "Check these");
+        ImGui::SameLine();
+        count("Diagnostic passed", "PASSED", passed, "Checked observations");
+        ImGui::TextDisabled("Scanned %.0f s ago / %d checks", ImGui::GetTime() - scanned,
+                            int(findings.size()));
+        auto detail = [&](const DiagnosticFinding &finding) {
+            ImGui::PushID(&finding);
+            if (suite_ui::CollapsingHeader((finding.title + "##" + finding.code).c_str(),
+                                           finding.severity >= 2 ? ImGuiTreeNodeFlags_DefaultOpen : 0))
             {
-                ImGui::PushID(r.code.c_str());
-                if (suite_ui::CollapsingHeader((r.code + " / " + r.title).c_str(),
-                                               r.severity >= 2 ? ImGuiTreeNodeFlags_DefaultOpen : 0))
+                ImGui::TextDisabled("%s", finding.code.c_str());
+                if (!finding.evidence.empty())
+                    ImGui::TextWrapped("%s", finding.evidence.c_str());
+                if (!finding.solution.empty())
                 {
-                    if (!r.evidence.empty())
-                        ImGui::TextWrapped("%s", r.evidence.c_str());
-                    if (!r.solution.empty())
-                        ImGui::TextWrapped("%s", r.solution.c_str());
+                    ImGui::TextColored(g_headerCol, "Next step");
+                    ImGui::TextWrapped("%s", finding.solution.c_str());
                 }
-                ImGui::PopID();
             }
-        if (suite_ui::CollapsingHeader("Passed checks"))
-            for (const auto &r : findings)
-                if (!r.severity)
-                    ImGui::TextWrapped("%s / %s", r.code.c_str(), r.title.c_str());
+            ImGui::PopID();
+        };
+        if (!errors && !warnings)
+            ImGui::TextWrapped("No issues found in the checked observations.");
+        for (int severity : {3, 2})
+            for (const auto &finding : findings)
+                if (finding.severity == severity)
+                    detail(finding);
+        if (suite_ui::CollapsingHeader("Information and passed checks"))
+            for (const auto &finding : findings)
+                if (finding.severity < 2)
+                    detail(finding);
     }
     ImGui::BeginDisabled(!g_pShared || g_pShared->timerState == 1 || HasPendingRequest());
     if (suite_ui::Button("Refresh map geometry [F5]"))

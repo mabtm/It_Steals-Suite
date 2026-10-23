@@ -1069,8 +1069,10 @@ inline void OutputPanel(bool &changed)
     }
     else if (options.format == 2 || options.format == 4)
     {
-        ImGui::TextWrapped("Lossless RGB / alpha. File size depends on the scene; "
-                           "use Size Limit for a capped MP4.");
+        ImGui::TextWrapped(options.format == 4 ? "Lossless RGB. File size depends on the scene; "
+                                                 "use MP4 for smaller files."
+                                               : "Lossless RGB / alpha. File size depends on the scene; "
+                                                 "use Size Limit for a capped MP4.");
     }
     const char *sizes[] = {"640 x 360", "1280 x 720", "1920 x 1080", "2560 x 1440"};
     int res = options.width == 2560 ? 3 : options.width == 1920 ? 2 : options.width == 1280 ? 1 : 0;

@@ -409,7 +409,7 @@ inline std::shared_ptr<const MapData> DecodeMap(std::vector<uint8_t> bytes, std:
         if (r.Read<uint32_t>() != 0x504D5349u)
             throw std::runtime_error("Unsupported map format");
         int format = r.Read<int32_t>();
-        if (format < 1 || format > 13 || format == 5)
+        if (format < 1 || format > 14 || format == 5)
             throw std::runtime_error("Unsupported map format");
         auto d = std::make_shared<MapData>();
         for (int *value : {&d->pid, &d->scene, &d->epoch, &d->seed, &d->recipe, &d->sourceKind, &d->spawn,
@@ -712,8 +712,10 @@ inline std::shared_ptr<const MapData> DecodeMap(std::vector<uint8_t> bytes, std:
                 part.flags = r.Read<uint32_t>();
                 int points = r.Count(64);
                 total += points;
-                if (points < 2 || total > 60000 || (part.flags & ~7u))
+                if (points < 2 || total > 60000 || (part.flags & ~(format >= 14 ? 15u : 7u)))
                     throw std::runtime_error("Invalid physical footprint");
+                if ((part.flags & 8) && (part.flags != 8 || points != 3))
+                    throw std::runtime_error("Invalid physical floor triangle");
                 for (int j = 0; j < points; j++)
                     part.points.push_back({r.Coordinate(), r.Coordinate(), r.Coordinate()});
                 if (points == 2)

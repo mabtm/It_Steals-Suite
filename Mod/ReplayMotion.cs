@@ -85,7 +85,7 @@ public sealed class ReplayMotionData
     public long Id;
     public int Scene, Seed;
     public double Seconds;
-    public string Hash = "";
+    public string Hash = "", AudioNotes = "";
     public ReplayMotionInfo Info = new ReplayMotionInfo();
     public ReplayColliderData Colliders = new ReplayColliderData();
     public ReplayVisualData Visuals = new ReplayVisualData();
@@ -273,7 +273,7 @@ public sealed class ReplayMotionData
                    new ReplayHashStream(target)) using (var w = new BinaryWriter(hash, Encoding.UTF8, true))
         {
             w.Write(0x4e495349u);
-            w.Write(6);
+            w.Write(7);
             w.Write(Id);
             w.Write(Scene);
             w.Write(Seed);
@@ -341,6 +341,7 @@ public sealed class ReplayMotionData
             Visuals.Write(w);
             Experience.Write(w);
             Coverage.Write(w);
+            Text(w, AudioNotes);
             w.Flush();
             ulong sum = hash.Hash;
             hash.Hashing = false;
@@ -360,7 +361,7 @@ public sealed class ReplayMotionData
             if (r.ReadUInt32() != 0x4e495349u)
                 throw new InvalidDataException("Unsupported input recording");
             int format = r.ReadInt32();
-            if (format < 1 || format > 6)
+            if (format < 1 || format > 7)
                 throw new InvalidDataException("Unsupported input recording");
             var d = new ReplayMotionData { InputFormat = format,           Id = r.ReadInt64(),
                                            Scene = r.ReadInt32(),          Seed = r.ReadInt32(),
@@ -472,11 +473,13 @@ public sealed class ReplayMotionData
                     throw new InvalidDataException("Device span ends before samples");
             }
             if (format >= 4)
-                d.Visuals = ReplayVisualData.Read(r, d.Seconds);
+                d.Visuals = ReplayVisualData.Read(r, d.Seconds, format);
             if (format >= 5)
                 d.Experience = ReplayExperienceData.Read(r, d.Seconds);
             if (format >= 6)
                 d.Coverage = ReplayCoverage.Read(r, d.Seconds);
+            if (format >= 7)
+                d.AudioNotes = Text(r, 4096);
             r.ReadUInt64();
             if (r.BaseStream.Position != bytes.Length)
                 throw new InvalidDataException("Trailing input data");

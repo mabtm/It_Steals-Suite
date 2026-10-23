@@ -1,6 +1,12 @@
-from pathlib import Path
-import subprocess, shlex, json, hashlib, struct
 import argparse
+import hashlib
+import json
+import math
+import shlex
+import shutil
+import struct
+import subprocess
+from pathlib import Path
 
 parser = argparse.ArgumentParser(
     description="Validate new recorded-audio exports with a matching FFmpeg build and independent ffprobe/ffmpeg."
@@ -9,9 +15,219 @@ parser.add_argument(
     "fixtures", type=Path, help="fresh output folder from replay_experience_tests.cpp"
 )
 parser.add_argument("ffmpeg", type=Path, help="encoder built from Encoder sources")
+parser.add_argument(
+    "--avi-only",
+    action="store_true",
+    help="check the 653-frame 1080p60 export with recorded audio",
+)
 args = parser.parse_args()
 ff = args.ffmpeg.resolve()
 out = args.fixtures.resolve()
+
+
+def chunks(data, start, end):
+    while start + 8 <= end:
+        tag, size = struct.unpack_from("<4sI", data, start)
+        body = start + 8
+        yield tag, body, size
+        start = body + size + (size & 1)
+
+
+def wave_data(path):
+    data = path.read_bytes()
+    assert data[:4] == b"RIFF" and data[8:12] == b"WAVE", path
+    return next(
+        data[body : body + size]
+        for tag, body, size in chunks(data, 12, len(data))
+        if tag == b"data"
+    )
+
+
+def verify_clock():
+    plan = json.loads((out / "clock-arguments.json").read_text())
+    width, height, fps, frames = (
+        plan[key] for key in ("width", "height", "fps", "frames")
+    )
+    assert (width, height, fps, frames) == (1920, 1080, 60, 653)
+    samples = round(frames * 48000 / fps)
+    pcm = b"".join(
+        struct.pack("<ff", math.sin(n * 0.037) * 0.25, ((n % 997) / 997 - 0.5) * 0.3)
+        for n in range(samples)
+    )
+    wave = out / "clock-audio.wav"
+    wave.write_bytes(
+        struct.pack(
+            "<4sI4s4sIHHIIHH4sI",
+            b"RIFF",
+            36 + len(pcm),
+            b"WAVE",
+            b"fmt ",
+            16,
+            3,
+            2,
+            48000,
+            48000 * 8,
+            8,
+            32,
+            b"data",
+            len(pcm),
+        )
+        + pcm
+    )
+    final = out / "clock-1080p60.avi"
+    command = [
+        str(ff),
+        *shlex.split(plan["input"]),
+        "-i",
+        str(wave),
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0",
+        *shlex.split(plan["output"]),
+        str(final),
+    ]
+    hashes = []
+    with (out / "clock-encoder.log").open("wb") as log:
+        process = subprocess.Popen(
+            command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=log
+        )
+        try:
+            for n in range(frames):
+                # Every frame has a unique RGB value; the lossless decoder must preserve its position.
+                frame = bytes((n & 255, (n >> 8) & 255, (n * 37) & 255, 255)) * (
+                    width * height
+                )
+                hashes.append(hashlib.md5(frame).hexdigest())
+                process.stdin.write(frame)
+            process.stdin.close()
+            assert process.wait(timeout=120) == 0, (
+                out / "clock-encoder.log"
+            ).read_text()
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+    with final.open("rb") as file:
+        header = file.read(1024 * 1024)
+    assert header[:4] == b"RIFF" and header[8:12] == b"AVI "
+    streams = []
+
+    def scan(start, end):
+        for tag, body, size in chunks(header, start, end):
+            if tag == b"LIST" and header[body : body + 4] != b"movi":
+                scan(body + 4, min(body + size, end))
+            elif tag == b"strh":
+                scale, rate, first, count = struct.unpack_from(
+                    "<IIII", header, body + 20
+                )
+                streams.append((header[body : body + 4], scale, rate, first, count))
+
+    scan(12, len(header))
+    video = next(s for s in streams if s[0] == b"vids")
+    audio = next(s for s in streams if s[0] == b"auds")
+    assert video[2] / video[1] == fps and video[3] == 0 and video[4] == frames, video
+    assert audio[3] == 0 and audio[4] * audio[1] / audio[2] == samples / 48000, audio
+    decoded = out / "clock-decoded.wav"
+    subprocess.run(
+        [
+            str(ff),
+            "-hide_banner",
+            "-nostdin",
+            "-loglevel",
+            "error",
+            "-y",
+            "-xerror",
+            "-i",
+            str(final),
+            "-map",
+            "0:a:0",
+            "-c:a",
+            "pcm_f32le",
+            "-f",
+            "wav",
+            str(decoded),
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    assert wave_data(decoded) == pcm, (
+        "Recorded PCM changed or the audio track was truncated"
+    )
+    independent = bool(shutil.which("ffprobe") and shutil.which("ffmpeg"))
+    if independent:
+        probe = json.loads(
+            subprocess.check_output(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-count_frames",
+                    "-show_streams",
+                    "-show_packets",
+                    "-show_entries",
+                    "stream=avg_frame_rate,nb_read_frames:packet=pts_time,duration_time",
+                    "-of",
+                    "json",
+                    str(final),
+                ]
+            )
+        )
+        assert probe["streams"][0]["avg_frame_rate"] == "60/1"
+        assert int(probe["streams"][0]["nb_read_frames"]) == frames
+        packets = probe["packets"]
+        assert len(packets) == frames
+        for n, packet in enumerate(packets):
+            assert abs(float(packet["pts_time"]) - n / fps) < 0.000001
+            assert abs(float(packet["duration_time"]) - 1 / fps) < 0.000001
+        decoded_hashes = subprocess.check_output(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-xerror",
+                "-i",
+                str(final),
+                "-map",
+                "0:v:0",
+                "-pix_fmt",
+                "bgra",
+                "-f",
+                "framemd5",
+                "-",
+            ]
+        ).decode()
+        actual = [
+            line.rsplit(",", 1)[1].strip()
+            for line in decoded_hashes.splitlines()
+            if not line.startswith("#")
+        ]
+        assert actual == hashes, (
+            "RGB frames were repeated, skipped, changed, or reordered"
+        )
+    report = {
+        "frames": frames,
+        "fps": fps,
+        "width": width,
+        "height": height,
+        "seconds": frames / fps,
+        "audioFrames": samples,
+        "audioRate": 48000,
+        "pcmExact": True,
+        "independentFrameDecode": independent,
+        "bytes": final.stat().st_size,
+    }
+    (out / "verified-export-clock.json").write_text(json.dumps(report, indent=2))
+    print(json.dumps(report))
+
+
+if args.avi_only:
+    verify_clock()
+    raise SystemExit(0)
+
 audit = []
 raw = bytes(((x // 4) * 7 + (x % 4) * 47) & 255 for x in range(320 * 180 * 4))
 raw = raw * 30

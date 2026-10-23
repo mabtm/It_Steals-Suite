@@ -267,6 +267,31 @@ int main(int argc, char **argv)
         assert(EstimateGameTravel(available.route.length, stale.movementTick, stale.movementSprintStep,
                                   !available.route.estimated)
                    .valid);
+        // Actual Floor BoxCollider coordinates from both supplied scene assets.
+        // Keep AI corridors for fast paths, but physical floor must also close a
+        // missing AI strip without crossing the captured solid wall footprints.
+        auto ground = d;
+        Vec3 lo{-32.135997f, .6144456f, -22.084532f}, hi{43.495915f, .6144456f, 34.044336f};
+        ground.physicalParts.push_back({8, {lo, {hi.x, lo.y, lo.z}, {hi.x, lo.y, hi.z}}});
+        ground.physicalParts.push_back({8, {lo, {hi.x, lo.y, hi.z}, {lo.x, lo.y, hi.z}}});
+        auto originalIndices = ground.indices;
+        ground.indices.clear();
+        for (size_t k = 0; k < originalIndices.size(); k += 3)
+            if ((k / 3) % 3 != 0)
+                ground.indices.insert(ground.indices.end(), originalIndices.begin() + k,
+                                      originalIndices.begin() + k + 3);
+        NavGraph groundGraph(ground);
+        auto groundTable = groundGraph.Routes();
+        assert(groundTable->unverifiedPairs == 0);
+        for (int i = 0; i < groundTable->count; i++)
+            for (int j = i + 1; j < groundTable->count; j++)
+            {
+                auto path = groundTable->Between(i, j);
+                for (size_t k = 1; k < path.points.size(); k++)
+                    assert(groundGraph.Visible(path.points[k - 1], path.points[k]));
+            }
+        std::cout << "Scene " << d.scene << ": actual physical floor closes fragmented AI floor; "
+                  << groundTable->checkedPairs + groundTable->recoveredPairs << " checked pairs.\n";
         NavGraph retry(d);
         int calls = 0;
         bool canceled = false;

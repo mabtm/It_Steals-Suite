@@ -59,6 +59,7 @@ struct ReplayMotion
     mutable std::shared_ptr<const RecordingCheck> recordingCheck;
     std::filesystem::path audioFile;
     std::string audioError;
+    std::string audioNotes;
     std::vector<suite_input::Frame> devices;
     double deviceThrough = 0;
     int deviceDropped = 0;
@@ -105,7 +106,7 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
         if (r.Read<uint32_t>() != 0x4e495349)
             throw std::runtime_error("Unsupported input recording");
         int format = r.Read<int32_t>();
-        if (format < 1 || format > 6)
+        if (format < 1 || format > 7)
             throw std::runtime_error("Unsupported input recording");
         auto d = std::make_shared<ReplayMotion>();
         d->inputFormat = format;
@@ -317,7 +318,7 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
                     if (type < 1 || type > 4 || slot < 0 || slot > 31 ||
                         !paths.insert({type, slot, path}).second)
                         throw std::runtime_error("Invalid visual track");
-                    int frames = r.Count(393216 - d->visualSamples);
+                    int frames = r.Count((format >= 7 ? 1048576 : 393216) - d->visualSamples);
                     d->visualSamples += frames;
                     double last = -1;
                     for (int k = 0; k < frames; k++)
@@ -357,7 +358,7 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
                     }
                 }
             }
-            if (r.Offset() - visualStart > 24 * 1024 * 1024)
+            if (r.Offset() - visualStart > (format >= 7 ? 64 : 24) * 1024 * 1024)
                 throw std::runtime_error("Visual recording exceeds byte limit");
             if (!d->visualsRecorded && (owners || d->visualSamples))
                 throw std::runtime_error("Unexpected visual observations");
@@ -366,6 +367,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
             d->experience = ReadReplayExperience(r, d->seconds);
         if (format >= 6)
             d->coverage = ReadCoverage(r, d->seconds);
+        if (format >= 7)
+            d->audioNotes = r.Text(4096);
         r.Read<uint64_t>();
         if (!r.Done())
             throw std::runtime_error("Trailing input data");

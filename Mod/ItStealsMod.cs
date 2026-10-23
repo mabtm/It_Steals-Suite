@@ -5,11 +5,14 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-[assembly:MelonInfo(typeof(ItStealsMod), "ItStealsHelper", "7.11.4", "mab")]
+[assembly:MelonInfo(typeof(ItStealsMod), "ItStealsHelper", ItStealsMod.Version, "mab")]
 [assembly:MelonGame("Zeekerss3", "It Steals")]
+[assembly:System.Reflection.AssemblyVersion(ItStealsMod.Version + ".0")]
+[assembly:System.Reflection.AssemblyFileVersion(ItStealsMod.Version + ".0")]
 
 public sealed class ItStealsMod : MelonMod
 {
+    public const string Version = "7.12.5";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -82,7 +85,7 @@ public sealed class ItStealsMod : MelonMod
             }
             inspector = new LiveInspector(pid, connection.Session);
             lastHeartbeatTime = Time.realtimeSinceStartup;
-            MelonLogger.Msg("ItStealsHelper 7.11.4 loaded; shared-memory protocol v" +
+            MelonLogger.Msg("ItStealsHelper " + Version + " loaded; shared-memory protocol v" +
                             SharedMemoryProtocol.Version + ".");
         }
         catch (Exception error)
@@ -118,6 +121,7 @@ public sealed class ItStealsMod : MelonMod
         if (speedrun != null)
             speedrun.SceneLoaded(buildIndex);
         PracticeRandom.SceneLoaded(buildIndex);
+        ReplayAudioCapture.Prepare();
     }
 
     public override void OnSceneWasInitialized(int buildIndex, string sceneName)
@@ -242,6 +246,8 @@ public sealed class ItStealsMod : MelonMod
                 planner.Review(commands.RunReviewId);
             else if (request && commands.RunReviewRequest == 2 && planner != null)
                 planner.CloseReview();
+            else if (request && commands.RunReviewRequest == 3 && !speedrun.Running)
+                speedrun.ResetStatistics();
             speedrun.AuditBeforeSuppression(commands);
             framePolicy.Tick(commands, trainerConnected);
             bool hitboxes = allowed && commands.HitboxEnabled == 1;
@@ -451,7 +457,7 @@ public sealed class ItStealsMod : MelonMod
             snapshot.WriteString(SharedLayout.Author, "mab", 64);
             snapshot.Write(SharedLayout.PlannerGenerationMs,
                            planner == null ? 0 : planner.GenerationMilliseconds);
-            snapshot.WriteString(SharedLayout.Version, "v7.11.4", 64);
+            snapshot.WriteString(SharedLayout.Version, "v" + Version, 64);
             snapshot.Write(SharedLayout.GameFps, gameFps);
             snapshot.Write(SharedLayout.Pid, pid);
             snapshot.Write(SharedLayout.BaseAddress, baseAddress);

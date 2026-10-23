@@ -183,12 +183,13 @@ public sealed class ReplayAudioSession
         Flag(1);
     }
 
-    public void Push(float[] samples, int countChannels, long firstFrame)
+    public void Push(float[] samples, int countChannels, long firstFrame, int sampleCount = -1)
     {
         if (!Accept(firstFrame))
             return;
-        if (samples == null || countChannels != channels || samples.Length % channels != 0 ||
-            samples.Length > ring[0].Data.Length)
+        int count = sampleCount < 0 ? (samples == null ? 0 : samples.Length) : sampleCount;
+        if (samples == null || countChannels != channels || count < 0 || count > samples.Length ||
+            count % channels != 0 || count > ring[0].Data.Length)
         {
             Flag(8);
             return;
@@ -200,9 +201,9 @@ public sealed class ReplayAudioSession
             return;
         }
         var b = ring[at];
-        Array.Copy(samples, b.Data, samples.Length);
+        Array.Copy(samples, b.Data, count);
         b.First = firstFrame;
-        b.Count = samples.Length;
+        b.Count = count;
         Interlocked.Increment(ref observed);
         Volatile.Write(ref head, next);
     }
@@ -520,12 +521,14 @@ public sealed class ReplayAudioLane
         }
     }
 
-    public void Push(float[] samples, int channels, long first, float gain)
+    public void Push(float[] samples, int channels, long first, float gain, int sampleCount = -1)
     {
         if (!owner.Accept(first))
             return;
-        if (samples == null || channels < 1 || channels > 2 || samples.Length % channels != 0 ||
-            samples.Length > ring[0].Data.Length || float.IsNaN(gain) || float.IsInfinity(gain) || gain < 0)
+        int count = sampleCount < 0 ? (samples == null ? 0 : samples.Length) : sampleCount;
+        if (samples == null || channels < 1 || channels > 2 || count < 0 || count > samples.Length ||
+            count % channels != 0 || count > ring[0].Data.Length || float.IsNaN(gain) ||
+            float.IsInfinity(gain) || gain < 0)
         {
             owner.Invalid();
             return;
@@ -538,9 +541,9 @@ public sealed class ReplayAudioLane
             return;
         }
         var block = ring[at];
-        Array.Copy(samples, block.Data, samples.Length);
+        Array.Copy(samples, block.Data, count);
         block.First = first;
-        block.Count = samples.Length;
+        block.Count = count;
         block.Channels = channels;
         block.Gain = gain;
         Volatile.Write(ref head, next);

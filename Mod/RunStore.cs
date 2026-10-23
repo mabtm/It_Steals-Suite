@@ -166,6 +166,27 @@ public sealed class RunStore : IDisposable
         return days.TryGetValue(Day(DateTime.UtcNow.Ticks), out counts) ? counts[index] : 0;
     }
 
+    public void UncountAttempt(long startedUtc)
+    {
+        Runs = Math.Max(0, Runs - 1);
+        int[] counts;
+        if (days.TryGetValue(Day(startedUtc), out counts))
+            counts[0] = Math.Max(0, counts[0] - 1);
+    }
+
+    public bool ResetStatistics()
+    {
+        if (Active != null || readOnly)
+            return false;
+        Runs = Finished = Deaths = Resets = TimedResets = 0;
+        TotalFinishedTime = TotalResetTime = 0;
+        FurthestProgress = 0;
+        days.Clear();
+        History.Clear();
+        QueueSave();
+        return true;
+    }
+
     private void LoadLegacyStats(string directory)
     {
         string legacy = Path.Combine(directory, "stats.txt");

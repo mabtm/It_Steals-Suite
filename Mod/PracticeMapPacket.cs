@@ -59,7 +59,7 @@ public sealed class PracticeMapData
                                                            new BinaryWriter(stream, Encoding.UTF8, true))
         {
             writer.Write(0x504D5349u);
-            writer.Write(13);
+            writer.Write(14);
             foreach (int i in new[] { Pid, Scene, Epoch, Seed, Recipe, SourceKind, Spawn, Keep, Flags, Stage,
                                       Requested, Completed, LiveSpawn, LiveSeed, LiveRecipe })
                 writer.Write(i);

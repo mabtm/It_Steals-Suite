@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.12.4](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.4)**
+**[v7.12.5](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.5)**
 
-- Improved code readability with named replay jobs and smaller menu and camera sections.
-- Removed duplicate validation code, redundant interface work, and an unused preview; related timing and input helpers now share fewer files.
-- Improved replay-package maintenance by keeping exporter and annotation compatibility in one table.
+- Improved Hide & Seek routing in both variants with captured collision floors, so gaps in the enemy NavMesh no longer cut off walkable connections.
+- Improved recorded-audio exports with one encoding pass, RGB UtVideo, and an AVI timing check before the file is saved. Export reports now include the container's frame count, FPS, and audio duration.
+- Fixed a bug caused by animation changes forcing pose samples across the whole scene; unchanged rotations now compress correctly, and the bounded visual recording can hold longer runs.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

@@ -8,7 +8,7 @@ inline constexpr const char *ExportPresetNames[] = {
     "Quick Preview", "Transparent Overlay", "GIF Loop", "Windows MP4",    "Custom"};
 inline constexpr const char *ExportPresetDescriptions[] = {
     "MP4 / x264, balanced quality and broad playback support.",
-    "AVI / UtVideo: exact RGB and alpha, fast lossless decoding. 30 / 60 / 120 "
+    "AVI / UtVideo: exact RGB, fast lossless decoding. 30 / 60 / 120 "
     "FPS.",
     "MKV / FFV1: exact RGB and alpha for archiving. Playback needs a capable "
     "decoder.",

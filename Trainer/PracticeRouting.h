@@ -289,11 +289,21 @@ class NavGraph
         pickupRegions = data.pickupRegions;
         catalogPositions = data.spawns;
         catalogPositions.insert(catalogPositions.end(), data.points.begin(), data.points.end());
+        auto capturedVertices = data.vertices;
+        auto capturedIndices = data.indices;
+        for (const auto &part : data.physicalParts)
+            if ((part.flags & 8) && part.points.size() >= 3)
+            {
+                int base = int(capturedVertices.size());
+                capturedVertices.insert(capturedVertices.end(), part.points.begin(), part.points.end());
+                for (size_t i = 2; i < part.points.size(); i++)
+                    capturedIndices.insert(capturedIndices.end(), {base, base + int(i - 1), base + int(i)});
+            }
         // Unity may return duplicated vertices at tile edges. Weld only equal
         // 3D positions, so different floors never become connected in X/Z.
         std::map<std::tuple<int64_t, int64_t, int64_t>, int> unique;
         std::vector<int> remap;
-        for (Vec3 v : data.vertices)
+        for (Vec3 v : capturedVertices)
         {
             auto key = std::make_tuple(std::llround(v.x * 10000), std::llround(v.y * 10000),
                                        std::llround(v.z * 10000));
@@ -304,13 +314,13 @@ class NavGraph
         }
         std::map<std::pair<int, int>, std::vector<int>> edges;
         std::set<std::array<int, 3>> uniqueTriangles;
-        for (size_t i = 0; i < data.indices.size(); i += 3)
+        for (size_t i = 0; i < capturedIndices.size(); i += 3)
         {
             if ((i & 1023) == 0 && canceled())
                 throw std::runtime_error("Canceled");
             Triangle t;
             for (int j = 0; j < 3; j++)
-                t.ids[j] = remap.at(data.indices[i + j]);
+                t.ids[j] = remap.at(capturedIndices[i + j]);
             auto key = t.ids;
             std::sort(key.begin(), key.end());
             if (!uniqueTriangles.insert(key).second)

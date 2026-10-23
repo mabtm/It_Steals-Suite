@@ -88,7 +88,7 @@ inline RecordingChannel CoverageChannel(const ReplayMotion &motion, const char *
     }
     out.status = RecordingStatus::Complete;
     out.detail = std::to_string(span.observations) + " observation checks / " + std::to_string(span.sources) +
-                 " sources. Complete at the recorded observation resolution.";
+                 " sources.";
     if (span.errors)
         RecordingIssue(out, std::to_string(span.errors) + " observation errors.");
     if (span.gapCount)
@@ -198,8 +198,10 @@ inline std::shared_ptr<const RecordingCheck> BuildRecordingCheck(const ReplayMot
     {
         sound.status = m.coverage.recorded ? RecordingStatus::Complete : RecordingStatus::Unknown;
         sound.detail = "Audio identity and full checksum verified. ";
-        sound.detail += m.coverage.recorded ? "No reported gaps or missing routes."
-                                            : "Historical recording without the current coverage checks.";
+        bool fullAudio = sound.through + 1.0 / std::max(1, audio.rate) + .000001 >= m.seconds;
+        sound.detail += !m.coverage.recorded ? "Historical recording without the current coverage checks."
+                        : !audio.flags && !audio.gaps && fullAudio ? "No reported gaps or missing routes."
+                                                                   : "Capture issues were reported.";
     }
     if (audio.recorded && (audio.flags || audio.gaps))
     {
@@ -216,6 +218,8 @@ inline std::shared_ptr<const RecordingCheck> BuildRecordingCheck(const ReplayMot
         if (audio.flags & 16)
             sound.detail += " Audio storage error.";
     }
+    if (!m.audioNotes.empty())
+        sound.detail += "\n" + m.audioNotes;
     if (audio.recorded && sound.through + 1.0 / std::max(1, audio.rate) + .000001 < m.seconds &&
         sound.status != RecordingStatus::Missing)
     {

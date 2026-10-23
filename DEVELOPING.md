@@ -24,6 +24,8 @@ Follow the owning component rather than adding a new layer for every change. Kee
 
 **PerformanceTiming.h** contains frame-cost and search-progress measurements. **MovementTiming.h** contains recorded movement analysis and travel-time estimates. Input colors live with their drawing helpers in **InputModules.h**.
 
+Map format 14 adds walkable collision-floor triangles alongside the existing NavMesh and obstacle capture. Input format 7 keeps bounded visual tracks and records explanations for missing audio routes. Both readers still accept previous formats; their original limits remain in place.
+
 <details>
 <summary><strong>Where to find the main systems</strong></summary>
 
@@ -53,7 +55,7 @@ Game, Unity, MelonLoader, and Harmony assemblies are local build inputs. Keep th
 
 ## Check a change
 
-Python 3 and a C++20 compiler run the native tests. `--ui` adds real ImGui interaction tests; `--managed` adds five C# contract programs and requires Mono's `mcs` and `mono`.
+Python 3 and a C++20 compiler run the native tests. `--ui` adds real ImGui interaction tests; `--managed` adds six C# contract programs and requires Mono's `mcs` and `mono`.
 
 ```sh
 python3 generate-layout.py --check
@@ -68,6 +70,8 @@ python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests 
 ```
 
 Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests.
+
+The Windows release job also encodes 653 distinct 1080p frames at 60 FPS with the supplied encoder, checks the AVI stream clocks, and decodes the recorded PCM for an exact comparison. To repeat it, run `python tests/verify_audio_exports.py build/verification/replay_experience_tests/work bin/PracticeSuiteEncoder.exe --avi-only`. If independent FFmpeg and ffprobe are installed, it also checks every video timestamp and decoded RGB frame.
 
 ## Check in game
 
@@ -90,7 +94,7 @@ Once the checks pass, capture real footage for the GitHub tour: seed search, rep
 
 ## Ship a release
 
-1. Change **SUITE_VERSION** and **SUITE_VERSION_COMPONENTS** in **Trainer/SuiteBranding.h** together; keep the previous exporter version in **ReplayPackage.h**'s compatibility table and its package-import regression test.
+1. Change **SUITE_VERSION** and **SUITE_VERSION_COMPONENTS** in **Trainer/SuiteBranding.h** together; keep the previous exporter version in **ReplayPackage.h**'s compatibility table and its package-import regression test. When changing the mod, also update **ItStealsMod.Version**, **SUITE_MOD_VERSION**, and the supplied DLL. Packaging checks the DLL's file version against that expected version.
 2. Add a short entry at the top of **CHANGELOG.md**, using the format below.
 3. Run `python repository.py sync`, check the changes, and push to **main**.
 4. Watch **Actions → Build and publish PracticeSuite**. Resolve failures before publishing another version.
@@ -120,7 +124,7 @@ For a local Windows package build, install **NSIS 3**, then run:
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
-Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.11.4**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
+Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.12.5**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
 Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
 

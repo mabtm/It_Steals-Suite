@@ -408,6 +408,12 @@ class Encoder
                         work.path = folder;
                     }
                     auto audioPath = work.path / L"audio.wav";
+                    if (withAudio)
+                    {
+                        phase = 5;
+                        RenderRecordedAudio(audioPath, options, source, abort);
+                        phase = 1;
+                    }
                     {
                         std::unique_ptr<GifWriter> gif;
                         std::unique_ptr<PngSequence> png;
@@ -429,7 +435,23 @@ class Encoder
                                 streamOptions.format = 4;
                                 streamOptions.maxFileBytes = 0;
                             }
-                            lossless = std::make_unique<LosslessWriter>(target, streamOptions, abort);
+                            if (withAudio && !options.maxFileBytes)
+                            {
+                                auto input = StreamInputArguments(streamOptions, true);
+                                auto codec = VideoCodecArguments(streamOptions);
+                                auto duration = AudioDurationArguments(streamOptions);
+                                std::wstring command = std::wstring(input.begin(), input.end()) + L"-i " +
+                                                       QuoteArgument(audioPath.wstring()) +
+                                                       L" -map 0:v:0 -map 1:a:0 " +
+                                                       std::wstring(codec.begin(), codec.end()) +
+                                                       AudioCodecArguments(streamOptions.format) +
+                                                       std::wstring(duration.begin(), duration.end()) +
+                                                       QuoteArgument(target.wstring());
+                                lossless = std::make_unique<LosslessWriter>(target, streamOptions, abort,
+                                                                            command, true);
+                            }
+                            else
+                                lossless = std::make_unique<LosslessWriter>(target, streamOptions, abort);
                         }
 #else
                         if (ExternalFormat(options.format))
@@ -489,11 +511,6 @@ class Encoder
                         {
                             if (written != options.Frames())
                                 throw std::runtime_error("Export ended before all frames were encoded");
-                            if (withAudio)
-                            {
-                                phase = 5;
-                                RenderRecordedAudio(audioPath, options, source, abort);
-                            }
                             if (gif)
                                 gif->Finish();
                             if (png)
@@ -570,7 +587,7 @@ class Encoder
                         }
                     }
 #ifdef _WIN32
-                    if (withAudio && !options.maxFileBytes)
+                    if (withAudio && !options.maxFileBytes && !ExternalFormat(options.format))
                     {
                         phase = 6;
                         auto video = work.path / (std::wstring(L"video") + Extension(options.format));
@@ -587,6 +604,8 @@ class Encoder
 #endif
                     if (abort)
                         throw std::runtime_error("Export cancelled");
+                    if (options.format == 4)
+                        VerifyAviTiming(temporary, options);
                     if (options.maxFileBytes && std::filesystem::file_size(temporary) > options.maxFileBytes)
                         throw std::runtime_error("Encoded file exceeds the size limit; "
                                                  "output was not published");

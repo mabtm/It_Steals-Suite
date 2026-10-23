@@ -30,6 +30,7 @@ public static class ReplayExperienceCapture
     private static ReplayExperienceData data;
     private static MouseLook player;
     private static readonly List<Animation> animations = new List<Animation>();
+    private static readonly HashSet<Transform> changedAnimators = new HashSet<Transform>();
     private static readonly HashSet<int> animators = new HashSet<int>(), skins = new HashSet<int>();
     private static readonly Dictionary<AnimationClip, int> clips = new Dictionary<AnimationClip, int>();
     private static readonly Dictionary<object, Component> contexts = new Dictionary<object, Component>();
@@ -77,6 +78,7 @@ public static class ReplayExperienceCapture
 
     public static void Stop()
     {
+        changedAnimators.Clear();
         detailUntil = 0;
         coverage = null;
         data = null;
@@ -198,6 +200,7 @@ public static class ReplayExperienceCapture
 
     public static bool Sample(double at, bool force = false)
     {
+        changedAnimators.Clear();
         if (data == null)
             return false;
         coverage.Spans[ReplayCoverage.Animation].Sources = animations.Count;
@@ -255,6 +258,7 @@ public static class ReplayExperienceCapture
                     {
                         f.Flags |= 2;
                         cut = true;
+                        changedAnimators.Add(a.Source.transform);
                         detailUntil = at + .2;
                     }
                     a.Source.GetCurrentAnimatorClipInfo(layer, a.Clips);
@@ -292,6 +296,14 @@ public static class ReplayExperienceCapture
             }
         }
         return cut;
+    }
+
+    public static bool PoseBoundary(Transform pose)
+    {
+        foreach (var root in changedAnimators)
+            if (pose == root || pose.IsChildOf(root))
+                return true;
+        return false;
     }
 
     public static void StateWritten(object value, bool enabled, string field)

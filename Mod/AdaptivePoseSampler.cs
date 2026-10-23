@@ -46,6 +46,12 @@ public sealed class AdaptivePoseSampler
         return a.x * (double)b.x + a.y * (double)b.y + a.z * (double)b.z + a.w * (double)b.w;
     }
 
+    private static double Cosine(Quaternion a, Quaternion b)
+    {
+        double norm = Dot(a, a) * Dot(b, b);
+        return norm > 0 ? Math.Min(1, Math.Abs(Dot(a, b)) / Math.Sqrt(norm)) : 0;
+    }
+
     public static Quaternion Rotation(Quaternion a, Quaternion b, double u)
     {
         double dot = Dot(a, b);
@@ -79,7 +85,7 @@ public sealed class AdaptivePoseSampler
     private static bool Same(ReplayVisualFrame a, ReplayVisualFrame b)
     {
         return Distance2(a.Position, b.Position) < 1e-10 && Distance2(a.Scale, b.Scale) < 1e-10 &&
-               Math.Abs(Dot(a.Rotation, b.Rotation)) > .9999999;
+               Cosine(a.Rotation, b.Rotation) > .9999999;
     }
 
     private static bool Finite(float n)
@@ -132,7 +138,7 @@ public sealed class AdaptivePoseSampler
             double u = (f.Seconds - anchor.Seconds) / dt;
             if (Distance2(f.Position, V(anchor.Position, end.Position, u)) > PositionError * PositionError ||
                 Distance2(f.Scale, V(anchor.Scale, end.Scale, u)) > ScaleError * ScaleError ||
-                Math.Abs(Dot(f.Rotation, Rotation(anchor.Rotation, end.Rotation, u))) < RotationDot)
+                Cosine(f.Rotation, Rotation(anchor.Rotation, end.Rotation, u)) < RotationDot)
                 return false;
         }
         return true;
@@ -173,8 +179,7 @@ public sealed class AdaptivePoseSampler
         }
         double dt = f.Seconds - previous.Seconds;
         double distance = Math.Sqrt(Distance2(previous.Position, f.Position));
-        double turn =
-            2 * Math.Acos(Math.Min(1, Math.Abs(Dot(previous.Rotation, f.Rotation)))) * 180 / Math.PI;
+        double turn = 2 * Math.Acos(Cosine(previous.Rotation, f.Rotation)) * 180 / Math.PI;
         bool cut = boundary || dt > .25 || distance > Math.Max(4, dt * 40);
         if (detail || cut || distance / dt > 4 || turn / dt > 120 ||
             Math.Sqrt(Distance2(previous.Scale, f.Scale)) / dt > .2)
@@ -182,7 +187,7 @@ public sealed class AdaptivePoseSampler
         if (cut)
         {
             Flush();
-            if (anchor.Seconds < previous.Seconds)
+            if (anchor.Seconds < previous.Seconds && !Same(previous, f))
                 Emit(previous);
             Emit(f);
             previous = f;

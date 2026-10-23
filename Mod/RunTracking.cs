@@ -128,6 +128,15 @@ public sealed class RunTracker
 
     private RunAids lastFeatures;
 
+    public bool ResetStatistics()
+    {
+        if (!store.ResetStatistics())
+            return false;
+        SessionAttempts = SessionCompleted = SessionResets = 0;
+        Last = null;
+        return true;
+    }
+
     public bool Begin(int scene, long utcTicks, RunAids aids, SeedEvidence seed,
                       RunEnvironment environment = null, bool exportReport = false,
                       bool observedFromStart = true)
@@ -253,6 +262,13 @@ public sealed class RunTracker
         RunRecord record = Active;
         record.EndedUtc = Math.Max(record.StartedUtc, utcTicks);
         record.Outcome = outcome;
+        bool quickReset = (outcome == RunOutcome.Reset || outcome == RunOutcome.Interrupted) &&
+                          record.Seconds < 1 && record.Progress <= 0;
+        if (quickReset)
+        {
+            store.UncountAttempt(record.StartedUtc);
+            SessionAttempts = Math.Max(0, SessionAttempts - 1);
+        }
         if (outcome == RunOutcome.Completed)
         {
             record.Progress = 1;
@@ -266,7 +282,7 @@ public sealed class RunTracker
             if (RunValidity.Eligible(record))
                 record.PersonalBest = store.RecordBest(record.Scene, record.Seconds);
         }
-        bool reset = outcome == RunOutcome.Reset || outcome == RunOutcome.Death;
+        bool reset = !quickReset && (outcome == RunOutcome.Reset || outcome == RunOutcome.Death);
         if (reset)
         {
             if (store.Resets < int.MaxValue)
@@ -282,7 +298,8 @@ public sealed class RunTracker
         store.FurthestProgress = Math.Max(store.FurthestProgress, record.Progress);
         store.CountDay(utcTicks, false, outcome == RunOutcome.Completed, reset);
         Event("RunEnd", outcome.ToString());
-        store.AddHistory(record);
+        if (!quickReset)
+            store.AddHistory(record);
         Last = record;
         store.Active = null;
         store.QueueSave();

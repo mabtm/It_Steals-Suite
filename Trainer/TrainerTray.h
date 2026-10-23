@@ -7,6 +7,84 @@
 #include <string_view>
 #include "SuiteBranding.h"
 
+// Independent of the game's owned overlay: it can finish after that HWND dies.
+inline void ShowSuiteExitGraphic(bool enabled, bool motion, COLORREF background, COLORREF accent,
+                                 COLORREF ink, float scale)
+{
+    if (!enabled)
+        return;
+    HINSTANCE instance = GetModuleHandleW(nullptr);
+    HBRUSH fill = CreateSolidBrush(background), edge = CreateSolidBrush(accent);
+    WNDCLASSW wc{};
+    wc.lpfnWndProc = DefWindowProcW;
+    wc.hInstance = instance;
+    wc.lpszClassName = L"PracticeSuite.Exit";
+    wc.hbrBackground = fill;
+    if (!RegisterClassW(&wc))
+    {
+        DeleteObject(fill);
+        DeleteObject(edge);
+        return;
+    }
+    RECT work{};
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    int width = int(460 * scale), height = int(138 * scale);
+    HWND window = CreateWindowExW(
+        WS_EX_LAYERED | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT, wc.lpszClassName,
+        L"PracticeSuite", WS_POPUP, work.left + (work.right - work.left - width) / 2,
+        work.top + (work.bottom - work.top - height) / 2, width, height, nullptr, nullptr, instance, nullptr);
+    if (window)
+    {
+        HFONT title = CreateFontW(-int(24 * scale), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                                  DEFAULT_PITCH, L"Segoe UI");
+        HFONT body = CreateFontW(-int(15 * scale), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                                 OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH,
+                                 L"Segoe UI");
+        SetLayeredWindowAttributes(window, 0, motion ? 0 : 255, LWA_ALPHA);
+        ShowWindow(window, SW_SHOWNOACTIVATE);
+        ULONGLONG started = GetTickCount64();
+        while (IsWindow(window) && GetTickCount64() - started < 650)
+        {
+            auto elapsed = GetTickCount64() - started;
+            if (motion)
+                SetLayeredWindowAttributes(
+                    window, 0,
+                    BYTE(255 * std::clamp(std::min(elapsed / 100., (650 - elapsed) / 180.), 0., 1.)),
+                    LWA_ALPHA);
+            HDC dc = GetDC(window);
+            RECT bounds{0, 0, width, height}, stripe{0, 0, int(5 * scale), height};
+            FillRect(dc, &bounds, fill);
+            FillRect(dc, &stripe, edge);
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, ink);
+            auto original = SelectObject(dc, title);
+            RECT line{int(28 * scale), int(25 * scale), width - int(20 * scale), int(66 * scale)};
+            DrawTextW(dc, L"PRACTICE SUITE", -1, &line, DT_SINGLELINE | DT_NOPREFIX);
+            SelectObject(dc, body);
+            SetTextColor(dc, accent);
+            line.top = int(77 * scale);
+            line.bottom = height;
+            DrawTextW(dc, L"Session closed. See you next run.", -1, &line, DT_SINGLELINE | DT_NOPREFIX);
+            SelectObject(dc, original);
+            ReleaseDC(window, dc);
+            MSG message{};
+            while (PeekMessageW(&message, window, 0, 0, PM_REMOVE))
+            {
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+            Sleep(16);
+        }
+        DestroyWindow(window);
+        DeleteObject(title);
+        DeleteObject(body);
+    }
+    UnregisterClassW(wc.lpszClassName, instance);
+    DeleteObject(fill);
+    DeleteObject(edge);
+}
+
 // A stable control window survives game/overlay recreation. It never covers
 // the game and gives a waiting trainer an explicit, reachable Exit command.
 class TrainerTray

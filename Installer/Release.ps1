@@ -14,6 +14,11 @@ $OutputDir = [IO.Path]::GetFullPath($OutputDir)
 $header = [IO.File]::ReadAllText((Join-Path $root 'Trainer/SuiteBranding.h'))
 $version = [regex]::Match($header, '#define SUITE_VERSION "(\d+\.\d+\.\d+)"').Groups[1].Value
 if (-not $version) { throw 'Suite version is missing.' }
+$modVersion = [regex]::Match($header, '#define SUITE_MOD_VERSION "(\d+\.\d+\.\d+)"').Groups[1].Value
+if (-not $modVersion) { throw 'Expected game mod version is missing.' }
+$modBinary = Join-Path $root 'bin/ItStealsHelper.dll'
+$modBinaryVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($modBinary).FileVersion
+if ($modBinaryVersion -ne "$modVersion.0") { throw "Game mod version $modBinaryVersion does not match expected $modVersion.0." }
 if (-not $SourceCommit) {
     $SourceCommit = & git -C $root rev-parse HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Source commit is required.' }
@@ -56,7 +61,7 @@ try {
         version = $version
         author = 'mab'
         sourceCommit = $SourceCommit
-        modVersion = '7.11.4'
+        modVersion = $modVersion
         trainerSha256 = (Get-FileHash -LiteralPath $TrainerBinary -Algorithm SHA256).Hash.ToLowerInvariant()
         modSha256 = (Get-FileHash -LiteralPath (Join-Path $payload 'ItStealsHelper.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
         encoderSha256 = $encoderHash

@@ -46,8 +46,8 @@ public sealed class ReplayVisualOwner
 
 public sealed class ReplayVisualData
 {
-    public const int MaxOwners = 512, MaxTracks = 8192, MaxSamples = 393216, MaxAssets = 4096,
-                     MaxWire = 24 * 1024 * 1024;
+    public const int MaxOwners = 512, MaxTracks = 8192, MaxSamples = 1048576, MaxAssets = 4096,
+                     MaxWire = 64 * 1024 * 1024;
     public bool Recorded, Full;
     public int Dropped, Count, TrackCount;
     private int estimated = 64;
@@ -260,7 +260,7 @@ public sealed class ReplayVisualData
         return new Color(N(r), N(r), N(r), N(r));
     }
 
-    public static ReplayVisualData Read(BinaryReader r, double duration)
+    public static ReplayVisualData Read(BinaryReader r, double duration, int inputFormat = 7)
     {
         long start = r.BaseStream.Position;
         var d = new ReplayVisualData();
@@ -299,7 +299,7 @@ public sealed class ReplayVisualData
                     throw new InvalidDataException("Invalid visual track");
                 d.TrackCount++;
                 o.Tracks.Add(t);
-                int frames = Size(r, MaxSamples - d.Count);
+                int frames = Size(r, (inputFormat >= 7 ? MaxSamples : 393216) - d.Count);
                 double previous = -1;
                 for (int k = 0; k < frames; k++)
                 {
@@ -341,12 +341,12 @@ public sealed class ReplayVisualData
                     }
                     t.Frames.Add(f);
                     d.Count++;
-                    if (r.BaseStream.Position - start > MaxWire)
+                    if (r.BaseStream.Position - start > (inputFormat >= 7 ? MaxWire : 24 * 1024 * 1024))
                         throw new InvalidDataException("Visual recording exceeds byte limit");
                 }
             }
         }
-        if (r.BaseStream.Position - start > MaxWire)
+        if (r.BaseStream.Position - start > (inputFormat >= 7 ? MaxWire : 24 * 1024 * 1024))
             throw new InvalidDataException("Visual recording exceeds byte limit");
         if (!d.Recorded && (d.Count != 0 || d.Owners.Count != 0))
             throw new InvalidDataException("Unexpected visual observations");

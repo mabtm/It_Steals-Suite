@@ -9,6 +9,7 @@ namespace UnityEngine
 {
 public class Object
 {
+    public string name = "Audio source";
     public static readonly List<Object> All = new List<Object>();
     public static T[] FindObjectsOfType<T>(bool inactive = false)
         where T : Object
@@ -93,6 +94,15 @@ public class AudioSource : Component
     public float volume = 1, spatialBlend, panStereo;
 }
 
+public class AudioLowPassFilter : Component
+{
+}
+
+public class CustomFilter : MonoBehaviour
+{
+    private void OnAudioFilterRead(float[] data, int channels) {}
+}
+
 public static class Application
 {
     public static string dataPath = "/game/It Steals_Data";
@@ -155,7 +165,7 @@ public class ReplayMotionData
 {
     public long Id = 1;
     public int Scene = 3, Seed = 42;
-    public string Hash = "hash";
+    public string Hash = "hash", AudioNotes = "";
     public ReplayAudioSession AudioSession;
     public ReplayExperienceData Experience = new ReplayExperienceData();
 }
@@ -165,6 +175,8 @@ public class ReplayAudioSession
     public readonly ReplayAudioInfo Info = new ReplayAudioInfo();
     public bool Done, Discarded;
     public int MainCalls, LaneCount;
+    public readonly List<long> Starts = new List<long>();
+    public readonly List<int> Counts = new List<int>();
     public long First;
     public double Ended = -1;
 
@@ -179,10 +191,12 @@ public class ReplayAudioSession
         return new ReplayAudioLane();
     }
 
-    public void Push(float[] data, int channels, long first)
+    public void Push(float[] data, int channels, long first, int count = -1)
     {
         MainCalls++;
         First = first;
+        Starts.Add(first);
+        Counts.Add(count < 0 ? data.Length : count);
     }
 
     public void MissingRoute()
@@ -207,7 +221,7 @@ public class ReplayAudioLane
     public float Gain;
     public long First;
 
-    public void Push(float[] data, int channels, long first, float gain)
+    public void Push(float[] data, int channels, long first, float gain, int count = -1)
     {
         Calls++;
         Gain = gain;
@@ -255,13 +269,27 @@ public static class ReplayAudioCaptureTests
         var motion = new ReplayMotionData();
         ReplayAudioCapture.Begin(motion, player);
         var session = motion.AudioSession;
-        Check(session != null && ReplayAudioCapture.BypassSources == 1 && session.LaneCount == 1,
+        Check(session != null && ReplayAudioCapture.BypassSources == 2 && session.LaneCount == 2,
               "GetPoints route observed once; normal and mixer buses are never duplicated");
         Check(session.Info.Flags == 0, "unused unsupported sources do not claim missing audible samples");
         ReplayAudioCapture.Track(spatial);
         Check(session.Info.Flags == 4 && spatial.GetComponent<ReplayAudioTap>() == null &&
-                  effectsOff.GetComponent<ReplayAudioTap>() == null,
-              "unobservable 3D/disabled effects remain explicit and are never approximated");
+                  effectsOff.GetComponent<ReplayAudioTap>() != null && !effectsOff.bypassEffects,
+              "filterless bypass is captured; spatial mixes retain an explicit missing route");
+        Check(motion.AudioNotes.Contains("Audio source: listener bypass"),
+              "an unobservable audible source has a readable name and reason");
+        var filtered = Source(true);
+        filtered.bypassEffects = true;
+        filtered.gameObject.AddComponent<AudioLowPassFilter>();
+        var custom = Source(true);
+        custom.bypassEffects = true;
+        custom.gameObject.AddComponent<CustomFilter>();
+        ReplayAudioCapture.Track(filtered);
+        ReplayAudioCapture.Track(custom);
+        Check(filtered.bypassEffects && custom.bypassEffects &&
+                  filtered.GetComponent<ReplayAudioTap>() == null &&
+                  custom.GetComponent<ReplayAudioTap>() == null,
+              "capture never enables existing source filters or custom DSP");
         Check(normal.GetComponent<ReplayAudioTap>() == null && mixed.GetComponent<ReplayAudioTap>() == null,
               "only the bypass source receives a tap");
         var tap = pickup.GetComponent<ReplayAudioTap>();
@@ -276,7 +304,7 @@ public static class ReplayAudioCaptureTests
         for (int n = 0; n < block.Length; n++)
             Check(block[n] == copy[n], "audio callbacks must be pass-through");
         ReplayAudioCapture.Track(pickup);
-        Check(session.LaneCount == 1, "repeated original Play hooks do not duplicate capture");
+        Check(session.LaneCount == 2, "repeated original Play hooks do not duplicate capture");
         pickup.mute = true;
         ReplayAudioCapture.Sync(2);
         Callback(tap, block);
@@ -301,7 +329,7 @@ public static class ReplayAudioCaptureTests
               "published clock corrections reach every tap atomically");
         var dynamic = Source(true);
         ReplayAudioCapture.Track(dynamic);
-        Check(session.LaneCount == 2, "new source tracked before original Play");
+        Check(session.LaneCount == 3, "new source tracked before original Play");
         ReplayAudioCapture.Finish(2.25);
         ReplayAudioCapture.Stop();
         Check(session.Ended == 2.25 && !session.Discarded, "finish retains routes for final DSP blocks");
@@ -311,6 +339,33 @@ public static class ReplayAudioCaptureTests
                   spatial.spatialBlend == 1 && effectsOff.bypassEffects &&
                   mixed.outputAudioMixerGroup != null,
               "all original audio settings remain intact");
+        // The callback preceding run setup can overlap time zero. Its real
+        // sample count and negative offset must survive the fixed-size history.
+        ReplayAudioCapture.Prepare(player);
+        var listenerTap = go.GetComponent<ReplayAudioTap>();
+        AudioSettings.dspTime = 20;
+        Callback(listenerTap, new float[2048]);
+        SpeedrunManager.Instance.CurrentSeconds = .005;
+        AudioSettings.dspTime = 20.01;
+        var warm = new ReplayMotionData { Id = 2 };
+        ReplayAudioCapture.Begin(warm, player);
+        var warmSession = warm.AudioSession;
+        Callback(listenerTap, new float[2048]);
+        Check(warmSession.MainCalls == 2 && warmSession.Starts[0] == -240 && warmSession.Starts[1] == 240 &&
+                  warmSession.Counts[0] == 2048,
+              "prewarmed PCM crossing run start retains sample offsets and actual block length");
+        var muted = Source(true);
+        muted.spatialize = muted.mute = true;
+        var silent = Source(true);
+        silent.spatialBlend = 1;
+        silent.volume = 0;
+        ReplayAudioCapture.Track(muted);
+        ReplayAudioCapture.Track(silent);
+        Check(warmSession.Info.Flags == 0 && warm.AudioNotes.Length == 0,
+              "inaudible unsupported sources do not claim recording gaps");
+        ReplayAudioCapture.Stop();
+        Check(effectsOff.bypassEffects && filtered.bypassEffects && custom.bypassEffects,
+              "prepared source flags are restored without enabling existing DSP");
         Console.WriteLine(
             "Production capture adapter: actual GetPoints bypass configuration, shared DSP timestamps, pass-through PCM, source/mixer deduplication, live mute/gain/routing, closing blocks and untouched game settings: PASS");
         return 0;

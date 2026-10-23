@@ -52,7 +52,7 @@ public static class ReplayInputCapture
 
     public static void Begin(PracticeMapData map, MouseLook mouse, RunRecord record)
     {
-        Stop();
+        Stop(true);
         if (map == null || map.Review == null || mouse == null)
             return;
         player = mouse;
@@ -61,7 +61,7 @@ public static class ReplayInputCapture
         horizontal = vertical = mx = my = jx = jy = 0;
         var e = record.Environment;
         active = new ReplayMotionData { Id = record.Id, Scene = map.Scene, Seed = map.Seed, Hash = map.Hash };
-        active.Info.Tool = e == null ? "7.11.4" : e.ToolVersion;
+        active.Info.Tool = e == null ? ItStealsMod.Version : e.ToolVersion;
         active.Info.Game = e == null ? "" : e.GameVersion;
         active.Info.Unity = e == null ? "" : e.UnityVersion;
         map.Review.Motion = active.Info;
@@ -74,22 +74,22 @@ public static class ReplayInputCapture
         LiveInputCapture.BeginRun();
         keys = KeyMask();
         active.Add(new ReplayInputEvent { Seconds = 0, Frame = 0, Tick = 0, Keys = keys, State = State });
+        ReplayAudioCapture.Begin(active, player);
         ReplayExperienceCapture.Begin(active, player);
         ReplayColliderCapture.Begin(active, player, map);
         ReplayVisualCapture.Begin(active, player, map);
-        ReplayAudioCapture.Begin(active, player);
         Camera.onPreCull += CameraFrame;
         Capture(PlayerContext.View(player), 0);
     }
 
-    public static void Stop()
+    public static void Stop(bool keepAudioPrepared = false)
     {
         Camera.onPreCull -= CameraFrame;
         inside = false;
         ReplayColliderCapture.Stop();
         ReplayVisualCapture.Stop();
         ReplayExperienceCapture.Stop();
-        ReplayAudioCapture.Stop();
+        ReplayAudioCapture.Stop(keepAudioPrepared);
         active = null;
         player = null;
     }
