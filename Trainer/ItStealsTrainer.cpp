@@ -1089,50 +1089,6 @@ std::string BuildDiagnostics()
     return out.str();
 }
 
-DiagnosticInputs CaptureDiagnosticInputs()
-{
-    DiagnosticInputs in;
-    in.data = g_pShared;
-    in.age = SnapshotAge();
-    in.menuP95 = g_menuFrameCost.P95();
-    in.hudP95 = g_hudFrameCost.P95();
-    in.software = g_softwareRenderer;
-    in.menuRequested = MenuInputRequested();
-    in.mapRequested = g_showMinimapWindow && !(g_speedrunMode && !g_practiceMode);
-    in.sounds = suite_ui::preferences.sounds;
-    in.audioStatus = g_interfaceAudio.Status();
-    in.settingsError = g_settings.error;
-    in.replayError = practice::g_replayArchive.Get()->error;
-    auto map = g_mapWorker.Get(g_pShared ? MapLevelIndex(g_pShared->currentSceneIndex) : -1);
-    in.mapReady = map && map->data && g_pShared && map->live &&
-                  map->data->epoch == int(g_pShared->sceneEpoch) && map->session == g_session;
-    auto displayed = DisplayedPlanner(g_plannerOptions.level);
-    if (displayed && displayed->data)
-    {
-        in.routeKnown = displayed->data->spawn >= 0 && !displayed->data->selected.empty();
-        in.routeWorking = displayed->working;
-        in.routeComplete = displayed->route.complete;
-        in.routeEstimated = displayed->route.estimated;
-        in.routeDetail = displayed->error.empty() ? displayed->route.message : displayed->error;
-        in.omittedGeometry = displayed->data->physicalOmitted;
-        for (const auto &part : displayed->data->physicalParts)
-            in.floorTriangles += (part.flags & 8) != 0;
-    }
-    auto search = g_seedSearch.Get();
-    in.searchActive = search->Busy();
-    in.checkedSeeds = search->evaluated;
-    in.searchResults = int(search->top.size());
-    in.searchRate = search->recentChecked;
-    auto motion = practice::g_replayArchive.Motion();
-    if (motion)
-    {
-        in.recordingRun = motion->id;
-        in.recording = practice::RecordingCheckFor(*motion);
-    }
-    in.exportError = suite_clip::error;
-    return in;
-}
-
 void SyncCommands(bool visible)
 {
     if (suite_ui::lifecycle.Exiting())
@@ -1302,6 +1258,50 @@ double SnapshotAge()
 
 #include "TrainerUI.h"
 #include "ClipRuntime.h"
+
+DiagnosticInputs CaptureDiagnosticInputs()
+{
+    DiagnosticInputs in;
+    in.data = g_pShared;
+    in.age = SnapshotAge();
+    in.menuP95 = g_menuFrameCost.P95();
+    in.hudP95 = g_hudFrameCost.P95();
+    in.software = g_softwareRenderer;
+    in.menuRequested = MenuInputRequested();
+    in.mapRequested = g_showMinimapWindow && !(g_speedrunMode && !g_practiceMode);
+    in.sounds = suite_ui::preferences.sounds;
+    in.audioStatus = g_interfaceAudio.Status();
+    in.settingsError = g_settings.error;
+    in.replayError = practice::g_replayArchive.Get()->error;
+    auto map = g_mapWorker.Get(g_pShared ? MapLevelIndex(g_pShared->currentSceneIndex) : -1);
+    in.mapReady = map && map->data && g_pShared && map->live &&
+                  map->data->epoch == int(g_pShared->sceneEpoch) && map->session == g_session;
+    auto displayed = DisplayedPlanner(g_plannerOptions.level);
+    if (displayed && displayed->data)
+    {
+        in.routeKnown = displayed->data->spawn >= 0 && !displayed->data->selected.empty();
+        in.routeWorking = displayed->working;
+        in.routeComplete = displayed->route.complete;
+        in.routeEstimated = displayed->route.estimated;
+        in.routeDetail = displayed->error.empty() ? displayed->route.message : displayed->error;
+        in.omittedGeometry = displayed->data->physicalOmitted;
+        for (const auto &part : displayed->data->physicalParts)
+            in.floorTriangles += (part.flags & 8) != 0;
+    }
+    auto search = g_seedSearch.Get();
+    in.searchActive = search->Busy();
+    in.checkedSeeds = search->evaluated;
+    in.searchResults = int(search->top.size());
+    in.searchRate = search->recentChecked;
+    auto motion = practice::g_replayArchive.Motion();
+    if (motion)
+    {
+        in.recordingRun = motion->id;
+        in.recording = practice::RecordingCheckFor(*motion);
+    }
+    in.exportError = suite_clip::error;
+    return in;
+}
 
 void ReleaseSurface()
 {
