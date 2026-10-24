@@ -184,6 +184,7 @@ struct ReplayPackageExporter
 
 inline constexpr ReplayPackageExporter ReplayPackageExporters[] = {
     {suite_brand::Version, true},
+    {"7.13.1", true},
     {"7.13.0", true},
     {"7.12.6", true},
     {"7.12.5", true},

@@ -97,6 +97,18 @@ def check():
     mod = re.search(r'public const string Version = "(' + VERSION + r')"', mod_source)
     if not expected_mod or not mod or mod[1] != expected_mod[1]:
         raise ValueError("The game mod source does not match SUITE_MOD_VERSION")
+    package = (ROOT / "Trainer/ReplayPackage.h").read_text(encoding="utf-8")
+    compatible = set(re.findall(r'\{"(' + VERSION + r')",\s*(?:true|false)\}', package))
+    required = {
+        previous
+        for previous in history()
+        if previous != version and tuple(map(int, previous.split("."))) >= (7, 2, 0)
+    }
+    if required - compatible:
+        raise ValueError(
+            "Missing replay package compatibility: "
+            + ", ".join(sorted(required - compatible))
+        )
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     if spotlight() not in readme:
         raise ValueError("Release spotlight is stale; run python repository.py sync")
