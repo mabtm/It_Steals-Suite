@@ -71,7 +71,7 @@ python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests 
 
 Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests.
 
-The Windows release job also encodes 653 distinct 1080p frames at 60 FPS with the supplied encoder, checks the AVI stream clocks, and decodes the recorded PCM for an exact comparison. To repeat it, run `python tests/verify_audio_exports.py build/verification/replay_experience_tests/work bin/PracticeSuiteEncoder.exe --avi-only`. If independent FFmpeg and ffprobe are installed, it also checks every video timestamp and decoded RGB frame.
+The Windows release job also encodes 1080p clips at 60 FPS (653 frames) and 120 FPS (587 frames) with the supplied encoder, checks the AVI stream clocks, and decodes the recorded PCM for an exact comparison. Moving RGB bars exercise frame order and spatial detail. To repeat it, run `python tests/verify_audio_exports.py build/verification/replay_experience_tests/work bin/PracticeSuiteEncoder.exe --avi-only`. If independent FFmpeg and ffprobe are installed, it also checks every video timestamp and decoded RGB frame. These checks verify encoded files; they do not measure playback speed in a user's media player.
 
 ## Check in game
 

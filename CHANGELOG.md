@@ -2,6 +2,12 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.12.6 Changelog
+
+- Improved the exit graphic with an extra second on screen.
+- Improved export reports with the actual average data rate, calculated from file size and duration.
+- Improved AVI verification with moving-image tests at 1080p60 and 1080p120, including frame timing and exact recorded-audio checks.
+
 ### v7.12.5 Changelog
 
 - Improved Hide & Seek routing in both variants with captured collision floors, so gaps in the enemy NavMesh no longer cut off walkable connections.

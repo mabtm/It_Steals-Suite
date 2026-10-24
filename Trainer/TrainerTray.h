@@ -44,13 +44,15 @@ inline void ShowSuiteExitGraphic(bool enabled, bool motion, COLORREF background,
         SetLayeredWindowAttributes(window, 0, motion ? 0 : 255, LWA_ALPHA);
         ShowWindow(window, SW_SHOWNOACTIVATE);
         ULONGLONG started = GetTickCount64();
-        while (IsWindow(window) && GetTickCount64() - started < 650)
+        constexpr ULONGLONG duration = 1650;
+        while (IsWindow(window) && GetTickCount64() - started < duration)
         {
             auto elapsed = GetTickCount64() - started;
             if (motion)
                 SetLayeredWindowAttributes(
                     window, 0,
-                    BYTE(255 * std::clamp(std::min(elapsed / 100., (650 - elapsed) / 180.), 0., 1.)),
+                    BYTE(255 *
+                         std::clamp(std::min(elapsed / 100., (double(duration) - elapsed) / 180.), 0., 1.)),
                     LWA_ALPHA);
             HDC dc = GetDC(window);
             RECT bounds{0, 0, width, height}, stripe{0, 0, int(5 * scale), height};

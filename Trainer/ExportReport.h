@@ -144,6 +144,7 @@ inline void WriteExportReport(const std::filesystem::path &output, const Options
         return;
     file.imbue(std::locale::classic());
     file << std::setprecision(17);
+    const auto bytes = o.format == 3 ? uint64_t(0) : std::filesystem::file_size(output);
     file << "{\n  \"version\": \"" << suite_brand::Version << "\",\n  \"run\": " << source.run
          << ",\n  \"seed\": " << source.seed << ",\n  \"format\": " << o.format
          << ",\n  \"preset\": " << o.preset << ",\n  \"width\": " << o.width
@@ -153,8 +154,8 @@ inline void WriteExportReport(const std::filesystem::path &output, const Options
          << ",\n  \"defaultPlaybackSpeed\": " << o.rate
          << ",\n  \"speedKeypointsApplied\": " << ((o.speedKeys && o.timing) ? "true" : "false")
          << ",\n  \"firstSourceTime\": " << o.At(0) << ",\n  \"lastSourceTime\": " << o.At(o.Frames() - 1)
-         << ",\n  \"sizeLimitBytes\": " << o.maxFileBytes
-         << ",\n  \"actualBytes\": " << (o.format == 3 ? 0 : std::filesystem::file_size(output))
+         << ",\n  \"sizeLimitBytes\": " << o.maxFileBytes << ",\n  \"actualBytes\": " << bytes
+         << ",\n  \"averageDataMegabytesPerSecond\": " << double(bytes) / EncodedSeconds(o) / 1000000.
          << ",\n  \"exportWallSeconds\": " << wallSeconds
          << ",\n  \"audio\": " << (o.AudioEnabled() ? "true" : "false")
          << ",\n  \"audioSourceFlags\": " << source.audio.flags

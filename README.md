@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.12.5](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.5)**
+**[v7.12.6](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.6)**
 
-- Improved Hide & Seek routing in both variants with captured collision floors, so gaps in the enemy NavMesh no longer cut off walkable connections.
-- Improved recorded-audio exports with one encoding pass, RGB UtVideo, and an AVI timing check before the file is saved. Export reports now include the container's frame count, FPS, and audio duration.
-- Fixed a bug caused by animation changes forcing pose samples across the whole scene; unchanged rotations now compress correctly, and the bounded visual recording can hold longer runs.
+- Improved the exit graphic with an extra second on screen.
+- Improved export reports with the actual average data rate, calculated from file size and duration.
+- Improved AVI verification with moving-image tests at 1080p60 and 1080p120, including frame timing and exact recorded-audio checks.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

@@ -153,23 +153,30 @@ int main(int argc, char **argv)
             args << LosslessArguments(o);
     }
     {
-        Options clock;
-        clock.a = 16.039872630928851;
-        clock.b = 26.909847730928828;
-        clock.width = 1920;
-        clock.height = 1080;
-        clock.fps = 60;
-        clock.format = 4;
-        clock.audio = true;
-        assert(clock.Frames() == 653);
-        auto codec = AudioCodecArguments(clock.format);
         std::ofstream plan(out / "clock-arguments.json");
-        plan << "{\"width\":" << clock.width << ",\"height\":" << clock.height << ",\"fps\":" << clock.fps
-             << ",\"frames\":" << clock.Frames()
-             << ",\"input\":" << std::quoted(StreamInputArguments(clock, true)) << ",\"output\":"
-             << std::quoted(VideoCodecArguments(clock) + std::string(codec.begin(), codec.end()) +
-                            AudioDurationArguments(clock))
-             << "}";
+        plan << '[';
+        for (int fps : {60, 120})
+        {
+            Options clock;
+            clock.a = fps == 60 ? 16.039872630928851 : 45.712109447483272;
+            clock.b = fps == 60 ? 26.909847730928828 : 50.602426142458171;
+            clock.width = 1920;
+            clock.height = 1080;
+            clock.fps = fps;
+            clock.format = 4;
+            clock.audio = true;
+            assert(clock.Frames() == (fps == 60 ? 653 : 587));
+            auto codec = AudioCodecArguments(clock.format);
+            if (fps != 60)
+                plan << ',';
+            plan << "{\"width\":" << clock.width << ",\"height\":" << clock.height << ",\"fps\":" << clock.fps
+                 << ",\"frames\":" << clock.Frames()
+                 << ",\"input\":" << std::quoted(StreamInputArguments(clock, true)) << ",\"output\":"
+                 << std::quoted(VideoCodecArguments(clock) + std::string(codec.begin(), codec.end()) +
+                                AudioDurationArguments(clock))
+                 << '}';
+        }
+        plan << ']';
     }
     // Full worker path: preserve the companion through Save, ZIP import and staging.
     auto original = out / "original";

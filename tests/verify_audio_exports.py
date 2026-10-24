@@ -18,7 +18,7 @@ parser.add_argument("ffmpeg", type=Path, help="encoder built from Encoder source
 parser.add_argument(
     "--avi-only",
     action="store_true",
-    help="check the 653-frame 1080p60 export with recorded audio",
+    help="check 1080p60 and 1080p120 exports with recorded audio",
 )
 args = parser.parse_args()
 ff = args.ffmpeg.resolve()
@@ -43,18 +43,19 @@ def wave_data(path):
     )
 
 
-def verify_clock():
-    plan = json.loads((out / "clock-arguments.json").read_text())
+def verify_clock(plan):
     width, height, fps, frames = (
         plan[key] for key in ("width", "height", "fps", "frames")
     )
-    assert (width, height, fps, frames) == (1920, 1080, 60, 653)
+    assert (width, height) == (1920, 1080)
+    assert (fps, frames) in ((60, 653), (120, 587))
+    label = f"clock-1080p{fps}"
     samples = round(frames * 48000 / fps)
     pcm = b"".join(
         struct.pack("<ff", math.sin(n * 0.037) * 0.25, ((n % 997) / 997 - 0.5) * 0.3)
         for n in range(samples)
     )
-    wave = out / "clock-audio.wav"
+    wave = out / f"{label}-audio.wav"
     wave.write_bytes(
         struct.pack(
             "<4sI4s4sIHHIIHH4sI",
@@ -74,7 +75,7 @@ def verify_clock():
         )
         + pcm
     )
-    final = out / "clock-1080p60.avi"
+    final = out / f"{label}.avi"
     command = [
         str(ff),
         *shlex.split(plan["input"]),
@@ -88,21 +89,29 @@ def verify_clock():
         str(final),
     ]
     hashes = []
-    with (out / "clock-encoder.log").open("wb") as log:
+    with (out / f"{label}-encoder.log").open("wb") as log:
         process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=log
         )
         try:
             for n in range(frames):
-                # Every frame has a unique RGB value; the lossless decoder must preserve its position.
-                frame = bytes((n & 255, (n >> 8) & 255, (n * 37) & 255, 255)) * (
-                    width * height
+                # Moving bars exercise spatial detail as well as exact frame order.
+                row = bytes(
+                    value
+                    for x in range(width)
+                    for value in (
+                        (x + n) & 255,
+                        (x // 4 + (n >> 8)) & 255,
+                        (x // 16 + n * 37) & 255,
+                        255,
+                    )
                 )
+                frame = row * height
                 hashes.append(hashlib.md5(frame).hexdigest())
                 process.stdin.write(frame)
             process.stdin.close()
             assert process.wait(timeout=120) == 0, (
-                out / "clock-encoder.log"
+                out / f"{label}-encoder.log"
             ).read_text()
         finally:
             if process.poll() is None:
@@ -128,7 +137,7 @@ def verify_clock():
     audio = next(s for s in streams if s[0] == b"auds")
     assert video[2] / video[1] == fps and video[3] == 0 and video[4] == frames, video
     assert audio[3] == 0 and audio[4] * audio[1] / audio[2] == samples / 48000, audio
-    decoded = out / "clock-decoded.wav"
+    decoded = out / f"{label}-decoded.wav"
     subprocess.run(
         [
             str(ff),
@@ -176,7 +185,7 @@ def verify_clock():
                 ]
             )
         )
-        assert probe["streams"][0]["avg_frame_rate"] == "60/1"
+        assert probe["streams"][0]["avg_frame_rate"] == f"{fps}/1"
         assert int(probe["streams"][0]["nb_read_frames"]) == frames
         packets = probe["packets"]
         assert len(packets) == frames
@@ -220,12 +229,19 @@ def verify_clock():
         "independentFrameDecode": independent,
         "bytes": final.stat().st_size,
     }
-    (out / "verified-export-clock.json").write_text(json.dumps(report, indent=2))
-    print(json.dumps(report))
+    return report
 
 
 if args.avi_only:
-    verify_clock()
+    plans = json.loads((out / "clock-arguments.json").read_text())
+    if isinstance(plans, dict):
+        plans = [plans]
+    reports = []
+    for plan in plans:
+        report = verify_clock(plan)
+        reports.append(report)
+        print(json.dumps(report), flush=True)
+    (out / "verified-export-clock.json").write_text(json.dumps(reports, indent=2))
     raise SystemExit(0)
 
 audit = []
