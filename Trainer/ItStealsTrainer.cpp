@@ -53,6 +53,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "Replay3DControls.h"
 
 bool g_autoStartGame = true;
+bool g_captureOverlayEnabled = false;
 std::string g_gameLaunchStatus = "Not requested";
 bool g_overlayVisible = false;
 bool g_allOverlayEnabled = true, g_quit = false, g_resetLayout = false;
@@ -80,6 +81,8 @@ bool g_overlayInteractive = false;
 bool g_surfaceInteractive = false;
 #include "LayeredHud.h"
 LayeredHud g_layeredHud;
+#include "CaptureOverlay.h"
+CaptureOverlay g_captureOverlay;
 InterfaceAudio g_interfaceAudio;
 bool g_settingsFeedbackPending = false;
 FrameCost g_menuFrameCost, g_hudFrameCost;
@@ -420,6 +423,7 @@ bool CreateDeviceD3D(HWND hWnd, bool interactive)
 
 void CleanupDeviceD3D()
 {
+    g_captureOverlay.ResetGraphics();
     suite_ui::introBackdrop = 0;
     g_introBackdrop.Reset();
     g_composition.Reset();
@@ -809,6 +813,7 @@ TrainerPreferences CollectPreferences()
     p.map = g_mapOptions;
     p.reports = g_reportsEnabled;
     p.autoStartGame = g_autoStartGame;
+    p.captureOverlay = g_captureOverlayEnabled;
     p.planner = g_plannerOptions;
     p.compact = g_compactMode;
     p.minimap = g_showMinimapWindow;
@@ -850,6 +855,7 @@ void ApplyPreferences(TrainerPreferences p)
     g_mapOptions = p.map;
     g_reportsEnabled = p.reports;
     g_autoStartGame = p.autoStartGame;
+    g_captureOverlayEnabled = p.captureOverlay;
     g_plannerOptions = p.planner;
     g_compactMode = p.compact;
     g_showMinimapWindow = p.minimap;
@@ -1771,6 +1777,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         binding.Refresh(OverlayRequested());
         binding.Apply();
         bool visible = binding.state.ShouldShow() && IsWindow(g_hWnd);
+        g_captureOverlay.enabled = g_captureOverlayEnabled;
+        // Color-key fallback menus need their visible pixels for hit testing.
+        g_captureOverlay.Tick(g_gamePid, visible && (!g_surfaceInteractive || g_alphaCompositing));
         bool introReady = visible && g_pShared && SnapshotAge() < .5;
         suite_ui::lifecycle.Consider(suite_ui::LifecycleNow(), introReady, suite_ui::preferences,
                                      ActiveSpeedrun() ||
@@ -2121,20 +2130,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
                     g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear);
                     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+                    if (g_surfaceInteractive && g_captureOverlayEnabled && g_alphaCompositing)
+                    {
+                        g_captureOverlay.RenderMenu(g_pd3dDevice, g_pd3dDeviceContext, binding.clientRect,
+                                                    g_wc);
+                        g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+                        if (g_captureOverlay.Active())
+                            g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear);
+                    }
                     HRESULT present =
                         g_surfaceInteractive
                             ? g_pSwapChain->Present(0, 0)
-                            : (g_layeredHud.Present(g_pd3dDevice, g_pd3dDeviceContext, g_hWnd, g_gameWnd,
-                                                    g_wc, binding.clientRect,
-                                                    HudContentRegions(*ImGui::GetDrawData(),
-                                                                      int(g_layeredHud.Width()),
-                                                                      int(g_layeredHud.Height())),
-                                                    g_validityBadgeBounds)
+                            : (g_layeredHud.Present(
+                                   g_pd3dDevice, g_pd3dDeviceContext, g_hWnd, g_gameWnd, g_wc,
+                                   binding.clientRect,
+                                   HudContentRegions(*ImGui::GetDrawData(), int(g_layeredHud.Width()),
+                                                     int(g_layeredHud.Height())),
+                                   g_validityBadgeBounds, g_captureOverlay.Active() ? 0 : 255)
                                    ? S_OK
                                    : E_FAIL);
                     suite_ui::CommitLifecycleFrame(present == S_OK, GetTickCount64() / 1000.0);
                     if (!g_surfaceInteractive && SUCCEEDED(present))
                     {
+                        g_captureOverlay.Publish(g_layeredHud);
                         auto region = g_layeredHud.PresentedRegion();
                         if (region.Width() > 0 && region.Height() > 0)
                         {

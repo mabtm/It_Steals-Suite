@@ -167,7 +167,7 @@ class LayeredHud
 
     bool Present(ID3D11Device *device, ID3D11DeviceContext *context, HWND mainWindow, HWND game,
                  const WNDCLASSEXW &wc, const RECT &gameClient, const std::vector<HudRegion> &regions,
-                 HudRegion badgeBounds)
+                 HudRegion badgeBounds, BYTE opacity = 255, bool windows = true)
     {
         if (!color || regions.empty() || regions.size() > surfaces.size())
             return false;
@@ -182,9 +182,9 @@ class LayeredHud
             auto region = ClampHudRegion(regions[i], int(width), int(height));
             if (!region.Width() || !region.Height())
                 return false;
-            if (i == 0)
+            if (windows && i == 0)
                 s.window = mainWindow;
-            else if (!s.window)
+            else if (windows && !s.window)
             {
                 s.window =
                     CreateWindowExW(WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
@@ -218,9 +218,9 @@ class LayeredHud
                     auto frame = s.queued[slot];
                     POINT destination{gameClient.left + frame.left, gameClient.top + frame.top}, source{};
                     SIZE size{static_cast<LONG>(s.width), static_cast<LONG>(s.height)};
-                    BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
-                    if (!UpdateLayeredWindow(s.window, nullptr, &destination, &size, s.dc, &source, 0, &blend,
-                                             ULW_ALPHA))
+                    BLENDFUNCTION blend{AC_SRC_OVER, 0, opacity, AC_SRC_ALPHA};
+                    if (windows && !UpdateLayeredWindow(s.window, nullptr, &destination, &size, s.dc, &source,
+                                                        0, &blend, ULW_ALPHA))
                         return false;
                     lastPresented = GetTickCount64();
                     if (s.badge[slot])
@@ -246,10 +246,21 @@ class LayeredHud
         }
         if (copied)
             context->Flush();
-        SyncVisibility(true, gameClient);
+        if (windows)
+            SyncVisibility(true, gameClient);
         uploadMs =
             std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
         return true;
+    }
+
+    template <class Visitor> void VisitPixels(Visitor visit) const
+    {
+        for (size_t i = 0; i < active; i++)
+        {
+            const auto &s = surfaces[i];
+            if (s.pixels && s.presented.Width() == int(s.width) && s.presented.Height() == int(s.height))
+                visit(s.presented, static_cast<const unsigned char *>(s.pixels));
+        }
     }
 
     ULONGLONG LastPresented() const

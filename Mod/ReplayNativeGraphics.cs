@@ -61,6 +61,7 @@ public sealed class ReplayNativeGraphics
     private readonly PracticeMapData map;
     private readonly Dictionary<Light, bool> enabledLights;
     private Light lamp;
+    private ReplayShaderClock shaderClock;
     private int missing;
     private double last = -1;
     private bool monstersVisible = true;
@@ -79,10 +80,14 @@ public sealed class ReplayNativeGraphics
     public void BindView(Camera view)
     {
         RenderUpdate(view.GetComponent<VolumetricLightRenderer>());
+        shaderClock = new ReplayShaderClock(view, motion.Experience.Names);
+        restore.Add(shaderClock.Dispose);
     }
 
     public void PrepareRender()
     {
+        if (shaderClock != null)
+            shaderClock.Set(Math.Max(0, last));
         foreach (var update in renderUpdates)
             update();
     }
@@ -93,7 +98,8 @@ public sealed class ReplayNativeGraphics
             return "original assets / " + bindings.Count + " visual tracks" +
                    (motion.Visuals.Recorded ? (motion.Visuals.Dropped > 0 ? " / capture reduced" : "")
                                             : " / legacy animation unavailable") +
-                   (missing > 0 ? " / unresolved " + missing : "");
+                   (missing > 0 ? " / unresolved " + missing : "") +
+                   (shaderClock != null && !shaderClock.RecordedOrigin ? " / material phase estimated" : "");
         }
     }
 

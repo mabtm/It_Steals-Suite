@@ -74,6 +74,10 @@ public static class ReplayExperienceCapture
         coverage.Start(ReplayCoverage.Animation);
         data.Dropped = HookFailures;
         player = source;
+        // Optional metadata in the existing name table; older readers retain it.
+        double shaderOrigin = Math.Max(0, Time.timeSinceLevelLoadAsDouble - Now);
+        data.Name(ReplayShaderClock.OriginName +
+                  shaderOrigin.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     public static void Stop()

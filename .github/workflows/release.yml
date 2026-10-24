@@ -101,7 +101,7 @@ jobs:
         run: |
           & .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native launcher smoke test failed.' }
-      - name: Test the production updater against the existing private release
+      - name: Test native capture and the production updater against the existing private release
         env:
           SUITE_UPDATE_TEST_TOKEN: ${{ github.token }}
         run: |

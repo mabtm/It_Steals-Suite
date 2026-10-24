@@ -33,7 +33,80 @@ public struct Quaternion
 
 public struct Rect
 {
-    public Rect(int x, int y, int w, int h) {}
+    public float x, y, width, height;
+
+    public Rect(float x, float y, float w, float h)
+    {
+        this.x = x;
+        this.y = y;
+        width = w;
+        height = h;
+    }
+}
+
+public struct Color
+{
+    public static Color white
+    {
+        get {
+            return new Color();
+        }
+    }
+}
+
+public struct Matrix4x4
+{
+    public static Matrix4x4 Scale(Vector3 v)
+    {
+        return new Matrix4x4();
+    }
+}
+
+public static class Screen
+{
+    public static int width = 1280, height = 720;
+}
+
+public static class Time
+{
+    public static double realtimeSinceStartupAsDouble;
+}
+
+public enum EventType
+{
+    Repaint,
+    Layout
+}
+
+public class Event
+{
+    public static Event current = new Event();
+    public EventType type = EventType.Repaint;
+}
+
+public static class GUI
+{
+    public static Matrix4x4 matrix;
+    public static Color color;
+    public static int depth, Draws;
+    public static Rect LastBounds, LastUv;
+
+    public static void DrawTextureWithTexCoords(Rect bounds, Texture2D texture, Rect uv, bool alpha)
+    {
+        Draws++;
+        LastBounds = bounds;
+        LastUv = uv;
+    }
+}
+
+public enum FilterMode
+{
+    Point
+}
+
+public enum TextureWrapMode
+{
+    Clamp
 }
 
 public struct Color32
@@ -118,9 +191,14 @@ public sealed class Texture2D : Object
     public HideFlags hideFlags;
     public byte[] Bytes;
     readonly TextureFormat format;
+    public int width, height;
+    public FilterMode filterMode;
+    public TextureWrapMode wrapMode;
 
     public Texture2D(int w, int h, TextureFormat f, bool mip)
     {
+        width = w;
+        height = h;
         Bytes = new byte[w * h * 4];
         format = f;
     }
@@ -137,6 +215,11 @@ public sealed class Texture2D : Object
     }
 
     public void Apply(bool m, bool n) {}
+
+    public void LoadRawTextureData(byte[] bytes)
+    {
+        Bytes = (byte[])bytes.Clone();
+    }
 
     public void ReadPixels(Rect r, int x, int y, bool m)
     {
@@ -474,6 +557,57 @@ public static class ClipChannelTests
             Check(Replay3D.Calls == calls, "bad dimensions, options and replay identity rejected");
         }
         ReplayClipChannel.Tick(Pid, false);
+        using (var overlay = new CaptureOverlay(Pid)) using (
+            var memory = MemoryMappedFile.OpenExisting("Local\\ItSteals.Capture.v1." +
+                                                       Pid)) using (var capture = memory.CreateViewAccessor())
+        {
+            Check(capture.ReadInt32(8) == 32 * 1024 * 1024 + 256 && capture.ReadInt32(12) == Pid,
+                  "capture channel identity/capacity");
+            capture.Write(24, 320);
+            capture.Write(28, 180);
+            capture.Write(32, 1);
+            capture.Write(36, 1);
+            capture.Write(64, 2);
+            capture.Write(68, 3);
+            capture.Write(72, 2);
+            capture.Write(76, 2);
+            capture.Write(80, 256);
+            capture.Write(84, 16);
+            capture.WriteArray(256, new byte[16], 0, 16);
+            capture.Write(16, 1u);
+            overlay.Tick(true);
+            UnityEngine.Event.current.type = UnityEngine.EventType.Layout;
+            overlay.Draw();
+            Check(capture.ReadUInt32(20) == 0, "capture acknowledgement requires an actual repaint");
+            UnityEngine.Event.current.type = UnityEngine.EventType.Repaint;
+            overlay.Draw();
+            Check(capture.ReadUInt32(20) == 1 && UnityEngine.GUI.Draws == 1 &&
+                      UnityEngine.GUI.LastBounds.x == 2 && UnityEngine.GUI.LastUv.height == -1,
+                  "capture placement, top-down pixels and presented acknowledgement");
+            UnityEngine.Time.realtimeSinceStartupAsDouble = 1;
+            overlay.Draw();
+            Check(UnityEngine.GUI.Draws == 1, "stalled capture expires instead of freezing on screen");
+            capture.Write(16, 2u);
+            overlay.Tick(true);
+            overlay.Draw();
+            Check(UnityEngine.GUI.Draws == 2, "capture recovers with a new frame");
+            capture.Write(36, 0u);
+            overlay.Tick(true);
+            overlay.Draw();
+            Check(UnityEngine.GUI.Draws == 2, "disabled capture disappears immediately");
+            capture.Write(36, 1u);
+            capture.Write(16, 3u);
+            capture.Write(72, int.MaxValue);
+            overlay.Tick(true);
+            overlay.Draw();
+            Check(UnityEngine.GUI.Draws == 2, "overflowing capture geometry rejected before allocation");
+            capture.Write(72, 2);
+            capture.Write(16, 4u);
+            overlay.Tick(true);
+            overlay.Tick(false);
+            overlay.Draw();
+            Check(UnityEngine.GUI.Draws == 2, "disconnect clears the in-game presentation");
+        }
         Console.WriteLine(
             "Production v4 channel + GPU adapter / host graphics doubles / " + mode +
             ": ordered identity, 3-slot overlap, pixel format/orientation, backpressure, cancellation, GPU lifetime and fallback: PASS");

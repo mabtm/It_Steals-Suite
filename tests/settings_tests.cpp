@@ -98,6 +98,7 @@ int main(int argc, char **argv)
             std::filesystem::remove(entry);
     TrainerPreferences p;
     p.seed = 123;
+    p.captureOverlay = true;
     p.experience.volume = .34f;
     p.experience.motion = false;
     p.experience.sounds = false;
@@ -117,8 +118,8 @@ int main(int argc, char **argv)
     {
         TrainerSettings settings;
         auto loaded = settings.Load();
-        assert(loaded.seed == 124 && !loaded.experience.motion && !loaded.experience.sounds &&
-               std::abs(loaded.experience.volume - .34f) < 1e-6);
+        assert(loaded.seed == 124 && loaded.captureOverlay && !loaded.experience.motion &&
+               !loaded.experience.sounds && std::abs(loaded.experience.volume - .34f) < 1e-6);
         assert(std::filesystem::exists(path.string() + ".bak"));
     }
     Write(path, std::string(270000, 'X'));

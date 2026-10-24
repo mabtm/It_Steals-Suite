@@ -7,6 +7,37 @@ using UnityEngine.Rendering;
 // ownership, restoration and timing contracts, not Unity/D3D rasterization.
 namespace UnityEngine.Rendering
 {
+public enum CameraEvent
+{
+    BeforeGBuffer,
+    BeforeForwardOpaque,
+    BeforeForwardAlpha,
+    BeforeImageEffects,
+    AfterEverything
+}
+
+public sealed class CommandBuffer
+{
+    public string name;
+    public bool Released;
+    public readonly Dictionary<string, Vector4> Values = new Dictionary<string, Vector4>();
+
+    public void Clear()
+    {
+        Values.Clear();
+    }
+
+    public void SetGlobalVector(string key, Vector4 value)
+    {
+        Values[key] = value;
+    }
+
+    public void Release()
+    {
+        Released = true;
+    }
+}
+
 public enum ShadowCastingMode
 {
     Off,
@@ -29,6 +60,40 @@ public enum ReflectionProbeUsage
 
 namespace UnityEngine
 {
+public struct Vector4
+{
+    public float x, y, z, w;
+
+    public Vector4(float a, float b, float c, float d)
+    {
+        x = a;
+        y = b;
+        z = c;
+        w = d;
+    }
+}
+
+public static class Time
+{
+    public static double timeSinceLevelLoadAsDouble = 99;
+}
+
+public sealed class Camera
+{
+    public readonly Dictionary<CameraEvent, CommandBuffer> Buffers =
+        new Dictionary<CameraEvent, CommandBuffer>();
+
+    public void AddCommandBuffer(CameraEvent stage, CommandBuffer buffer)
+    {
+        Buffers.Add(stage, buffer);
+    }
+
+    public void RemoveCommandBuffer(CameraEvent stage, CommandBuffer buffer)
+    {
+        Buffers.Remove(stage);
+    }
+}
+
 public sealed class Material
 {
     public string Name;
@@ -274,6 +339,31 @@ public static class ReplayRendererTests
         clock.Loop(true, 2, 5);
         Check(clock.At(601) >= 2 && clock.At(601) < 5 && clock.Playing(601),
               "loop can recover a seek beyond B");
+        var shaderCamera = new Camera();
+        CommandBuffer shaderBuffer;
+        using (var shader = new ReplayShaderClock(shaderCamera, new[] { "Unity shader clock / 12.5" }))
+        {
+            shader.Set(2);
+            shaderBuffer = shaderCamera.Buffers[CameraEvent.BeforeForwardAlpha];
+            Check(shader.RecordedOrigin && Near(shaderBuffer.Values["_Time"].y, 14.5),
+                  "shader time includes recorded scene phase while game time is paused");
+            shader.Set(1);
+            Check(Near(shaderBuffer.Values["_Time"].y, 13.5), "shader time supports backward seek");
+            shader.Set(2);
+            Check(Near(shaderBuffer.Values["_Time"].y, 14.5) && shaderBuffer.Values.Count == 3,
+                  "repeat exports evaluate exactly the same material phase without accumulating commands");
+            Check(Near(shaderCamera.Buffers[CameraEvent.AfterEverything].Values["_Time"].y, 99),
+                  "normal scene time is restored after the replay camera");
+        }
+        Check(shaderCamera.Buffers.Count == 0 && shaderBuffer.Released,
+              "replay shader command buffers are detached and released");
+        using (var legacy = new ReplayShaderClock(shaderCamera, new[] { "Unity shader clock / NaN" }))
+        {
+            legacy.Set(2);
+            Check(!legacy.RecordedOrigin &&
+                      Near(shaderCamera.Buffers[CameraEvent.BeforeForwardAlpha].Values["_Time"].y, 2),
+                  "legacy recordings and malformed origins use a finite replay-relative shader clock");
+        }
         Console.WriteLine(
             "Scene renderer adapter: original batched ranges/material slots, property blocks, culled geometry vs inactive variants, shared flat materials, no scene copies, complete/idempotent/failure rollback: PASS");
         Console.WriteLine(

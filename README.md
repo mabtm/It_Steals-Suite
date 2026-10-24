@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.12.6](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.12.6)**
+**[v7.13.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.13.0)**
 
-- Improved the exit graphic with an extra second on screen.
-- Improved export reports with the actual average data rate, calculated from file size and duration.
-- Improved AVI verification with moving-image tests at 1080p60 and 1080p120, including frame timing and exact recorded-audio checks.
+- Improved OBS capture with an optional in-game copy of the trainer's HUD and menu. Enable it under Settings > System, then capture the It Steals window in OBS.
+- Improved 3D replays with a separate material clock for animated effects such as crystal holograms. Effects follow playback, pause, seeks, and exports.
+- Improved full-run exports with a 1080p60 preset using the original camera and normal speed. Export reports identify rendered replays.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

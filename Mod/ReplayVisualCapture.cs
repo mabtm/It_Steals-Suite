@@ -165,6 +165,10 @@ public static class ReplayVisualCapture
                 if (body.gameObject.scene.handle == scene && !Dynamic(body.transform) &&
                     !Point(body.transform) && !body.isKinematic)
                     BindPose(world, body.transform, Path(body.transform), true, null);
+            foreach (var spin in UnityEngine.Object.FindObjectsOfType<speen>(true))
+                if (spin.gameObject.scene.handle == scene && !Dynamic(spin.transform) &&
+                    !Point(spin.transform))
+                    BindPose(world, spin.transform, Path(spin.transform), true, null);
             BindOwner(1, 0, 0, PlayerContext.Body(source));
             if (source.gemsList != null)
                 foreach (var gem in source.gemsList)

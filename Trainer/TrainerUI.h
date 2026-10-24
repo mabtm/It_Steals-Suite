@@ -509,6 +509,9 @@ inline void RenderSystemSettings()
         "A one-time, locally blurred game image behind the intro card. No continuous capture or full-screen effect. If capture is unavailable, the card uses its normal background.");
     ImGui::Separator();
     ImGui::TextColored(g_headerCol, "Display");
+    suite_ui::Checkbox("Include trainer in game captures (OBS)", &g_captureOverlayEnabled);
+    Help(
+        "Draw the same HUD and menu inside the game image for OBS Window Capture or Game Capture. Select It Steals in OBS. The normal overlay remains available if the game cannot receive it. Adds texture transfers while enabled.");
     const char *rates[] = {"30 FPS", "60 FPS", "120 FPS"};
     int rate = g_renderFps == 30 ? 0 : g_renderFps == 120 ? 2 : 1;
     if (ImGui::Combo("Overlay frame limit", &rate, rates, 3))

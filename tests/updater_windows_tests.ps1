@@ -18,6 +18,8 @@ $lines=@(
     ('rc /nologo /fo "'+(Join-Path $out 'suite.res')+'" TrainerResources.rc'),
     'if errorlevel 1 exit /b 1',
     ('cl /nologo /std:c++20 /EHsc /MT /utf-8 /DUNICODE /D_UNICODE /DNOMINMAX /I"'+(Join-Path $root 'Trainer')+'" /Fo"'+(Join-Path $out 'contract.obj')+'" /Fe"'+(Join-Path $out 'contract.exe')+'" "'+(Join-Path $PSScriptRoot 'update_windows_contract.cpp')+'" "'+(Join-Path $out 'suite.res')+'" /link winhttp.lib advapi32.lib bcrypt.lib shell32.lib ole32.lib'),
+    'if errorlevel 1 exit /b 1',
+    ('cl /nologo /std:c++20 /EHsc /MT /utf-8 /DUNICODE /D_UNICODE /DNOMINMAX /I"'+(Join-Path $root 'Trainer')+'" /I"'+(Join-Path $root 'Trainer/imgui')+'" /I"'+(Join-Path $root 'Trainer/imgui/backends')+'" /Fo"'+(Join-Path $out 'capture.obj')+'" /Fe"'+(Join-Path $out 'capture.exe')+'" "'+(Join-Path $PSScriptRoot 'capture_windows_contract.cpp')+'" /link d3d11.lib dxgi.lib gdi32.lib user32.lib'),
     'exit /b %errorlevel%'
 )
 [IO.File]::WriteAllLines($command,$lines,[Text.Encoding]::ASCII)
@@ -25,5 +27,7 @@ $lines=@(
 if($LASTEXITCODE -ne 0){throw 'Native updater contract compilation failed.'}
 & (Join-Path $out 'contract.exe')
 if($LASTEXITCODE -ne 0){throw 'Native updater transport contract failed.'}
+& (Join-Path $out 'capture.exe')
+if($LASTEXITCODE -ne 0){throw 'Native capture transfer contract failed.'}
 @{passed=$true;checks=@('actual private GitHub API','Credential Manager round trip and deletion','safe asset redirect','streamed package SHA-256 and length','embedded current and historical changelog');liveUacTested=$false}|
     ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $out 'summary.json') -Encoding UTF8

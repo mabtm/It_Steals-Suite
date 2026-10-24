@@ -27,6 +27,7 @@ struct TrainerPreferences
     ReplayPreferences replay;
     bool reports = false;
     bool autoStartGame = true;
+    bool captureOverlay = false;
     bool rawSpawn = false;
     bool compact = false, minimap = true, path = false, lockAspect = true;
     bool player = true, crystals = true, monster = true, visuals = true;
@@ -76,7 +77,8 @@ struct TrainerPreferences
             << "\nlockAspect=" << lockAspect << "\nplayer=" << player << "\ncrystals=" << crystals
             << "\nmonster=" << monster << "\nvisuals=" << visuals << "\nwidth=" << width
             << "\nheight=" << height << "\nfps=" << fps << "\nlevel=" << level << "\nseed=" << seed
-            << "\nautoStartGame=" << autoStartGame << "\nopacity=" << opacity << '\n';
+            << "\nautoStartGame=" << autoStartGame << "\ncaptureOverlay=" << captureOverlay
+            << "\nopacity=" << opacity << '\n';
         const float *colors[] = {background, text, header, accent};
         const char *names[] = {"background", "text", "header", "accent"};
         for (int c = 0; c < 4; c++)
@@ -156,6 +158,8 @@ struct TrainerPreferences
             }
             else if (key == "autoStartGame" && (value == 0 || value == 1))
                 result.autoStartGame = flag;
+            else if (key == "captureOverlay" && (value == 0 || value == 1))
+                result.captureOverlay = flag;
             else if (key == "compact")
                 result.compact = flag;
             else if (key == "frameLimitMode")

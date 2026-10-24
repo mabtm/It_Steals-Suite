@@ -279,6 +279,26 @@ inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
     PauseViewer();
 }
 
+inline void OpenFullRun(std::shared_ptr<const practice::MapAnalysis> analysis,
+                        std::shared_ptr<const practice::ReplayMotion> motion)
+{
+    if (!analysis || !analysis->data || !analysis->data->review || !motion || motion->frames.empty() ||
+        (g_pShared && g_pShared->timerState == 1) || encoder.State() == 1)
+        return;
+    Open(analysis, motion);
+    options = Options();
+    ApplyExportPreset(options, 0);
+    options.b = analysis->data->review->seconds;
+    options.scene3d = true;
+    options.speedKeys = options.route = options.colliders = false;
+    options.audio = motion->experience.audio.recorded && !motion->audioFile.empty();
+    content.track = {};
+    previewAt = 0;
+    SeedCamera();
+    ChangedCamera();
+    status = "Full run / original camera / 1x speed / rendered replay";
+}
+
 inline void Close()
 {
     if (encoder.State() == 1)
@@ -304,6 +324,14 @@ inline void Button(std::shared_ptr<const practice::MapAnalysis> a,
     ImGui::EndDisabled();
     Help("Compose a clip, animate a camera track, then export MP4, GIF, RGB "
          "lossless MKV or a PNG sequence. New recordings include the original game mix.");
+    SameLineIfFits("Full run video");
+    ImGui::BeginDisabled(!a || !a->data || !a->data->review || !motion || motion->frames.empty() ||
+                         encoder.State() == 1);
+    if (suite_ui::Button("Full run video"))
+        OpenFullRun(a, motion);
+    ImGui::EndDisabled();
+    Help(
+        "Prepare the entire recorded run at 1080p60, original camera and 1x speed, ignoring clip trims and camera edits. This is a rendered replay; leaderboard acceptance depends on the board's rules.");
 }
 
 inline void Field(const char *text)

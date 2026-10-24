@@ -105,3 +105,84 @@ public sealed class ReplayRestoreScope : IDisposable
         undo.Clear();
     }
 }
+
+// Unity pauses its built-in shader time with gameplay. Replay cameras instead
+// evaluate material effects at the requested recording time, including seeks.
+public sealed class ReplayShaderClock : IDisposable
+{
+    public const string OriginName = "Unity shader clock / ";
+    private static readonly CameraEvent[] stages = { CameraEvent.BeforeGBuffer,
+                                                     CameraEvent.BeforeForwardOpaque,
+                                                     CameraEvent.BeforeForwardAlpha,
+                                                     CameraEvent.BeforeImageEffects };
+    private readonly Camera camera;
+    private readonly CommandBuffer begin = new CommandBuffer { name = "Replay material time" };
+    private readonly CommandBuffer end = new CommandBuffer { name = "Restore material time" };
+    private readonly double origin;
+    private bool disposed;
+    public readonly bool RecordedOrigin;
+
+    public ReplayShaderClock(Camera view, IEnumerable<string> names)
+    {
+        camera = view;
+        foreach (string name in names)
+        {
+            double value;
+            if (name.StartsWith(OriginName, StringComparison.Ordinal) &&
+                double.TryParse(name.Substring(OriginName.Length), System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out value) &&
+                !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0 && value <= 315360000)
+            {
+                origin = value;
+                RecordedOrigin = true;
+                break;
+            }
+        }
+        try
+        {
+            foreach (var stage in stages)
+                camera.AddCommandBuffer(stage, begin);
+            camera.AddCommandBuffer(CameraEvent.AfterEverything, end);
+            Set(0);
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
+    }
+
+    private static void Parameters(CommandBuffer buffer, double time)
+    {
+        buffer.Clear();
+        float t = (float)time;
+        buffer.SetGlobalVector("_Time", new Vector4(t / 20, t, t * 2, t * 3));
+        buffer.SetGlobalVector("_SinTime", new Vector4((float)Math.Sin(time / 8), (float)Math.Sin(time / 4),
+                                                       (float)Math.Sin(time / 2), (float)Math.Sin(time)));
+        buffer.SetGlobalVector("_CosTime", new Vector4((float)Math.Cos(time / 8), (float)Math.Cos(time / 4),
+                                                       (float)Math.Cos(time / 2), (float)Math.Cos(time)));
+    }
+
+    public void Set(double seconds)
+    {
+        if (disposed || double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds < 0)
+            return;
+        Parameters(begin, origin + seconds);
+        Parameters(end, Time.timeSinceLevelLoadAsDouble);
+    }
+
+    public void Dispose()
+    {
+        if (disposed)
+            return;
+        disposed = true;
+        if (camera != null)
+        {
+            foreach (var stage in stages)
+                camera.RemoveCommandBuffer(stage, begin);
+            camera.RemoveCommandBuffer(CameraEvent.AfterEverything, end);
+        }
+        begin.Release();
+        end.Release();
+    }
+}

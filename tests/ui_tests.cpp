@@ -16,6 +16,7 @@
 #include <iostream>
 
 bool g_autoStartGame = true;
+bool g_captureOverlayEnabled = false;
 bool g_overlayVisible = true, g_allOverlayEnabled = true, g_quit = false, g_resetLayout = false;
 bool g_compactMode = false, g_showMinimapWindow = true, g_showPath = false, minimapLockAspect = true;
 bool g_showPlayerPanel = true, g_showCrystalPanel = true, g_showMonsterPanel = true,
@@ -1521,6 +1522,21 @@ void Workshop740Cases(const std::string &output)
         Dump(output + "/740-clip-composition.draw");
     suite_clip::Open(analysis, motion);
     assert(suite_clip::open);
+    suite_clip::options.a = 2;
+    suite_clip::options.b = 6;
+    suite_clip::options.rate = .5;
+    suite_clip::options.camera = 2;
+    suite_clip::options.fullbright = true;
+    auto fullMotion = std::make_shared<practice::ReplayMotion>(*motion);
+    practice::ReplayViewFrame first, last;
+    last.seconds = review->seconds;
+    fullMotion->frames = {first, last};
+    suite_clip::OpenFullRun(analysis, fullMotion);
+    assert(suite_clip::options.a == 0 && suite_clip::options.b == analysis->data->review->seconds &&
+           suite_clip::options.rate == 1 && suite_clip::options.camera == 0 && suite_clip::options.scene3d &&
+           !suite_clip::options.speedKeys && !suite_clip::options.fullbright && !suite_clip::options.route &&
+           suite_clip::options.width == 1920 && suite_clip::options.fps == 60);
+    suite_clip::Open(analysis, motion);
     for (int i = 0; i < 3; i++)
     {
         ImGui::NewFrame();

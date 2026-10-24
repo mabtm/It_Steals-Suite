@@ -35,6 +35,7 @@ MANAGED = {
     ],
     "replay_audio_capture_tests": ["ReplayAudioCapture.cs"],
     "clip_channel_tests": [
+        "CaptureOverlay.cs",
         "ReplayClipChannel.cs",
         "ClipGpuReadback.cs",
         "ClipPixelLayout.cs",

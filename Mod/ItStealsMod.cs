@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.12.5";
+    public const string Version = "7.13.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -42,6 +42,7 @@ public sealed class ItStealsMod : MelonMod
     private readonly FramePolicy framePolicy = new FramePolicy();
     private ExternalToolMonitor externalTools;
     private LiveInspector inspector;
+    private CaptureOverlay captureOverlay;
 
     public override void OnInitializeMelon()
     {
@@ -84,6 +85,14 @@ public sealed class ItStealsMod : MelonMod
                 MelonLogger.Warning("Seed Map unavailable: " + error.Message);
             }
             inspector = new LiveInspector(pid, connection.Session);
+            try
+            {
+                captureOverlay = new CaptureOverlay(pid);
+            }
+            catch (Exception error)
+            {
+                MelonLogger.Warning("Capture overlay unavailable: " + error.Message);
+            }
             lastHeartbeatTime = Time.realtimeSinceStartup;
             MelonLogger.Msg("ItStealsHelper " + Version + " loaded; shared-memory protocol v" +
                             SharedMemoryProtocol.Version + ".");
@@ -420,6 +429,8 @@ public sealed class ItStealsMod : MelonMod
 
     public override void OnLateUpdate()
     {
+        if (captureOverlay != null)
+            captureOverlay.Tick(trainerConnected);
         long workStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         if (connection == null)
             return;
@@ -532,8 +543,26 @@ public sealed class ItStealsMod : MelonMod
         }
     }
 
+    public override void OnGUI()
+    {
+        if (captureOverlay != null)
+            try
+            {
+                captureOverlay.Draw();
+            }
+            catch (Exception error)
+            {
+                Report(error);
+            }
+    }
+
     public override void OnDeinitializeMelon()
     {
+        if (captureOverlay != null)
+        {
+            Release(captureOverlay.Dispose, "capture overlay");
+            captureOverlay = null;
+        }
         Release(ReplayClipChannel.Close, "clip capture");
         Release(Replay3D.Stop, "3D replay");
         if (inspector != null)

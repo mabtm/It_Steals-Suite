@@ -145,7 +145,8 @@ inline void WriteExportReport(const std::filesystem::path &output, const Options
     file.imbue(std::locale::classic());
     file << std::setprecision(17);
     const auto bytes = o.format == 3 ? uint64_t(0) : std::filesystem::file_size(output);
-    file << "{\n  \"version\": \"" << suite_brand::Version << "\",\n  \"run\": " << source.run
+    file << "{\n  \"version\": \"" << suite_brand::Version
+         << "\",\n  \"captureType\": \"renderedReplay\",\n  \"run\": " << source.run
          << ",\n  \"seed\": " << source.seed << ",\n  \"format\": " << o.format
          << ",\n  \"preset\": " << o.preset << ",\n  \"width\": " << o.width
          << ",\n  \"height\": " << o.height << ",\n  \"outputFps\": " << o.fps

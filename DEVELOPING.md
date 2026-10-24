@@ -92,6 +92,30 @@ If a check fails, use the [bug form](.github/ISSUE_TEMPLATE/bug.yml). Include th
 
 Once the checks pass, capture real footage for the GitHub tour: seed search, replay playback, Inspector selection, and the finish screen.
 
+## Capture and final release checks
+
+Enable **Settings > System > Include trainer in game captures (OBS)**. In OBS add **Window Capture**, select **It Steals**, and use the **Windows 10** capture method. Game Capture can also capture the in-game presentation. Capture the game window rather than the trainer's external windows. This mode transfers only occupied HUD regions; interactive menus use a separate readback. It adds work while enabled, so compare performance with the setting off and on. The native overlay stays available until the game acknowledges drawing the transferred pixels. Disconnects, hidden overlays and stale frames clear the in-game copy.
+
+Use **Passed / Failed / Not tested** for each row. Record the Suite version and OBS capture method. Screenshots or a short clip of a failed check are useful.
+
+| Check | Steps and expected result |
+| --- | --- |
+| OBS picture | Capture only the It Steals window, enable the capture setting, and close the Suite menu. The HUD, timer and validity badge appear once, with readable text and correct colors/transparency. |
+| OBS menu | Open F3, change a HUD color, move a block, and close F3. Both the recording and the game show the same placement and style. Menu buttons remain clickable. |
+| Focus and display | Alt-Tab to OBS and back three times. Resize the game, then try borderless fullscreen. The overlay follows the game, clears outside it, and returns without a frozen copy or duplicate panels. |
+| Capture fallback | Toggle capture off and on, then close the trainer while the game is open. The normal overlay works when disabled and no in-game image remains after disconnect. Restarting the trainer reconnects. |
+| Capture performance | At the same fixed-seed position, compare 30 seconds with capture off and on. Note game FPS, helper work, and stutter; test a menu and a passive HUD separately. |
+| Crystal effects | Record a new run. In native 3D playback, watch an uncollected crystal, pause, seek backward, and resume. Compare its rotation and hologram with the game. Seeking twice to the same time should show the same effect phase. Older files use a replay-relative shader phase. |
+| Other animations | Check the player's arms, enemy motion, lights and a ceiling fan. Leave 3D playback and verify normal game movement, camera, audio and animations resume. |
+| Full-run video | Set a short clip range and alter the camera/speed, then reopen the replay and choose **Full run video**. The editor resets to the whole run, original camera, normal speed and 1080p60. Export and check the beginning, ending, sound and duration in VLC. |
+| 120 FPS video | Export a short 1080p120 lossless clip with recorded sound. Check smooth playback and audio sync in VLC. Check the accompanying JSON for 120 FPS and matching container/audio durations. |
+| Statistics and routes | Clear the local counters, complete a run and abort another. Confirm PBs and saved replays remain. Check both Hide & Seek routes and that full-route visibility survives selecting another seed. |
+| Install and update | Use the release Setup, confirm the detected game folder, and check versions after updating. Settings and replays must remain. Close the game: the trainer exits and its graphic remains visible for about 1.65 seconds. |
+
+Repeat the mode checks above in every supported mode before marking the public release ready. Keep the broader mode/seed/replay checks in the previous section as part of this pass.
+
+**Deferred:** automatic PB recording will be considered separately after this capture work. The full-run button currently renders a replay; it does not start or control OBS, automatically save PB videos, upload a run, or certify leaderboard eligibility.
+
 ## Ship a release
 
 1. Change **SUITE_VERSION** and **SUITE_VERSION_COMPONENTS** in **Trainer/SuiteBranding.h** together; keep the previous exporter version in **ReplayPackage.h**'s compatibility table and its package-import regression test. When changing the mod, also update **ItStealsMod.Version**, **SUITE_MOD_VERSION**, and the supplied DLL. Packaging checks the DLL's file version against that expected version.
@@ -124,7 +148,7 @@ For a local Windows package build, install **NSIS 3**, then run:
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
-Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.12.5**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
+Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.13.0**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
 Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
 
