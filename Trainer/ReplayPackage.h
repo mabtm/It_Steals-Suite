@@ -143,7 +143,7 @@ inline std::string ReplayManifest(const MapData &d, bool inputs, bool validation
           << ",\n  \"cameraFrames\": " << r.motion->frames << ",\n  \"physicsTicks\": " << r.motion->ticks
           << ",\n  \"inputEvents\": " << r.motion->events << ",\n  \"captureFlags\": " << r.motion->flags
           << ",\n  \"droppedSamples\": " << r.motion->dropped;
-    o << ",\n  \"scope\": \"Local observations with unsigned consistency hashes. No physical-key or tamper-proof attestation. Monster poses are sampled; animations are not recorded.\"\n}\n";
+    o << ",\n  \"scope\": \"Local observations with unsigned consistency hashes. No physical-key or tamper-proof attestation. Replay fidelity depends on the recording channels and their reported coverage.\"\n}\n";
     return o.str();
 }
 
@@ -157,6 +157,7 @@ struct ReplayPackageExporter
 
 inline constexpr ReplayPackageExporter ReplayPackageExporters[] = {
     {suite_brand::Version, true},
+    {"7.13.0", true},
     {"7.12.6", true},
     {"7.12.5", true},
     {"7.12.4", true},

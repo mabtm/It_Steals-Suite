@@ -397,16 +397,20 @@ inline void Tick(ID3D11Device *device, ID3D11DeviceContext *gpu, DWORD pid)
     if (startRequested)
     {
         startRequested = false;
+        bool fullRun = fullRunRequested;
+        fullRunRequested = false;
         try
         {
-            options.Validate(content.analysis->data->review->seconds);
-            content.track.Validate(content.analysis->data->review->seconds);
-            if (options.scene3d && options.camera == 3 && content.track.keys.empty())
+            frozen = fullRun ? FullRunOptions(options, content) : options;
+            frozenContent = content;
+            if (fullRun)
+                frozenContent.track = {};
+            frozen.Validate(content.analysis->data->review->seconds);
+            frozenContent.track.Validate(content.analysis->data->review->seconds);
+            if (frozen.scene3d && frozen.camera == 3 && frozenContent.track.keys.empty())
                 throw std::runtime_error("Add a cinematic camera keypoint first");
             SaveProject();
-            frozen = options;
-            frozenContent = content;
-            ConfigureSpeed(frozen.timing, frozenContent.track, content.analysis->data->review->seconds,
+            ConfigureSpeed(frozen.timing, frozenContent.track, frozenContent.analysis->data->review->seconds,
                            frozen.rate, frozen.camera == 3 && frozen.speedKeys);
             if (testRequested)
             {

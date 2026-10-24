@@ -3,6 +3,7 @@ using System.IO.MemoryMappedFiles;
 using System.Threading;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 // Three independent slots. Rendering, GPU transfer, native composition and
 // encoding overlap; each result remains bound to serial + run + frame index.
@@ -139,9 +140,22 @@ public static class ReplayClipChannel
                             long start = Stopwatch.GetTimestamp();
                             if (slot.Error == null)
                             {
-                                view.WriteArray(slot.Offset + Pixels, slot.Readback.Pixels, 0,
-                                                slot.Readback.Pixels.Length);
-                                slot.Pose.Write(view, slot.Offset + 96);
+                                var pixels = slot.Readback.Pixels;
+                                if (pixels == null || pixels.Length != (long)slot.Width * slot.Height * 4 ||
+                                    pixels.Length > SlotBytes - Pixels)
+                                    slot.Error = "Invalid clip pixel buffer size";
+                                else
+                                {
+                                    // Mono's byte-wise accessor writes dominate large exports.
+                                    // Keep the slot bounds and identity checks around a bulk copy.
+                                    Marshal.Copy(
+                                        pixels, 0,
+                                        IntPtr.Add(view.SafeMemoryMappedViewHandle.DangerousGetHandle(),
+                                                   checked((int)view.PointerOffset + slot.Offset + Pixels)),
+                                        pixels.Length);
+                                    GC.KeepAlive(view);
+                                    slot.Pose.Write(view, slot.Offset + 96);
+                                }
                             }
                             byte[] text = System.Text.Encoding.UTF8.GetBytes(slot.Error ?? "");
                             int n = Math.Min(510, text.Length);

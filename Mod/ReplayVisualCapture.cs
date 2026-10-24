@@ -25,6 +25,7 @@ public static class ReplayVisualCapture
     private static readonly List<Entry> entries = new List<Entry>();
     private static readonly Dictionary<Sprite, int> spriteIds = new Dictionary<Sprite, int>();
     private static readonly Dictionary<Texture, int> textureIds = new Dictionary<Texture, int>();
+    private static readonly Dictionary<Material, int> materialIds = new Dictionary<Material, int>();
     private static readonly HashSet<int> owners = new HashSet<int>();
     private static readonly HashSet<Renderer> culling = new HashSet<Renderer>();
     private static int scene;
@@ -95,6 +96,19 @@ public static class ReplayVisualCapture
         return id;
     }
 
+    private static int MaterialAsset(Material material)
+    {
+        if (material == null)
+            return 0;
+        int id;
+        if (!materialIds.TryGetValue(material, out id))
+        {
+            id = data.Asset(ReplayMaterialLibrary.Key(material));
+            materialIds[material] = id;
+        }
+        return id;
+    }
+
     public static bool Dynamic(Transform t)
     {
         var body = observedBody != null ? observedBody : PlayerContext.Body(PlayerContext.Observed);
@@ -139,6 +153,8 @@ public static class ReplayVisualCapture
                     !(r is ParticleSystemRenderer) && !(r is TrailRenderer) && !(r is LineRenderer))
                 {
                     BindRenderer(world, r, Path(r.transform), false);
+                    if (r is SpriteRenderer)
+                        BindPose(world, r.transform, Path(r.transform), true, null);
                     if (r.GetComponentInParent<Animator>(true) != null)
                     {
                         var animator = r.GetComponentInParent<Animator>(true);
@@ -353,6 +369,7 @@ public static class ReplayVisualCapture
                             var m = r.sharedMaterial;
                             if (m != null)
                             {
+                                f.Asset = MaterialAsset(m);
                                 if (m.HasProperty("_Color"))
                                 {
                                     f.Color = m.color;
@@ -411,5 +428,6 @@ public static class ReplayVisualCapture
         ownerIds.Clear();
         spriteIds.Clear();
         textureIds.Clear();
+        materialIds.Clear();
     }
 }

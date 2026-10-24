@@ -52,6 +52,8 @@ public sealed class ReplayNativeGraphics
         new Dictionary<string, Texture>(StringComparer.Ordinal);
     private readonly Dictionary<string, Sprite> sprites =
         new Dictionary<string, Sprite>(StringComparer.Ordinal);
+    private readonly ReplayMaterialLibrary materials;
+    private readonly HashSet<string> missingAssets = new HashSet<string>(StringComparer.Ordinal);
     private readonly Dictionary<string, Transform> world =
         new Dictionary<string, Transform>(StringComparer.Ordinal);
     private readonly ReplayRestoreScope restore;
@@ -98,7 +100,8 @@ public sealed class ReplayNativeGraphics
             return "original assets / " + bindings.Count + " visual tracks" +
                    (motion.Visuals.Recorded ? (motion.Visuals.Dropped > 0 ? " / capture reduced" : "")
                                             : " / legacy animation unavailable") +
-                   (missing > 0 ? " / unresolved " + missing : "") +
+                   (missing + missingAssets.Count > 0 ? " / unresolved " + (missing + missingAssets.Count)
+                                                      : "") +
                    (shaderClock != null && !shaderClock.RecordedOrigin ? " / material phase estimated" : "");
         }
     }
@@ -118,6 +121,7 @@ public sealed class ReplayNativeGraphics
         motion = input;
         restore = scope;
         enabledLights = originalLights;
+        materials = new ReplayMaterialLibrary(Resources.FindObjectsOfTypeAll<Material>());
         int scene = mouse.gameObject.scene.handle;
         foreach (var t in UnityEngine.Object.FindObjectsOfType<Transform>(true))
             if (t.gameObject.scene.handle == scene)
@@ -508,6 +512,7 @@ public sealed class ReplayNativeGraphics
             }
             var r = sources[track.Slot];
             bool enabled = r.enabled;
+            var originalMaterials = r.sharedMaterials;
             var sprite = r as SpriteRenderer;
             var originalSprite = sprite != null ? sprite.sprite : null;
             var originalColor = sprite != null ? sprite.color : Color.white;
@@ -519,6 +524,7 @@ public sealed class ReplayNativeGraphics
                             if (r != null)
                             {
                                 r.enabled = enabled;
+                                r.sharedMaterials = originalMaterials;
                                 r.SetPropertyBlock(original.isEmpty ? null : original, 0);
                                 if (sprite != null)
                                 {
@@ -766,12 +772,33 @@ public sealed class ReplayNativeGraphics
                                 sprite.sprite = null;
                             else if (sprites.TryGetValue(Asset(f.Asset), out asset) && asset != null)
                                 sprite.sprite = asset;
+                            else
+                                missingAssets.Add(Asset(f.Asset));
                             sprite.color = f.Color;
                             sprite.flipX = (f.Flags & 2) != 0;
                             sprite.flipY = (f.Flags & 4) != 0;
                         }
                         else
                         {
+                            // Asset was unused on mesh tracks before material capture.
+                            // An absent reference keeps legacy replay behavior unchanged.
+                            string key = Asset(f.Asset);
+                            if (key.StartsWith("M|", StringComparison.Ordinal))
+                            {
+                                var material = materials.Find(key);
+                                if (material != null)
+                                {
+                                    if (b.Renderer.sharedMaterial != material)
+                                        b.Renderer.sharedMaterial = material;
+                                    b.BaseColor =
+                                        material.HasProperty("_Color") ? material.color : Color.white;
+                                    b.BaseTexture = material.HasProperty("_MainTex")
+                                                        ? ReplayVisualCapture.TextureKey(material.mainTexture)
+                                                        : "";
+                                }
+                                else
+                                    missingAssets.Add(key);
+                            }
                             bool before = b.ColorOverride;
                             bool color = (f.Flags & 8) != 0 && f.Color != b.BaseColor;
                             bool texture = (f.Flags & 16) != 0 && Asset(f.Texture) != b.BaseTexture;
@@ -786,6 +813,8 @@ public sealed class ReplayNativeGraphics
                                     b.Block.SetTexture("_MainTex", null);
                                 else if (textures.TryGetValue(Asset(f.Texture), out asset) && asset != null)
                                     b.Block.SetTexture("_MainTex", asset);
+                                else
+                                    missingAssets.Add(Asset(f.Texture));
                             }
                             if (color || texture)
                                 b.Renderer.SetPropertyBlock(b.Block, 0);

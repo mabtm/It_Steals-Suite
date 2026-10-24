@@ -1531,11 +1531,40 @@ void Workshop740Cases(const std::string &output)
     practice::ReplayViewFrame first, last;
     last.seconds = review->seconds;
     fullMotion->frames = {first, last};
-    suite_clip::OpenFullRun(analysis, fullMotion);
-    assert(suite_clip::options.a == 0 && suite_clip::options.b == analysis->data->review->seconds &&
-           suite_clip::options.rate == 1 && suite_clip::options.camera == 0 && suite_clip::options.scene3d &&
-           !suite_clip::options.speedKeys && !suite_clip::options.fullbright && !suite_clip::options.route &&
-           suite_clip::options.width == 1920 && suite_clip::options.fps == 60);
+    auto fullContent = suite_clip::content;
+    fullContent.motion = fullMotion;
+    suite_clip::options.format = 4;
+    suite_clip::options.fps = 120;
+    auto fullOptions = suite_clip::FullRunOptions(suite_clip::options, fullContent);
+    assert(fullOptions.a == 0 && fullOptions.b == analysis->data->review->seconds && fullOptions.rate == 1 &&
+           fullOptions.camera == 0 && fullOptions.scene3d && !fullOptions.speedKeys &&
+           !fullOptions.fullbright && !fullOptions.route && fullOptions.format == 4 &&
+           fullOptions.fps == 120);
+    assert(suite_clip::options.a == 2 && suite_clip::options.b == 6 && suite_clip::options.rate == .5 &&
+           suite_clip::options.camera == 2 && suite_clip::options.fullbright);
+    auto imageOutput = suite_clip::options;
+    suite_clip::ApplyExportPreset(imageOutput, 6);
+    auto videoOutput = suite_clip::FullRunOptions(imageOutput, fullContent);
+    assert(videoOutput.format == 6 && !videoOutput.transparent && videoOutput.fps == 60);
+    suite_clip::content = fullContent;
+    auto backend = suite_clip::backendAvailable;
+    suite_clip::backendAvailable = true;
+    auto studioFrame = [&] {
+        ImGui::NewFrame();
+        suite_ui::BeginFrame(true, false);
+        suite_clip::Render();
+        ImGui::Render();
+    };
+    for (int i = 0; i < 3; i++)
+        studioFrame();
+    auto *studio = ImGui::FindWindowByName(suite_clip::WindowTitle().c_str());
+    assert(studio && !suite_clip::startRequested);
+    ImGui::ActivateItemByID(studio->GetID("Full run video"));
+    studioFrame();
+    assert(suite_clip::startRequested && suite_clip::fullRunRequested && !suite_clip::testRequested &&
+           suite_clip::options.a == 2 && suite_clip::options.b == 6 && suite_clip::options.camera == 2);
+    suite_clip::startRequested = suite_clip::fullRunRequested = false;
+    suite_clip::backendAvailable = backend;
     suite_clip::Open(analysis, motion);
     for (int i = 0; i < 3; i++)
     {

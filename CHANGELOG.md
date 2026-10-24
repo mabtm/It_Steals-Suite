@@ -2,6 +2,14 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.13.1 Changelog
+
+- Fixed a bug caused by slow shared-memory reads delaying the OBS menu. Capture now uses bulk copies, releases its lock before GPU uploads, and reuses the rendered menu instead of drawing it twice.
+- Improved Clip Studio with its own Full run video button. It exports the original camera at normal speed, keeps your video output settings, and preserves clip edits.
+- Improved video export transfers with a bounded bulk copy instead of byte-wise writes between the game and trainer.
+- Improved native replays with recorded mesh material changes, including eye and door-indicator materials, plus world-sprite poses. Missing visual assets are reported instead of silently ignored.
+- Improved Recording check with explicit replay limits for particles, the original game UI, procedural material properties, and objects created after scene discovery.
+
 ### v7.13.0 Changelog
 
 - Improved OBS capture with an optional in-game copy of the trainer's HUD and menu. Enable it under Settings > System, then capture the It Steals window in OBS.

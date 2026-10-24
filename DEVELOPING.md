@@ -94,25 +94,39 @@ Once the checks pass, capture real footage for the GitHub tour: seed search, rep
 
 ## Capture and final release checks
 
-Enable **Settings > System > Include trainer in game captures (OBS)**. In OBS add **Window Capture**, select **It Steals**, and use the **Windows 10** capture method. Game Capture can also capture the in-game presentation. Capture the game window rather than the trainer's external windows. This mode transfers only occupied HUD regions; interactive menus use a separate readback. It adds work while enabled, so compare performance with the setting off and on. The native overlay stays available until the game acknowledges drawing the transferred pixels. Disconnects, hidden overlays and stale frames clear the in-game copy.
+Enable **Settings > System > Include trainer in game captures (OBS)**. In OBS add **Window Capture**, select **It Steals**, and use the **Windows 10** capture method. Game Capture can also capture the in-game presentation. Capture the game window rather than the trainer's external windows. This mode transfers only occupied regions. Menus reuse the existing composition buffer, with asynchronous readback capped at about 60 Hz. Unchanged readbacks are not republished. Unity copies the bounded payload in bulk and releases the shared mutex before creating or uploading textures. It adds work while enabled, so compare performance with the setting off and on. The native overlay stays available until the game acknowledges drawing the transferred pixels. Disconnects, hidden overlays and stale frames clear the in-game copy.
 
 Use **Passed / Failed / Not tested** for each row. Record the Suite version and OBS capture method. Screenshots or a short clip of a failed check are useful.
 
 | Check | Steps and expected result |
 | --- | --- |
 | OBS picture | Capture only the It Steals window, enable the capture setting, and close the Suite menu. The HUD, timer and validity badge appear once, with readable text and correct colors/transparency. |
-| OBS menu | Open F3, change a HUD color, move a block, and close F3. Both the recording and the game show the same placement and style. Menu buttons remain clickable. |
+| OBS menu | Open F3, change a HUD color, move a block, and close F3. Both the recording and the game show the same placement and style. Menu buttons, scrolling, dragging and the custom cursor remain responsive. |
 | Focus and display | Alt-Tab to OBS and back three times. Resize the game, then try borderless fullscreen. The overlay follows the game, clears outside it, and returns without a frozen copy or duplicate panels. |
 | Capture fallback | Toggle capture off and on, then close the trainer while the game is open. The normal overlay works when disabled and no in-game image remains after disconnect. Restarting the trainer reconnects. |
-| Capture performance | At the same fixed-seed position, compare 30 seconds with capture off and on. Note game FPS, helper work, and stutter; test a menu and a passive HUD separately. |
+| Capture performance | At the same fixed-seed position, compare 30 seconds with capture off and on. Note game FPS, menu responsiveness, helper work, and stutter; test a menu and a passive HUD separately, including the highest resolution you use. |
 | Crystal effects | Record a new run. In native 3D playback, watch an uncollected crystal, pause, seek backward, and resume. Compare its rotation and hologram with the game. Seeking twice to the same time should show the same effect phase. Older files use a replay-relative shader phase. |
-| Other animations | Check the player's arms, enemy motion, lights and a ceiling fan. Leave 3D playback and verify normal game movement, camera, audio and animations resume. |
-| Full-run video | Set a short clip range and alter the camera/speed, then reopen the replay and choose **Full run video**. The editor resets to the whole run, original camera, normal speed and 1080p60. Export and check the beginning, ending, sound and duration in VLC. |
+| Other animations | Check the player's arms, enemy motion, sprite orientation, lights, a ceiling fan, eye color changes and vault-button materials. Leave 3D playback and verify normal game movement, camera, audio and animations resume. |
+| Full-run video | In Clip Studio, set a short range, alter camera/speed and select a video preset, resolution and FPS. Click **Full run video** in the footer. The export covers the whole run with the original camera, normal speed and recorded audio, using the chosen video output settings. Clip edits stay intact. GIF/PNG output settings use 1080p60 MP4 for this button. Check the beginning, ending, sound and duration in VLC. |
 | 120 FPS video | Export a short 1080p120 lossless clip with recorded sound. Check smooth playback and audio sync in VLC. Check the accompanying JSON for 120 FPS and matching container/audio durations. |
 | Statistics and routes | Clear the local counters, complete a run and abort another. Confirm PBs and saved replays remain. Check both Hide & Seek routes and that full-route visibility survives selecting another seed. |
 | Install and update | Use the release Setup, confirm the detected game folder, and check versions after updating. Settings and replays must remain. Close the game: the trainer exits and its graphic remains visible for about 1.65 seconds. |
 
 Repeat the mode checks above in every supported mode before marking the public release ready. Keep the broader mode/seed/replay checks in the previous section as part of this pass.
+
+### Replay fidelity
+
+The game assembly and asset metadata were checked alongside the capture and playback paths. Coverage means successful observations of the supported tracks; it does not certify that every visible effect was recorded.
+
+| Channel | Captured and replayed | Remaining limits |
+| --- | --- | --- |
+| Poses and animation | Player/enemy transforms, cached bone poses, blendshapes, Animator state and transitions; shader effects follow the recorded scene clock. | Observation resolution and capacity are bounded. Procedural transforms without a bound pose can be missed. |
+| Meshes and materials | Original meshes and shaders, first-slot material changes, primary texture and color, renderer visibility. | Other material slots and arbitrary shader properties such as emission or animated UV scale are not fully recorded. |
+| Sprites | Sprite identity, color, flips, visibility and bound poses. | Original game UI Images/Canvases are separate from SpriteRenderer tracks and are not reproduced in full. |
+| Particles and runtime objects | Existing supported scene/actor renderers are cached. | Particle systems, trails and lines are excluded. The game creates pickup explosions and uses phantom particles; these are known replay differences. New objects outside actor discovery can be absent. |
+| Audio | Listener PCM plus supported centered 2D listener-bypass sources, including hooked Play/PlayOneShot calls. Files verify identity and the full checksum. | Unsupported spatial/filter bypass routes, queue loss or storage limits produce Partial with the recorded reason. The checksum verifies stored audio, not the audibility of every route. |
+
+Material identity uses the existing mesh-track asset reference, so the input wire format remains 7 and previous recordings still load. Runtime instances resolve to the original material when it is unambiguous; unresolved assets appear in the 3D viewer status. The Recording check and its copied report state the fidelity limits. A direct in-game A/B test is still required for each mode, sound route and effect before public release.
 
 **Deferred:** automatic PB recording will be considered separately after this capture work. The full-run button currently renders a replay; it does not start or control OBS, automatically save PB videos, upload a run, or certify leaderboard eligibility.
 
@@ -148,7 +162,7 @@ For a local Windows package build, install **NSIS 3**, then run:
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
-Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.13.0**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
+Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.13.1**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
 Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
 

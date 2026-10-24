@@ -188,6 +188,9 @@ public sealed class RenderTexture : Object
 public sealed class Texture2D : Object
 {
     public static int FullReads;
+    public static Action Uploaded;
+    public static int Uploads;
+    public static byte[] UploadedBytes;
     public HideFlags hideFlags;
     public byte[] Bytes;
     readonly TextureFormat format;
@@ -214,7 +217,13 @@ public sealed class Texture2D : Object
         }
     }
 
-    public void Apply(bool m, bool n) {}
+    public void Apply(bool m, bool n)
+    {
+        Uploads++;
+        UploadedBytes = Bytes;
+        if (Uploaded != null)
+            Uploaded();
+    }
 
     public void LoadRawTextureData(byte[] bytes)
     {
@@ -573,9 +582,34 @@ public static class ClipChannelTests
             capture.Write(76, 2);
             capture.Write(80, 256);
             capture.Write(84, 16);
-            capture.WriteArray(256, new byte[16], 0, 16);
+            var frame = new byte[] { 7, 19, 31, 41, 53, 61, 73, 89, 97, 101, 113, 127, 139, 151, 163, 179 };
+            capture.WriteArray(256, frame, 0, frame.Length);
             capture.Write(16, 1u);
+            bool uploadUnlocked = false;
+            using (var producerGate = Mutex.OpenExisting("Local\\ItSteals.Capture.v1." + Pid + ".Lock"))
+            {
+                UnityEngine.Texture2D.Uploaded = () =>
+                {
+                    var producer = new Thread(() =>
+                                              {
+                                                  uploadUnlocked = producerGate.WaitOne(0);
+                                                  if (uploadUnlocked)
+                                                      producerGate.ReleaseMutex();
+                                              });
+                    producer.Start();
+                    Check(producer.Join(1000), "capture upload did not release producer");
+                };
+                overlay.Tick(true);
+                UnityEngine.Texture2D.Uploaded = null;
+            }
+            Check(uploadUnlocked, "GPU uploads must not hold the cross-process mutex");
+            Check(UnityEngine.Texture2D.UploadedBytes.Length == frame.Length,
+                  "capture bulk copy retains the exact payload size");
+            for (int i = 0; i < frame.Length; i++)
+                Check(UnityEngine.Texture2D.UploadedBytes[i] == frame[i], "capture bulk copy preserves BGRA");
+            int uploads = UnityEngine.Texture2D.Uploads;
             overlay.Tick(true);
+            Check(UnityEngine.Texture2D.Uploads == uploads, "unchanged capture frames never upload twice");
             UnityEngine.Event.current.type = UnityEngine.EventType.Layout;
             overlay.Draw();
             Check(capture.ReadUInt32(20) == 0, "capture acknowledgement requires an actual repaint");
@@ -607,6 +641,29 @@ public static class ClipChannelTests
             overlay.Tick(false);
             overlay.Draw();
             Check(UnityEngine.GUI.Draws == 2, "disconnect clears the in-game presentation");
+            const int largeBytes = 1920 * 1080 * 4;
+            var large = new byte[largeBytes];
+            large[largeBytes - 1] = 193;
+            capture.Write(24, 1920);
+            capture.Write(28, 1080);
+            capture.Write(64, 0);
+            capture.Write(68, 0);
+            capture.Write(72, 1920);
+            capture.Write(76, 1080);
+            capture.Write(84, largeBytes);
+            System.Runtime.InteropServices.Marshal.Copy(
+                large, 0, IntPtr.Add(capture.SafeMemoryMappedViewHandle.DangerousGetHandle(), 256),
+                largeBytes);
+            capture.Write(16, 5u);
+            var bulk = System.Diagnostics.Stopwatch.StartNew();
+            overlay.Tick(true);
+            bulk.Stop();
+            Check(UnityEngine.Texture2D.UploadedBytes.Length == largeBytes &&
+                      UnityEngine.Texture2D.UploadedBytes[largeBytes - 1] == 193,
+                  "full-size capture copies the last byte without truncation");
+            Console.WriteLine("1080p capture bulk read + host texture copy: " +
+                              bulk.Elapsed.TotalMilliseconds.ToString("F2") +
+                              " ms (not a GPU upload benchmark)");
         }
         Console.WriteLine(
             "Production v4 channel + GPU adapter / host graphics doubles / " + mode +

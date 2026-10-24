@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.13.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.13.0)**
+**[v7.13.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.13.1)**
 
-- Improved OBS capture with an optional in-game copy of the trainer's HUD and menu. Enable it under Settings > System, then capture the It Steals window in OBS.
-- Improved 3D replays with a separate material clock for animated effects such as crystal holograms. Effects follow playback, pause, seeks, and exports.
-- Improved full-run exports with a 1080p60 preset using the original camera and normal speed. Export reports identify rendered replays.
+- Fixed a bug caused by slow shared-memory reads delaying the OBS menu. Capture now uses bulk copies, releases its lock before GPU uploads, and reuses the rendered menu instead of drawing it twice.
+- Improved Clip Studio with its own Full run video button. It exports the original camera at normal speed, keeps your video output settings, and preserves clip edits.
+- Improved video export transfers with a bounded bulk copy instead of byte-wise writes between the game and trainer.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

@@ -1950,6 +1950,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             suite_ui::ApplyPalette(g_mainBgCol, g_textCol, g_headerCol);
             if (g_resizeWidth && g_resizeHeight)
             {
+                // Capture owns a reference to the composition backbuffer.
+                // Release it before ResizeBuffers, just like the main RTV.
+                g_captureOverlay.ResetGraphics();
                 g_pd3dDeviceContext->OMSetRenderTargets(0, nullptr, nullptr);
                 if (g_mainRenderTargetView)
                 {
@@ -2132,9 +2135,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
                     if (g_surfaceInteractive && g_captureOverlayEnabled && g_alphaCompositing)
                     {
-                        g_captureOverlay.RenderMenu(g_pd3dDevice, g_pd3dDeviceContext, binding.clientRect,
-                                                    g_wc);
-                        g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+                        g_captureOverlay.CopyMenu(
+                            g_pd3dDevice, g_pd3dDeviceContext, g_mainRenderTargetView, binding.clientRect,
+                            g_wc,
+                            HudContentRegions(*ImGui::GetDrawData(), int(ImGui::GetDrawData()->DisplaySize.x),
+                                              int(ImGui::GetDrawData()->DisplaySize.y)));
                         if (g_captureOverlay.Active())
                             g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear);
                     }

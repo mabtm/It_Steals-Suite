@@ -7,8 +7,8 @@
 namespace suite_clip
 {
 inline bool open = false, requestOpen = false, playPreview = false, startRequested = false,
-            testRequested = false, cancelRequested = false, dirty = false, backendAvailable = false,
-            actualSize = false;
+            testRequested = false, fullRunRequested = false, cancelRequested = false, dirty = false,
+            backendAvailable = false, actualSize = false;
 inline bool focusWindow = false, started3d = false, editLayout = false, cameraEditing = false,
             shownPoseReady = false;
 inline int selectedBlock = Keyboard, selectedKey = -1, profileSlot = 0, dragBlock = -1;
@@ -279,24 +279,26 @@ inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
     PauseViewer();
 }
 
-inline void OpenFullRun(std::shared_ptr<const practice::MapAnalysis> analysis,
-                        std::shared_ptr<const practice::ReplayMotion> motion)
+inline Options FullRunOptions(const Options &output, const Content &source)
 {
-    if (!analysis || !analysis->data || !analysis->data->review || !motion || motion->frames.empty() ||
-        (g_pShared && g_pShared->timerState == 1) || encoder.State() == 1)
-        return;
-    Open(analysis, motion);
-    options = Options();
-    ApplyExportPreset(options, 0);
-    options.b = analysis->data->review->seconds;
-    options.scene3d = true;
-    options.speedKeys = options.route = options.colliders = false;
-    options.audio = motion->experience.audio.recorded && !motion->audioFile.empty();
-    content.track = {};
-    previewAt = 0;
-    SeedCamera();
-    ChangedCamera();
-    status = "Full run / original camera / 1x speed / rendered replay";
+    if (!source.analysis || !source.analysis->data || !source.analysis->data->review || !source.motion ||
+        source.motion->frames.empty())
+        throw std::runtime_error("Full run video needs a recorded camera");
+    auto full = output;
+    if (full.format == 1 || full.format == 3)
+        ApplyExportPreset(full, 0);
+    full.a = 0;
+    full.b = source.analysis->data->review->seconds;
+    full.rate = 1;
+    full.camera = 0;
+    full.scene3d = true;
+    full.speedKeys = full.route = full.colliders = full.fullbright = full.hideCeiling = full.fadeWalls =
+        full.simplified = full.transparent = false;
+    full.timing.reset();
+    full.audio = source.motion->experience.audio.recorded && !source.motion->audioFile.empty();
+    full.audioVolume = 1;
+    full.Validate(full.b);
+    return full;
 }
 
 inline void Close()
@@ -324,14 +326,6 @@ inline void Button(std::shared_ptr<const practice::MapAnalysis> a,
     ImGui::EndDisabled();
     Help("Compose a clip, animate a camera track, then export MP4, GIF, RGB "
          "lossless MKV or a PNG sequence. New recordings include the original game mix.");
-    SameLineIfFits("Full run video");
-    ImGui::BeginDisabled(!a || !a->data || !a->data->review || !motion || motion->frames.empty() ||
-                         encoder.State() == 1);
-    if (suite_ui::Button("Full run video"))
-        OpenFullRun(a, motion);
-    ImGui::EndDisabled();
-    Help(
-        "Prepare the entire recorded run at 1080p60, original camera and 1x speed, ignoring clip trims and camera edits. This is a rendered replay; leaderboard acceptance depends on the board's rules.");
 }
 
 inline void Field(const char *text)
@@ -1347,7 +1341,7 @@ inline void Render()
         if (suite_ui::Button("Settings", {w, 0}))
             narrowPage = 1;
     }
-    float footer = std::min(78 * unit, ImGui::GetContentRegionAvail().y * .30f);
+    float footer = std::min((narrow ? 110.f : 78.f) * unit, ImGui::GetContentRegionAvail().y * .38f);
     ImGui::BeginChild("Clip body", {0, -footer}, false);
     float controls = std::min(390 * unit, ImGui::GetContentRegionAvail().x * .34f);
     bool changed = false;
@@ -1496,7 +1490,7 @@ inline void Render()
         if (suite_ui::Button(narrow ? "Export" : "Export clip"))
         {
             startRequested = true;
-            testRequested = false;
+            testRequested = fullRunRequested = false;
             playPreview = false;
             error.clear();
             Changed();
@@ -1505,11 +1499,34 @@ inline void Render()
         if (suite_ui::Button(narrow ? "3 s test" : "3 s test export"))
         {
             startRequested = testRequested = true;
+            fullRunRequested = false;
             playPreview = false;
             error.clear();
             Changed();
         }
         ImGui::EndDisabled();
+        SameLineIfFits("Full run video");
+        bool fullReady = backendAvailable;
+        try
+        {
+            FullRunOptions(options, content);
+        }
+        catch (const std::exception &)
+        {
+            fullReady = false;
+        }
+        ImGui::BeginDisabled(!fullReady);
+        if (suite_ui::Button("Full run video"))
+        {
+            startRequested = fullRunRequested = true;
+            testRequested = playPreview = false;
+            error.clear();
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("Export the whole run: original camera, 1x speed and recorded audio.\n"
+                              "Uses your video output settings; GIF / PNG use 1080p60 MP4.\n"
+                              "Clip edits stay saved. This exports a rendered replay.");
         SameLineIfFits("Close");
         if (suite_ui::Button("Close") || ImGui::IsKeyPressed(ImGuiKey_Escape))
             Close();

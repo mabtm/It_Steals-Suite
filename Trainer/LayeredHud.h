@@ -100,6 +100,7 @@ class LayeredHud
     std::array<Surface, 4> surfaces{};
     size_t active = 0;
     ULONGLONG lastPresented = 0, lastBadgePresented = 0;
+    uint64_t generation = 0;
     UINT width = 0, height = 0;
     double uploadMs = 0;
 
@@ -115,6 +116,7 @@ class LayeredHud
             s.Reset();
         active = 0;
         lastPresented = lastBadgePresented = 0;
+        generation = 0;
         uploadMs = 0;
         if (color)
         {
@@ -139,6 +141,24 @@ class LayeredHud
         desc.BindFlags = D3D11_BIND_RENDER_TARGET;
         return SUCCEEDED(device->CreateTexture2D(&desc, nullptr, &color)) &&
                SUCCEEDED(device->CreateRenderTargetView(color, nullptr, view));
+    }
+
+    // Capture the already rendered composition buffer without another UI pass.
+    bool UseTexture(ID3D11Texture2D *texture)
+    {
+        if (color == texture)
+            return color != nullptr;
+        D3D11_TEXTURE2D_DESC desc{};
+        if (texture)
+            texture->GetDesc(&desc);
+        if (!texture || desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM || desc.SampleDesc.Count != 1)
+            return false;
+        Reset();
+        color = texture;
+        color->AddRef();
+        width = desc.Width;
+        height = desc.Height;
+        return true;
     }
 
     void SyncVisibility(bool show, const RECT &gameClient)
@@ -226,6 +246,7 @@ class LayeredHud
                     if (s.badge[slot])
                         lastBadgePresented = lastPresented;
                     s.presented = frame;
+                    ++generation;
                 }
                 else if (hr != DXGI_ERROR_WAS_STILL_DRAWING)
                     return false;
@@ -266,6 +287,11 @@ class LayeredHud
     ULONGLONG LastPresented() const
     {
         return lastPresented;
+    }
+
+    uint64_t Generation() const
+    {
+        return generation;
     }
 
     ULONGLONG LastBadgePresented() const

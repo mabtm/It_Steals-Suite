@@ -1,6 +1,5 @@
 #pragma once
 #include "LayeredHud.h"
-#include "imgui_impl_dx11.h"
 #include <string>
 #include <vector>
 
@@ -15,7 +14,21 @@ class CaptureOverlay
     uint32_t acknowledged = 0;
     ULONGLONG lastAck = 0, nextConnect = 0;
     LayeredHud menu;
-    ID3D11RenderTargetView *menuView = nullptr;
+    const LayeredHud *lastSource = nullptr;
+    uint64_t lastFrame = 0;
+    ULONGLONG nextMenu = 0;
+
+    static const std::array<uint8_t, 65536> &StraightAlpha()
+    {
+        static const auto values = [] {
+            std::array<uint8_t, 65536> result{};
+            for (unsigned a = 1; a < 256; ++a)
+                for (unsigned c = 0; c < 256; ++c)
+                    result[a * 256 + c] = uint8_t(std::min(255u, (c * 255 + a / 2) / a));
+            return result;
+        }();
+        return values;
+    }
 
     bool Lock()
     {
@@ -53,9 +66,8 @@ class CaptureOverlay
     void ResetGraphics()
     {
         lastAck = 0;
-        if (menuView)
-            menuView->Release();
-        menuView = nullptr;
+        lastSource = nullptr;
+        lastFrame = nextMenu = 0;
         menu.Reset();
     }
 
@@ -126,8 +138,10 @@ class CaptureOverlay
 
     void Publish(const LayeredHud &source)
     {
-        if (!enabled || !data || !Lock())
+        if (!enabled || !data || !source.Generation() ||
+            (lastSource == &source && lastFrame == source.Generation()) || !Lock())
             return;
+        const auto &alphaTable = StraightAlpha();
         uint32_t count = 0, offset = 256;
         bool valid = true;
         source.VisitPixels([&](HudRegion region, const uint8_t *pixels) {
@@ -153,10 +167,9 @@ class CaptureOverlay
                     std::memcpy(data + offset + i, pixels + i, 4);
                     continue;
                 }
+                const auto *row = alphaTable.data() + unsigned(alpha) * 256;
                 for (int c = 0; c < 3; c++)
-                    data[offset + i + c] =
-                        alpha ? uint8_t(std::min(255u, (unsigned(pixels[i + c]) * 255 + alpha / 2) / alpha))
-                              : 0;
+                    data[offset + i + c] = row[pixels[i + c]];
                 data[offset + i + 3] = alpha;
             }
             offset += uint32_t(size);
@@ -168,28 +181,30 @@ class CaptureOverlay
         Write(36, valid && count ? 1u : 0u);
         auto serial = Read<uint32_t>(16) + 1;
         Write(16, serial ? serial : 1u);
+        lastSource = &source;
+        lastFrame = source.Generation();
         ReleaseMutex(mutex);
     }
 
-    void RenderMenu(ID3D11Device *device, ID3D11DeviceContext *context, const RECT &client,
-                    const WNDCLASSEXW &wc)
+    void CopyMenu(ID3D11Device *device, ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
+                  const RECT &client, const WNDCLASSEXW &wc, const std::vector<HudRegion> &regions)
     {
-        auto *draw = ImGui::GetDrawData();
-        UINT w = UINT(draw->DisplaySize.x), h = UINT(draw->DisplaySize.y);
-        if (!enabled || !data || !w || !h)
+        auto now = GetTickCount64();
+        if (!enabled || !data || !target || now < nextMenu)
             return;
-        if (!menuView || menu.Width() != w || menu.Height() != h)
+        nextMenu = now + 16;
+        ID3D11Resource *resource = nullptr;
+        ID3D11Texture2D *texture = nullptr;
+        target->GetResource(&resource);
+        if (resource)
         {
-            ResetGraphics();
-            if (!menu.Resize(device, w, h, &menuView))
-                return;
+            resource->QueryInterface(IID_PPV_ARGS(&texture));
+            resource->Release();
         }
-        const float clear[4]{};
-        context->OMSetRenderTargets(1, &menuView, nullptr);
-        context->ClearRenderTargetView(menuView, clear);
-        ImGui_ImplDX11_RenderDrawData(draw);
-        if (menu.Present(device, context, nullptr, nullptr, wc, client,
-                         HudContentRegions(*draw, int(w), int(h)), {}, 0, false))
+        bool ready = texture && menu.UseTexture(texture);
+        if (texture)
+            texture->Release();
+        if (ready && menu.Present(device, context, nullptr, nullptr, wc, client, regions, {}, 0, false))
             Publish(menu);
     }
 };

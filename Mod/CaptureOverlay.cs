@@ -1,5 +1,6 @@
 using System;
 using System.IO.MemoryMappedFiles;
+using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine;
 
@@ -78,6 +79,21 @@ public sealed class CaptureOverlay : IDisposable
                 if (iw < 1 || ih < 1 || x < 0 || y < 0 || (long)x + iw > w || (long)y + ih > h ||
                     (long)iw * ih * 4 != bytes || offset < 256 || (long)offset + bytes > Capacity)
                     throw new InvalidOperationException("Invalid capture overlay region");
+                if (pixels[i] == null || pixels[i].Length != bytes)
+                    pixels[i] = new byte[bytes];
+                // Mono's accessor ReadArray<byte> copies element by element.
+                // The validated region is contiguous; copy it in one operation.
+                Marshal.Copy(IntPtr.Add(view.SafeMemoryMappedViewHandle.DangerousGetHandle(),
+                                        checked((int)view.PointerOffset + offset)),
+                             pixels[i], 0, bytes);
+                bounds[i] = new Rect(x, y, iw, ih);
+            }
+            // Never hold the producer's mutex during texture creation/upload.
+            gate.ReleaseMutex();
+            locked = false;
+            for (int i = 0; i < n; i++)
+            {
+                int iw = (int)bounds[i].width, ih = (int)bounds[i].height;
                 if (images[i] == null || images[i].width != iw || images[i].height != ih)
                 {
                     if (images[i] != null)
@@ -86,13 +102,11 @@ public sealed class CaptureOverlay : IDisposable
                                               false) { hideFlags = HideFlags.HideAndDontSave,
                                                        filterMode = FilterMode.Point,
                                                        wrapMode = TextureWrapMode.Clamp };
-                    pixels[i] = new byte[bytes];
                 }
-                view.ReadArray(offset, pixels[i], 0, bytes);
                 images[i].LoadRawTextureData(pixels[i]);
                 images[i].Apply(false, false);
-                bounds[i] = new Rect(x, y, iw, ih);
             }
+            GC.KeepAlive(view);
             width = w;
             height = h;
             count = n;

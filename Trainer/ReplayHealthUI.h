@@ -27,12 +27,13 @@ inline bool RenderRecordingCheck(const practice::ReplayMotion &motion, practice:
     else if (check->unknown)
         label += " / historical data";
     else
-        label += " / complete";
+        label += " / observed tracks complete";
     bool open = ImGui::CollapsingHeader(label.c_str());
     Help(
         "Checks movement, camera, inputs, visual/animation observations, colliders and recorded audio. Complete means no detected capture gaps at the recorded resolution. This is independent of VALID / UNVALID and is not proof of replay origin.");
     if (!open)
         return false;
+    Help(practice::ReplayFidelityScope);
     bool seek = false;
     if (ImGui::BeginTable("##Recording coverage", 2, ImGuiTableFlags_SizingStretchProp))
     {

@@ -3,6 +3,51 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using System.Collections.Generic;
 
+// Material assets stay in the installed game. Prefer the original asset over
+// runtime instances, and refuse ambiguous names instead of choosing at random.
+public sealed class ReplayMaterialLibrary
+{
+    private sealed class Entry
+    {
+        public Material Asset;
+        public bool Original;
+    }
+
+    private readonly Dictionary<string, Entry> assets = new Dictionary<string, Entry>(StringComparer.Ordinal);
+
+    public static string Key(Material material)
+    {
+        if (material == null || material.shader == null)
+            return "";
+        string name = material.name ?? "";
+        while (name.EndsWith(" (Instance)", StringComparison.Ordinal))
+            name = name.Substring(0, name.Length - 11);
+        return "M|" + name + "|" + material.shader.name;
+    }
+
+    public ReplayMaterialLibrary(IEnumerable<Material> materials)
+    {
+        foreach (var material in materials)
+        {
+            string key = Key(material);
+            if (key.Length == 0)
+                continue;
+            bool original = !(material.name ?? "").EndsWith(" (Instance)", StringComparison.Ordinal);
+            Entry previous;
+            if (!assets.TryGetValue(key, out previous) || original && !previous.Original)
+                assets[key] = new Entry { Asset = material, Original = original };
+            else if (original == previous.Original && previous.Asset != material)
+                previous.Asset = null;
+        }
+    }
+
+    public Material Find(string key)
+    {
+        Entry found;
+        return assets.TryGetValue(key, out found) ? found.Asset : null;
+    }
+}
+
 // Style the existing renderer. Do not copy its MeshFilter: a static-batched
 // renderer owns a sub-range of a shared combined mesh, not that whole mesh.
 public static class ReplayRendererScope

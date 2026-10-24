@@ -6,6 +6,11 @@
 
 namespace practice
 {
+inline constexpr const char *ReplayFidelityScope =
+    "Visual coverage checks recorded poses, renderers, sprites, lights and animation metadata. "
+    "Particle simulation, the original game UI, every material property and objects spawned after "
+    "discovery are not fully captured. Complete describes the observed tracks, not every pixel of the game.";
+
 enum class RecordingStatus
 {
     Complete,
@@ -282,7 +287,8 @@ inline std::string RecordingCheckReport(const ReplayMotion &m, const RecordingCh
     out << std::fixed << std::setprecision(6) << "PracticeSuite recording check\nRun: " << m.id
         << " / scene: " << m.scene << " / seed: " << m.seed << " / seconds: " << m.seconds
         << " / input format: " << m.inputFormat
-        << "\nRecording coverage at observed resolution; separate from run validity and origin verification.\n";
+        << "\nRecording coverage at observed resolution; separate from run validity and origin verification.\n"
+        << "Replay fidelity: " << ReplayFidelityScope << "\n";
     for (const auto &c : check.channels)
     {
         out << c.name << ": " << RecordingStatusName(c.status) << " / samples: " << c.samples

@@ -94,9 +94,21 @@ public sealed class Camera
     }
 }
 
+public sealed class Shader
+{
+    public string name = "Game/Original";
+}
+
 public sealed class Material
 {
     public string Name;
+    public string name
+    {
+        get {
+            return Name;
+        }
+    }
+    public Shader shader = new Shader();
 
     public Material(string name)
     {
@@ -224,6 +236,23 @@ public static class ReplayRendererTests
 
     public static int Main()
     {
+        var asset = new Material("Eye");
+        var instance = new Material("Eye (Instance)");
+        var library = new ReplayMaterialLibrary(new[] { instance, asset });
+        Check(ReplayMaterialLibrary.Key(asset) == ReplayMaterialLibrary.Key(instance) &&
+                  ReferenceEquals(library.Find(ReplayMaterialLibrary.Key(instance)), asset),
+              "runtime instances resolve to the original shader/material asset");
+        library = new ReplayMaterialLibrary(new[] { asset, instance });
+        Check(ReferenceEquals(library.Find(ReplayMaterialLibrary.Key(asset)), asset),
+              "material resolution is independent of asset discovery order");
+        var otherShader = new Material("Eye");
+        otherShader.shader.name = "Game/Hologram";
+        library = new ReplayMaterialLibrary(new[] { asset, otherShader });
+        Check(ReferenceEquals(library.Find(ReplayMaterialLibrary.Key(otherShader)), otherShader),
+              "equal material names with different shaders remain distinct");
+        library = new ReplayMaterialLibrary(new[] { asset, new Material("Eye"), instance });
+        Check(library.Find(ReplayMaterialLibrary.Key(asset)) == null && library.Find("missing") == null,
+              "ambiguous or absent materials never select an arbitrary asset");
         Material originalA = new Material("wall"), originalB = new Material("floor"),
                  flat = new Material("shared flat");
         var batch = new object();

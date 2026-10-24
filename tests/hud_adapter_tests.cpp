@@ -31,7 +31,7 @@ int main()
     HudRegion badge{640, 420, 700, 445};
     assert(hud.Present(&device, &context, main, game, wc, client, regions, badge));
     assert(hud.SurfaceCount() == 2 && context.copies == 2 && context.flushes == 1 &&
-           hud.LastPresented() == 0 && main->uploads == 0);
+           hud.LastPresented() == 0 && hud.Generation() == 0 && main->uploads == 0);
     auto aux = fakeWindows.back().get();
     assert(aux != main && aux->owner == game &&
            aux->styles == (WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW));
@@ -39,9 +39,23 @@ int main()
     assert(hud.Present(&device, &context, main, game, wc, client, regions, badge));
     assert(main->uploads == 1 && aux->uploads == 1 && hud.LastPresented() == 110 &&
            hud.LastBadgePresented() == 110 && main->blend == 255 && aux->blend == 255);
+    assert(hud.Generation() == 2);
     assert(main->pixels.front() == Pixel(16, 16) && main->pixels[127] == Pixel(143, 16) &&
            main->pixels[128] == Pixel(16, 17) && main->pixels.back() == Pixel(143, 111));
     assert(aux->pixels.front() == Pixel(600, 400) && aux->pixels.back() == Pixel(791, 591));
+    {
+        LayeredHud capture;
+        int references = color->references;
+        assert(!capture.UseTexture(nullptr) && capture.UseTexture(color));
+        assert(color->references == references + 1 && capture.Width() == 800 && capture.Height() == 600);
+        assert(capture.Present(&device, &context, nullptr, nullptr, wc, client, {regions[0]}, {}, 0, false));
+        assert(capture.Present(&device, &context, nullptr, nullptr, wc, client, {regions[0]}, {}, 0, false));
+        auto generation = capture.Generation();
+        assert(generation && capture.UseTexture(color) && capture.Generation() == generation &&
+               color->references == references + 1);
+        capture.Reset();
+        assert(color->references == references && capture.Generation() == 0);
+    }
     assert(hud.ReadbackBytes() == 128ull * 96 * 4 + 192ull * 192 * 4);
     assert(main->rect.left == client.left + 16 && main->rect.top == client.top + 16 &&
            aux->rect.left == client.left + 600);
