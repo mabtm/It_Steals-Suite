@@ -143,24 +143,6 @@ class LayeredHud
                SUCCEEDED(device->CreateRenderTargetView(color, nullptr, view));
     }
 
-    // Capture the already rendered composition buffer without another UI pass.
-    bool UseTexture(ID3D11Texture2D *texture)
-    {
-        if (color == texture)
-            return color != nullptr;
-        D3D11_TEXTURE2D_DESC desc{};
-        if (texture)
-            texture->GetDesc(&desc);
-        if (!texture || desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM || desc.SampleDesc.Count != 1)
-            return false;
-        Reset();
-        color = texture;
-        color->AddRef();
-        width = desc.Width;
-        height = desc.Height;
-        return true;
-    }
-
     void SyncVisibility(bool show, const RECT &gameClient)
     {
         for (size_t i = 1; i < active; i++)

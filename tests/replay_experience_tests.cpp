@@ -155,19 +155,25 @@ int main(int argc, char **argv)
     {
         std::ofstream plan(out / "clock-arguments.json");
         plan << '[';
-        for (int fps : {60, 120})
+        for (int sample : {0, 1, 2})
         {
+            int fps = sample == 0 ? 60 : 120;
             Options clock;
             clock.a = fps == 60 ? 16.039872630928851 : 45.712109447483272;
             clock.b = fps == 60 ? 26.909847730928828 : 50.602426142458171;
+            if (sample == 2)
+            {
+                clock.a = 0;
+                clock.b = 3601. / 120;
+            }
             clock.width = 1920;
             clock.height = 1080;
             clock.fps = fps;
             clock.format = 4;
             clock.audio = true;
-            assert(clock.Frames() == (fps == 60 ? 653 : 587));
+            assert(clock.Frames() == (sample == 2 ? 3601 : fps == 60 ? 653 : 587));
             auto codec = AudioCodecArguments(clock.format);
-            if (fps != 60)
+            if (sample)
                 plan << ',';
             plan << "{\"width\":" << clock.width << ",\"height\":" << clock.height << ",\"fps\":" << clock.fps
                  << ",\"frames\":" << clock.Frames()

@@ -24,7 +24,7 @@ Follow the owning component rather than adding a new layer for every change. Kee
 
 **PerformanceTiming.h** contains frame-cost and search-progress measurements. **MovementTiming.h** contains recorded movement analysis and travel-time estimates. Input colors live with their drawing helpers in **InputModules.h**.
 
-Map format 14 adds walkable collision-floor triangles alongside the existing NavMesh and obstacle capture. Input format 7 keeps bounded visual tracks and records explanations for missing audio routes. Both readers still accept previous formats; their original limits remain in place.
+Map format 14 adds walkable collision-floor triangles alongside the existing NavMesh and obstacle capture. Input format 8 adds bounded snapshots for game UI, extra cameras and particles. All recording channels share the 128 MiB input-file budget; omitted observations remain visible in Recording check. Audio format 1 uses checksummed reserved header bytes for PCM gap timestamps and queue diagnostics. Both readers still accept previous formats; their original limits remain in place.
 
 <details>
 <summary><strong>Where to find the main systems</strong></summary>
@@ -69,9 +69,9 @@ Use `--only TEST_NAME`, `--output DIRECTORY`, or `--compiler COMPILER` for a foc
 python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests routing_reliability_tests --output build/sanitized
 ```
 
-Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests.
+Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests; compile it separately against the matching game SDK and loader.
 
-The Windows release job also encodes 1080p clips at 60 FPS (653 frames) and 120 FPS (587 frames) with the supplied encoder, checks the AVI stream clocks, and decodes the recorded PCM for an exact comparison. Moving RGB bars exercise frame order and spatial detail. To repeat it, run `python tests/verify_audio_exports.py build/verification/replay_experience_tests/work bin/PracticeSuiteEncoder.exe --avi-only`. If independent FFmpeg and ffprobe are installed, it also checks every video timestamp and decoded RGB frame. These checks verify encoded files; they do not measure playback speed in a user's media player.
+The Windows release job also encodes 1080p clips at 60 FPS (653 frames) and 120 FPS (587 and 3,601 frames) with the supplied encoder, checks the AVI stream clocks, and decodes the recorded PCM for an exact comparison. Moving RGB bars exercise frame order and spatial detail. To repeat it, run `python tests/verify_audio_exports.py build/verification/replay_experience_tests/work bin/PracticeSuiteEncoder.exe --avi-only`. If independent FFmpeg and ffprobe are installed, it also checks every video timestamp and decoded RGB frame. These checks verify encoded files; they do not measure playback speed in a user's media player.
 
 ## Check in game
 
@@ -94,20 +94,23 @@ Once the checks pass, capture real footage for the GitHub tour: seed search, rep
 
 ## Capture and final release checks
 
-Enable **Settings > System > Include trainer in game captures (OBS)**. In OBS add **Window Capture**, select **It Steals**, and use the **Windows 10** capture method. Game Capture can also capture the in-game presentation. Capture the game window rather than the trainer's external windows. This mode transfers only occupied regions. Menus reuse the existing composition buffer, with asynchronous readback capped at about 60 Hz. Unchanged readbacks are not republished. Unity copies the bounded payload in bulk and releases the shared mutex before creating or uploading textures. It adds work while enabled, so compare performance with the setting off and on. The native overlay stays available until the game acknowledges drawing the transferred pixels. Disconnects, hidden overlays and stale frames clear the in-game copy.
+Enable **Settings > System > Include HUD in game captures (OBS)**. In OBS, capture **It Steals** with Window Capture (Windows 10 method) or Game Capture. The option transfers only passive compact/speedrun HUD regions. Interactive menus always use the trainer's direct render path; they do not wait for a GPU readback, shared-memory transfer or Unity upload. Add the trainer window as a separate OBS source to show menus. Unchanged HUD readbacks are not republished. Unity releases the shared mutex before GPU uploads. Disconnects, hidden overlays and stale frames clear the in-game HUD copy.
 
 Use **Passed / Failed / Not tested** for each row. Record the Suite version and OBS capture method. Screenshots or a short clip of a failed check are useful.
 
 | Check | Steps and expected result |
 | --- | --- |
 | OBS picture | Capture only the It Steals window, enable the capture setting, and close the Suite menu. The HUD, timer and validity badge appear once, with readable text and correct colors/transparency. |
-| OBS menu | Open F3, change a HUD color, move a block, and close F3. Both the recording and the game show the same placement and style. Menu buttons, scrolling, dragging and the custom cursor remain responsive. |
+| OBS menu | Open F3, change a HUD color, move a block, and close F3. The HUD style matches after closing F3. Menus stay in the trainer window; record that window separately if wanted. Menu buttons, scrolling, dragging and the custom cursor must feel as responsive with capture enabled as disabled. |
 | Focus and display | Alt-Tab to OBS and back three times. Resize the game, then try borderless fullscreen. The overlay follows the game, clears outside it, and returns without a frozen copy or duplicate panels. |
 | Capture fallback | Toggle capture off and on, then close the trainer while the game is open. The normal overlay works when disabled and no in-game image remains after disconnect. Restarting the trainer reconnects. |
 | Capture performance | At the same fixed-seed position, compare 30 seconds with capture off and on. Note game FPS, menu responsiveness, helper work, and stutter; test a menu and a passive HUD separately, including the highest resolution you use. |
 | Crystal effects | Record a new run. In native 3D playback, watch an uncollected crystal, pause, seek backward, and resume. Compare its rotation and hologram with the game. Seeking twice to the same time should show the same effect phase. Older files use a replay-relative shader phase. |
 | Other animations | Check the player's arms, enemy motion, sprite orientation, lights, a ceiling fan, eye color changes and vault-button materials. Leave 3D playback and verify normal game movement, camera, audio and animations resume. |
-| Full-run video | In Clip Studio, set a short range, alter camera/speed and select a video preset, resolution and FPS. Click **Full run video** in the footer. The export covers the whole run with the original camera, normal speed and recorded audio, using the chosen video output settings. Clip edits stay intact. GIF/PNG output settings use 1080p60 MP4 for this button. Check the beginning, ending, sound and duration in VLC. |
+| Full-run video | In Clip Studio, set a short range, alter camera/speed and select a video preset, resolution and FPS. Click **Full run video** in the footer. The export covers the whole run with the original camera, normal speed and recorded audio, using the chosen video output settings. Clip edits stay intact. GIF/PNG output settings use 1080p60 MP4 for this button. A fresh file check runs first. Check the beginning, ending, sound and duration in VLC, then the five-second replay-check card. The card and sidecar must retain original warnings and show partial/missing channels honestly. |
+| Game UI and effects | Record crystal pickups and a third monster flash. Compare remaining crystals, RUN, hands, flashlight, pickup particles and phantom particles in the game, replay and exported video. Pause, seek back and repeat in each supported mode. |
+| Replay recheck | Click Recheck replay for one completed and one invalid/aborted run. The stored verdict and warnings must remain unchanged. With a copy of the archive, damage an input or audio companion after loading it; a fresh recheck must fail despite the cached preview. |
+| Sustained AVI | Export over 3,601 frames at 1080p120 with Best Quality AVI. Note the output size and any slowdown. Keep the JSON sidecar and compare exportProgress entries before/after frame 3,000. |
 | 120 FPS video | Export a short 1080p120 lossless clip with recorded sound. Check smooth playback and audio sync in VLC. Check the accompanying JSON for 120 FPS and matching container/audio durations. |
 | Statistics and routes | Clear the local counters, complete a run and abort another. Confirm PBs and saved replays remain. Check both Hide & Seek routes and that full-route visibility survives selecting another seed. |
 | Install and update | Use the release Setup, confirm the detected game folder, and check versions after updating. Settings and replays must remain. Close the game: the trainer exits and its graphic remains visible for about 1.65 seconds. |
@@ -116,18 +119,21 @@ Repeat the mode checks above in every supported mode before marking the public r
 
 ### Replay fidelity
 
-The game assembly and asset metadata were checked alongside the capture and playback paths. Coverage means successful observations of the supported tracks; it does not certify that every visible effect was recorded.
+The game assembly and asset metadata were checked alongside capture and playback. Coverage means successful observations at the stated resolution, not every pixel or proof of replay origin.
 
-| Channel | Captured and replayed | Remaining limits |
+| Channel | New recordings | Remaining limits / live checks |
 | --- | --- | --- |
-| Poses and animation | Player/enemy transforms, cached bone poses, blendshapes, Animator state and transitions; shader effects follow the recorded scene clock. | Observation resolution and capacity are bounded. Procedural transforms without a bound pose can be missed. |
-| Meshes and materials | Original meshes and shaders, first-slot material changes, primary texture and color, renderer visibility. | Other material slots and arbitrary shader properties such as emission or animated UV scale are not fully recorded. |
-| Sprites | Sprite identity, color, flips, visibility and bound poses. | Original game UI Images/Canvases are separate from SpriteRenderer tracks and are not reproduced in full. |
-| Particles and runtime objects | Existing supported scene/actor renderers are cached. | Particle systems, trails and lines are excluded. The game creates pickup explosions and uses phantom particles; these are known replay differences. New objects outside actor discovery can be absent. |
-| Audio | Listener PCM plus supported centered 2D listener-bypass sources, including hooked Play/PlayOneShot calls. Files verify identity and the full checksum. | Unsupported spatial/filter bypass routes, queue loss or storage limits produce Partial with the recorded reason. The checksum verifies stored audio, not the audibility of every route. |
+| Player / animation | Adaptive player, monster and world poses, plus the separate Arms hierarchy, renderer states and blend shapes. | Compare arm/flashlight actions, eye changes, fan motion and crystal effects at normal speed, pause and backwards seeks. |
+| Cameras / game UI | Local poses and settings for BodyCam, UICamera and radar cameras; UI text, sprites, textures, layout, colors, groups and known material values at up to 60 Hz. | Compare remaining crystals, RUN messages, battery/breath indicators, radar, masks and multiple export aspect ratios. Unrecorded material properties may differ. |
+| Particles | Public particle values, emitter transforms, seeds and renderer states at up to 60 Hz. The original Instantiate call is observed for runtime bursts. Only visual-only particle prefabs can be recreated, with at most 128 runtime effect instances. Their automatic destruction is suspended during playback so backwards seeks remain possible. | Compare crystal pickup bursts and phantom effects. Trails/lines, unsafe or ambiguous runtime prefabs and effects between sampled frames can differ. Native engine playback structs are used only in memory to restore the scene, never loaded from replay files. |
+| Audio | Listener PCM plus supported 2D bypass routes, verified companions and sample-based timing. Gap reports identify start/interior/end boundaries and queue saturation. | Compare every mode and audible route. Spatial or filtered bypass routes that cannot be reconstructed retain explicit source warnings. A successful checksum does not erase capture gaps. |
+| Recheck / full-run card | Fresh reads, schema/identity/timeline checks, original-report comparisons and SHA-256 hashes on the archive worker. Full-run videos append a five-second card without requesting extra game renders. | A recheck never replaces the original run verdict or scans a past process. Local unsigned files and editable software cannot provide absolute tamper resistance or leaderboard approval. |
 
-Material identity uses the existing mesh-track asset reference, so the input wire format remains 7 and previous recordings still load. Runtime instances resolve to the original material when it is unambiguous; unresolved assets appear in the 3D viewer status. The Recording check and its copied report state the fidelity limits. A direct in-game A/B test is still required for each mode, sound route and effect before public release.
+Older recordings cannot gain missing channels. Missing asset bindings appear in the 3D status. Compare each mode against a real recording before public release, then leave 3D playback and confirm that cameras, original UI, particles, input and audio restore correctly.
 
+For a reported PCM gap, copy Recording check from a new replay and keep its `.isaudio` file. The audio header distinguishes missing sample ranges from listener/bypass queue overruns. Older audio headers cannot reveal a cause that was never recorded.
+
+For an export slowdown, keep the finished video's JSON sidecar. `exportProgress` records cumulative timings, bytes and working sets every 500 frames, so compare adjacent entries around the slowdown. Encoding/pipe time, waiting for new source frames and scene render/transfer work are separate. Memory samples include the trainer, encoder and game where available. The 3,601-frame AVI check crosses the reported frame count; it does not reproduce a particular PC, disk or live Unity scene.
 **Deferred:** automatic PB recording will be considered separately after this capture work. The full-run button currently renders a replay; it does not start or control OBS, automatically save PB videos, upload a run, or certify leaderboard eligibility.
 
 ## Ship a release
@@ -162,7 +168,7 @@ For a local Windows package build, install **NSIS 3**, then run:
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
-Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.13.1**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
+Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.14.0**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
 Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
 

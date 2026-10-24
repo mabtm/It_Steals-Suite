@@ -1539,13 +1539,39 @@ void Workshop740Cases(const std::string &output)
     assert(fullOptions.a == 0 && fullOptions.b == analysis->data->review->seconds && fullOptions.rate == 1 &&
            fullOptions.camera == 0 && fullOptions.scene3d && !fullOptions.speedKeys &&
            !fullOptions.fullbright && !fullOptions.route && fullOptions.format == 4 &&
-           fullOptions.fps == 120);
+           fullOptions.fps == 120 && fullOptions.verification &&
+           fullOptions.Frames() == fullOptions.SourceFrames() + 600);
     assert(suite_clip::options.a == 2 && suite_clip::options.b == 6 && suite_clip::options.rate == .5 &&
            suite_clip::options.camera == 2 && suite_clip::options.fullbright);
     auto imageOutput = suite_clip::options;
     suite_clip::ApplyExportPreset(imageOutput, 6);
     auto videoOutput = suite_clip::FullRunOptions(imageOutput, fullContent);
     assert(videoOutput.format == 6 && !videoOutput.transparent && videoOutput.fps == 60);
+    auto checked = std::make_shared<practice::ReplayRevalidation>();
+    checked->run = review->id;
+    checked->filesOk = true;
+    checked->inputSha256 = std::string(64, 'a');
+    checked->coverage = practice::BuildRecordingCheck(*fullMotion);
+    fullContent.revalidation = checked;
+    for (int i = 0; i < 3; i++)
+    {
+        ImGui::NewFrame();
+        suite_clip::ComposeViewport(ImGui::GetBackgroundDrawList(), fullOptions, fullContent, review->seconds,
+                                    {0, 0}, io.DisplaySize, 1);
+        ImGui::Render();
+    }
+    if (!output.empty())
+        Dump(output + "/740-replay-check-card.draw");
+    for (const auto &test :
+         std::array<std::array<float, 2>, 5>{{{{0, 0}}, {{1, 0}}, {{0, 1}}, {{6, 6}}, {{600, 300}}}})
+    {
+        auto direction = suite_input::MouseDirection(test[0], test[1]);
+        assert(std::hypot(direction[0], direction[1]) <= 1.000001);
+        if (test[1] > 0)
+            assert(direction[1] < 0);
+        if (test[0] > 0 && test[1] > 0)
+            assert(std::abs(direction[0] / -direction[1] - test[0] / test[1]) < .00001);
+    }
     suite_clip::content = fullContent;
     auto backend = suite_clip::backendAvailable;
     suite_clip::backendAvailable = true;

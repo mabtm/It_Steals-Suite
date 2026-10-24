@@ -3,7 +3,6 @@
 #include <iostream>
 #include <stdexcept>
 #include <wrl/client.h>
-#include <dxgi1_2.h>
 #include "CaptureOverlay.h"
 
 static void Check(bool ok, const char *message)
@@ -79,63 +78,6 @@ int main()
             write(20, read(16));
             capture.Tick(GetCurrentProcessId(), true);
             Check(capture.Active(), "Presented game frame was not acknowledged");
-            LayeredHud menu;
-            Check(!menu.UseTexture(nullptr), "Missing composition buffer must be rejected");
-            Microsoft::WRL::ComPtr<ID3D11Resource> resource;
-            Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
-            target->GetResource(resource.GetAddressOf());
-            Check(SUCCEEDED(resource.As(&texture)) && menu.UseTexture(texture.Get()),
-                  "Capture must reuse the existing BGRA composition texture");
-            Check(menu.UseTexture(texture.Get()), "Reusing a target must retain readback state");
-            for (int i = 0; i < 300 && !menu.LastPresented(); i++)
-            {
-                Check(menu.Present(device.Get(), gpu.Get(), nullptr, nullptr, wc, client, {{0, 0, 4, 4}}, {},
-                                   0, false),
-                      "Composition target readback failed");
-                Sleep(1);
-            }
-            capture.Publish(menu);
-            Check(read(16) != serial && read(36) == 1 && read(24) == 4,
-                  "Existing composition target must publish without a second render");
-            serial = read(16);
-            for (int i = 0; i < 300 && read(16) == serial; i++)
-            {
-                capture.CopyMenu(device.Get(), gpu.Get(), target.Get(), client, wc, {{0, 0, 4, 4}});
-                Sleep(1);
-            }
-            Check(read(16) != serial && read(36) == 1 && bytes[read(80) + 2] == 128,
-                  "Production menu capture must copy the already rendered pixels");
-            ComPtr<IDXGIDevice> dxgi;
-            ComPtr<IDXGIAdapter> adapter;
-            ComPtr<IDXGIFactory2> factory;
-            Check(SUCCEEDED(device.As(&dxgi)) && SUCCEEDED(dxgi->GetAdapter(&adapter)) &&
-                      SUCCEEDED(adapter->GetParent(IID_PPV_ARGS(&factory))),
-                  "DXGI factory unavailable");
-            DXGI_SWAP_CHAIN_DESC1 desc{};
-            desc.Width = desc.Height = 4;
-            desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-            desc.SampleDesc.Count = 1;
-            desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-            desc.BufferCount = 2;
-            desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-            desc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
-            ComPtr<IDXGISwapChain1> chain;
-            Check(SUCCEEDED(factory->CreateSwapChainForComposition(device.Get(), &desc, nullptr, &chain)),
-                  "Composition swapchain creation failed");
-            ComPtr<ID3D11Texture2D> buffer;
-            ComPtr<ID3D11RenderTargetView> bufferView;
-            Check(SUCCEEDED(chain->GetBuffer(0, IID_PPV_ARGS(&buffer))) &&
-                      SUCCEEDED(device->CreateRenderTargetView(buffer.Get(), nullptr, &bufferView)),
-                  "Composition backbuffer unavailable");
-            capture.ResetGraphics();
-            capture.CopyMenu(device.Get(), gpu.Get(), bufferView.Get(), client, wc, {{0, 0, 4, 4}});
-            capture.ResetGraphics();
-            bufferView.Reset();
-            buffer.Reset();
-            gpu->ClearState();
-            gpu->Flush();
-            Check(SUCCEEDED(chain->ResizeBuffers(0, 8, 8, DXGI_FORMAT_UNKNOWN, 0)),
-                  "ResetGraphics must release capture's backbuffer before resizing");
             capture.Tick(GetCurrentProcessId(), false);
             Check(!capture.Active() && read(36) == 0, "Alt-Tab must clear capture immediately");
             capture.enabled = false;

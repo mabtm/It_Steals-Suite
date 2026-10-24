@@ -54,12 +54,78 @@ static void Checksums(ReplayFiles &files)
     files["SHA256SUMS.txt"] = ReplayText(text);
 }
 
+static void SceneChecks(std::vector<uint8_t> bytes)
+{
+    std::string error;
+    auto legacy = DecodeMotion(bytes, error);
+    assert(legacy && legacy->inputFormat == 6);
+    bytes.resize(bytes.size() - 8);
+    int format = 8;
+    std::memcpy(bytes.data() + 4, &format, 4);
+    auto value = [&]<class T>(T v) {
+        size_t at = bytes.size();
+        bytes.resize(at + sizeof(v));
+        std::memcpy(bytes.data() + at, &v, sizeof(v));
+    };
+    auto text = [&](const std::string &v) {
+        value(int32_t(v.size()));
+        bytes.insert(bytes.end(), v.begin(), v.end());
+    };
+    text(""); // format-7 audio notes
+    value(uint8_t(1));
+    value(int32_t(0));
+    value(legacy->seconds);
+    value(int32_t(1));
+    value(int32_t(6));
+    text("0:Canvas/0:HUD");
+    text("");
+    text("");
+    value(int32_t(2));
+    size_t payload = 0, payloadLength = 0, stamp = 0;
+    for (int n = 0; n < 2; n++)
+    {
+        stamp = bytes.size();
+        value(n ? legacy->seconds : 0.);
+        payloadLength = bytes.size();
+        value(int32_t(5));
+        payload = bytes.size();
+        value(n ? .25f : 1.f);
+        value(uint8_t(n));
+    }
+    value(ReplayHash(bytes, bytes.size()));
+    auto scene = DecodeMotion(bytes, error);
+    assert(scene && scene->inputFormat == 8 && scene->sceneData.recorded && scene->sceneData.ui == 1 &&
+           scene->sceneData.samples == 2 && scene->sceneData.through == legacy->seconds);
+    for (int fault = 0; fault < 4; fault++)
+    {
+        auto bad = bytes;
+        if (fault == 0)
+        {
+            float n = std::numeric_limits<float>::quiet_NaN();
+            std::memcpy(bad.data() + payload, &n, 4);
+        }
+        if (fault == 1)
+            bad[payload + 4] = 2;
+        if (fault == 2)
+            bad[payloadLength] = 6;
+        if (fault == 3)
+        {
+            double n = legacy->seconds + 1;
+            std::memcpy(bad.data() + stamp, &n, 8);
+        }
+        auto sum = ReplayHash(bad, bad.size() - 8);
+        std::memcpy(bad.data() + bad.size() - 8, &sum, 8);
+        assert(!DecodeMotion(std::move(bad), error));
+    }
+}
+
 int main(int argc, char **argv)
 {
     assert(argc == 3);
     std::filesystem::path fixtures = argv[1], test = argv[2];
     std::filesystem::remove_all(test);
     std::filesystem::create_directories(test);
+    SceneChecks(Read(fixtures / "experience/input-v6.isinput"));
     std::string error;
     auto map = DecodeMap(Read(fixtures / "input-map.isrun"), error);
     assert(map && map->review && map->review->motion);
@@ -225,6 +291,42 @@ int main(int argc, char **argv)
         archive.LoadMotion(transport);
         Until([&] { return archive.Motion() || !archive.Get()->motionError.empty(); });
         assert(archive.Motion() && archive.Motion()->Matches(*map));
+        auto recheck = [&](std::shared_ptr<const MapData> selected) {
+            auto request = archive.Revalidate(std::move(selected));
+            Until([&] {
+                auto report = archive.Get()->revalidation;
+                return report && report->request == request;
+            });
+            return archive.Get()->revalidation;
+        };
+        auto checked = recheck(transport);
+        assert(checked->filesOk && checked->inputSha256 == ReplaySha256(bytes) &&
+               checked->mapSha256 == ReplayFileSha256(source / (prefix + ".isrun"), MapCapacity) &&
+               checked->reportIncluded && !checked->reportChecked);
+        auto damaged = bytes;
+        damaged[256] ^= 1;
+        Write(source / (prefix + ".isinput"), damaged);
+        checked = recheck(transport);
+        assert(!checked->filesOk && checked->error.find("checksum") != std::string::npos);
+        assert(archive.Motion()); // A cached preview cannot make the fresh check pass.
+        Write(source / (prefix + ".isinput"), bytes);
+        auto reportBytes = Read(source / (prefix + ".validation.json"));
+        Write(source / (prefix + ".validation.json"), ReplayText("{\"runId\":1}"));
+        assert(!recheck(transport)->filesOk);
+        Write(source / (prefix + ".validation.json"), reportBytes);
+        auto invalid = *map;
+        auto invalidRun = std::make_shared<RunReview>(*map->review);
+        invalidRun->valid = false;
+        invalidRun->aids |= 1;
+        invalid.review = invalidRun;
+        auto invalidWire = EncodeFixture(invalid, 12);
+        auto invalidMap = DecodeMap(invalidWire, error);
+        assert(invalidMap && !invalidMap->review->valid);
+        Write(source / (prefix + ".isrun"), invalidWire);
+        assert(recheck(invalidMap)->filesOk && Read(source / (prefix + ".isrun")) == invalidWire &&
+               !invalidMap->review->valid);
+        Write(source / (prefix + ".isrun"), map->bytes);
+        assert(recheck(transport)->filesOk);
         archive.Save(transport, "Input run", "Moderation", "Original notes\nSecond line");
         Until([&] { return archive.Get()->savedRevision == 1 && !archive.Get()->busy; });
         assert(Read(saved / (prefix + ".isinput")) == bytes &&

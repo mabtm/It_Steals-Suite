@@ -1,6 +1,7 @@
 #pragma once
 #include "SharedProtocol.h"
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -36,6 +37,19 @@ struct Frame
             keys[vk / 64] |= uint64_t(1) << (vk % 64);
     }
 };
+
+// Preserve direction and use the full circular travel range. Unity's positive
+// Mouse Y points up; screen coordinates point down. No frame-dependent smoothing.
+inline std::array<float, 2> MouseDirection(float x, float y)
+{
+    if (!std::isfinite(x) || !std::isfinite(y))
+        return {};
+    double length = std::hypot(double(x), double(y));
+    if (length < 1e-12)
+        return {};
+    double gain = std::tanh(length / 6.) / length;
+    return {float(x * gain), float(-y * gain)};
+}
 
 struct Change
 {

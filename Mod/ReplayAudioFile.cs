@@ -55,6 +55,33 @@ public static class ReplayAudioFile
                 i.Frames > (MaxBytes - HeaderBytes - 8) / (i.Channels * 4) ||
                 s.Length != HeaderBytes + i.Frames * i.Channels * 4 + 8 || (i.Flags & ~31) != 0 || i.Gaps < 0)
                 throw new InvalidDataException("Invalid recorded audio header");
+            s.Position = 128;
+            uint diagnosticMagic = r.ReadUInt32();
+            if (diagnosticMagic != 0)
+            {
+                if (diagnosticMagic != 0x47445349u || r.ReadInt32() != 1)
+                    throw new InvalidDataException("Invalid audio diagnostics");
+                i.Diagnostics = true;
+                i.ListenerOverruns = r.ReadInt32();
+                i.BypassOverruns = r.ReadInt32();
+                i.MissingFrames = r.ReadInt64();
+                i.PeakListener = r.ReadInt32();
+                i.PeakBypass = r.ReadInt32();
+                int details = r.ReadInt32();
+                if (i.ListenerOverruns < 0 || i.BypassOverruns < 0 || i.MissingFrames < 0 ||
+                    i.MissingFrames > i.Frames || i.PeakListener < 0 || i.PeakListener > 63 ||
+                    i.PeakBypass < 0 || i.PeakBypass > 15 || details < 0 || details > 3)
+                    throw new InvalidDataException("Invalid audio diagnostics");
+                for (int k = 0; k < details; k++)
+                {
+                    var gap = new ReplayAudioGap { First = r.ReadInt64(), Frames = r.ReadInt64(),
+                                                   Reason = r.ReadInt32() };
+                    if (r.ReadInt32() != 0 || gap.First < 0 || gap.Frames <= 0 ||
+                        gap.First > i.Frames - gap.Frames || gap.Reason < 1 || gap.Reason > 3)
+                        throw new InvalidDataException("Invalid audio gap");
+                    i.GapDetails.Add(gap);
+                }
+            }
             s.Position = s.Length - 8;
             i.Checksum = r.ReadUInt64();
             s.Position = 0;
@@ -85,10 +112,14 @@ public sealed class ReplayAudioSession
         }
     }
 
-    private readonly Block[] ring = new Block[32];
+    private readonly Block[] ring = new Block[64];
     private int head, tail, done, closing, discard, flags, gaps, accepting = 1;
-    private long target, closeDeadline;
-    private int observed;
+    private long target, closeDeadline, closeReadyDeadline;
+    private int lastBlockFrames;
+    private int observed, listenerOverruns, peakListener;
+    private long missingFrames;
+    private readonly System.Collections.Generic.List<ReplayAudioGap> gapDetails =
+        new System.Collections.Generic.List<ReplayAudioGap>();
     private readonly int rate, channels;
     private readonly long id;
     private readonly int scene, seed;
@@ -198,12 +229,15 @@ public sealed class ReplayAudioSession
         if (next == Volatile.Read(ref tail))
         {
             Flag(1);
+            Interlocked.Increment(ref listenerOverruns);
             return;
         }
+        peakListener = Math.Max(peakListener, (next - Volatile.Read(ref tail) + ring.Length) % ring.Length);
         var b = ring[at];
         Array.Copy(samples, b.Data, count);
         b.First = firstFrame;
         b.Count = count;
+        Volatile.Write(ref lastBlockFrames, count / channels);
         Interlocked.Increment(ref observed);
         Volatile.Write(ref head, next);
     }
@@ -213,7 +247,11 @@ public sealed class ReplayAudioSession
         if (double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds < 0 || seconds > 315360000)
             seconds = 0;
         target = (long)Math.Ceiling(seconds * rate);
-        closeDeadline = Stopwatch.GetTimestamp() + Stopwatch.Frequency / 5;
+        long now = Stopwatch.GetTimestamp();
+        closeReadyDeadline =
+            now + (long)(Stopwatch.Frequency *
+                         Math.Min(.2, Math.Max(.02, 2.0 * Volatile.Read(ref lastBlockFrames) / rate)));
+        closeDeadline = now + Stopwatch.Frequency;
         Volatile.Write(ref closing, 1);
     }
 
@@ -224,6 +262,15 @@ public sealed class ReplayAudioSession
             End(0);
         if (Done)
             DeleteTemp();
+    }
+
+    private void Gap(long first, long frames, int reason)
+    {
+        Flag(1);
+        gaps++;
+        missingFrames += frames;
+        if (gapDetails.Count < 3)
+            gapDetails.Add(new ReplayAudioGap { First = first, Frames = frames, Reason = reason });
     }
 
     private void Header(Stream s, long frames, int status = 0, int missing = 0)
@@ -244,6 +291,29 @@ public sealed class ReplayAudioSession
             byte[] bytes = Encoding.UTF8.GetBytes(hash);
             w.Write(bytes.Length);
             w.Write(bytes);
+            while (s.Position < 128)
+                w.Write((byte)0);
+            w.Write(0x47445349u);
+            w.Write(1);
+            w.Write(Volatile.Read(ref listenerOverruns));
+            int bypass = 0, peak = 0;
+            foreach (var lane in lanes)
+            {
+                bypass += lane.Dropped;
+                peak = Math.Max(peak, lane.Peak);
+            }
+            w.Write(bypass);
+            w.Write(missingFrames);
+            w.Write(Volatile.Read(ref peakListener));
+            w.Write(peak);
+            w.Write(gapDetails.Count);
+            foreach (var gap in gapDetails)
+            {
+                w.Write(gap.First);
+                w.Write(gap.Frames);
+                w.Write(gap.Reason);
+                w.Write(0);
+            }
             while (s.Position < ReplayAudioFile.HeaderBytes)
                 w.Write((byte)0);
         }
@@ -273,7 +343,9 @@ public sealed class ReplayAudioSession
                     {
                         // Listener and bypass callbacks can arrive in either
                         // order. Let the final DSP blocks reach their own rings.
-                        if (Volatile.Read(ref closing) != 0 && Stopwatch.GetTimestamp() > closeDeadline)
+                        if (Volatile.Read(ref closing) != 0 &&
+                            (Stopwatch.GetTimestamp() > closeDeadline ||
+                             position >= target && Stopwatch.GetTimestamp() > closeReadyDeadline))
                             break;
                         Thread.Sleep(2);
                         continue;
@@ -287,8 +359,7 @@ public sealed class ReplayAudioSession
                         long missing = Math.Min(first, limit) - position;
                         if (missing > 0)
                         {
-                            Flag(1);
-                            Interlocked.Increment(ref gaps);
+                            Gap(position, missing, position == 0 ? 1 : 2);
                             while (missing > 0)
                             {
                                 int n = (int)Math.Min(zero.Length / (channels * 4), missing);
@@ -327,9 +398,8 @@ public sealed class ReplayAudioSession
                 {
                     if (position < wanted)
                     {
-                        Flag(1);
-                        Interlocked.Increment(ref gaps);
                         long missing = wanted - position;
+                        Gap(position, missing, 3);
                         while (missing > 0)
                         {
                             int n = (int)Math.Min(zero.Length / (channels * 4), missing);
@@ -349,6 +419,20 @@ public sealed class ReplayAudioSession
                         bypassGaps += lane.Dropped;
                     int finalFlags = Volatile.Read(ref flags),
                         finalGaps = Volatile.Read(ref gaps) + bypassGaps;
+                    // A final game tick may end inside a PCM block already written.
+                    // Keep diagnostic ranges inside the retained audio timeline too.
+                    missingFrames = Math.Min(missingFrames, position);
+                    for (int k = gapDetails.Count - 1; k >= 0; k--)
+                    {
+                        var gap = gapDetails[k];
+                        if (gap.First >= position)
+                            gapDetails.RemoveAt(k);
+                        else
+                        {
+                            gap.Frames = Math.Min(gap.Frames, position - gap.First);
+                            gapDetails[k] = gap;
+                        }
+                    }
                     Header(s, position, finalFlags, finalGaps);
                     s.Flush();
                     s.Position = 0;
@@ -367,6 +451,14 @@ public sealed class ReplayAudioSession
                     Info.Flags = finalFlags;
                     Info.Gaps = finalGaps;
                     Info.Recorded = true;
+                    Info.Diagnostics = true;
+                    Info.ListenerOverruns = listenerOverruns;
+                    Info.BypassOverruns = bypassGaps;
+                    Info.MissingFrames = missingFrames;
+                    Info.PeakListener = peakListener;
+                    foreach (var lane in lanes)
+                        Info.PeakBypass = Math.Max(Info.PeakBypass, lane.Peak);
+                    Info.GapDetails.AddRange(gapDetails);
                 }
                 else
                 {
@@ -497,8 +589,14 @@ public sealed class ReplayAudioSession
 public sealed class ReplayAudioLane
 {
     private readonly ReplayAudioSession owner;
-    private readonly ReplayAudioSession.Block[] ring = new ReplayAudioSession.Block[8];
-    private int head, tail, dropped;
+    private readonly ReplayAudioSession.Block[] ring = new ReplayAudioSession.Block[16];
+    private int head, tail, dropped, peak;
+    public int Peak
+    {
+        get {
+            return Volatile.Read(ref peak);
+        }
+    }
     internal long Through;
 
     internal ReplayAudioLane(ReplayAudioSession session, int capacity)
@@ -540,6 +638,7 @@ public sealed class ReplayAudioLane
             Interlocked.Increment(ref dropped);
             return;
         }
+        peak = Math.Max(peak, (next - Volatile.Read(ref tail) + ring.Length) % ring.Length);
         var block = ring[at];
         Array.Copy(samples, block.Data, count);
         block.First = first;

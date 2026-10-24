@@ -9,12 +9,22 @@ namespace practice
 {
 inline constexpr uint64_t AudioCapacity = 256ull * 1024 * 1024, AudioHeaderBytes = 256;
 
+struct ReplayAudioGap
+{
+    int64_t first = 0, frames = 0;
+    int reason = 0;
+};
+
 struct ReplayAudioInfo
 {
     bool recorded = false;
     int rate = 0, channels = 0, flags = 0, gaps = 0;
     int64_t frames = 0, bytes = 0;
     uint64_t checksum = 0;
+    bool diagnostics = false;
+    int listenerOverruns = 0, bypassOverruns = 0, peakListener = 0, peakBypass = 0;
+    int64_t missingFrames = 0;
+    std::vector<ReplayAudioGap> gapDetails;
 
     double Duration() const
     {

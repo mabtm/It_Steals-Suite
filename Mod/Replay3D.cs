@@ -50,6 +50,7 @@ public static class Replay3D
     private static GameObject playerMarker;
     private static bool nativeStyle;
     private static ReplayNativeGraphics native;
+    private static ReplayScenePlayback scenePlayback;
     private static ReplayAudioPlayback audio;
     private static double audioPreviewAt, audioPreviewClock, audioPreviewDeadline;
     private static float audioPreviewRate, audioPreviewVolume;
@@ -629,6 +630,9 @@ public static class Replay3D
             native.BindView(view);
             analysis.BeforeRender = native.PrepareRender;
         }
+        if (nativeStyle && current.Motion.SceneData.Recorded)
+            scenePlayback = new ReplayScenePlayback(current.Motion.SceneData, player, restore,
+                                                    current.Motion.Experience.Names);
         var lighting = new SceneBrightness();
         replayBrightness = lighting;
         restore.Add(lighting.Dispose);
@@ -785,12 +789,21 @@ public static class Replay3D
         while (rendererCursor < renderers.Length && count++ < 64)
         {
             var renderer = renderers[rendererCursor++];
-            if (renderer == null || renderer.gameObject.scene.handle != scene ||
-                !ReplaySceneVisibility.Included(sceneMask, renderer.gameObject.layer))
+            if (renderer == null || renderer.gameObject.scene.handle != scene)
+                continue;
+            // Body-camera layers are outside the main camera mask too. Their
+            // original models must be hidden when recorded proxies are used.
+            if (nativeStyle && Dynamic(renderer.transform))
+            {
+                ReplayRendererScope.Hide(restore, renderer);
+                continue;
+            }
+            if (!ReplaySceneVisibility.Included(sceneMask, renderer.gameObject.layer))
                 continue;
             if (Dynamic(renderer.transform) || Point(renderer.transform) ||
                 !(renderer is MeshRenderer) && !(renderer is SkinnedMeshRenderer) &&
-                    !(nativeStyle && renderer is SpriteRenderer) ||
+                    !(nativeStyle && (renderer is SpriteRenderer ||
+                                      scenePlayback != null && renderer is ParticleSystemRenderer)) ||
                 !nativeStyle && renderer.GetComponentInParent<VolumetricLight>(true) != null)
             {
                 ReplayRendererScope.Hide(restore, renderer);
@@ -831,8 +844,11 @@ public static class Replay3D
             renderers = null;
             if (geometryCount == 0)
                 throw new InvalidOperationException("No level renderers found; original scene restored");
-            sceneMessage = (nativeStyle ? native.Status : "Analysis materials") + " / " + geometryCount +
-                           " renderers / " + batchCount + " batched";
+            sceneMessage =
+                (nativeStyle ? native.Status + (scenePlayback == null ? " / no recorded game UI or particles"
+                                                                      : " / recorded game UI and particles")
+                             : "Analysis materials") +
+                " / " + geometryCount + " renderers / " + batchCount + " batched";
             message = sceneStatus = sceneMessage;
             MelonLoader.MelonLogger.Msg(
                 "Replay3D: " + sceneMessage + " / camera mask " + sceneMask.ToString("X8") + " / alpha " +
@@ -899,7 +915,11 @@ public static class Replay3D
             view.targetTexture = target;
             view.aspect = (float)target.width / target.height;
             view.rect = new Rect(0, 0, 1, 1);
+            if (scenePlayback != null)
+                scenePlayback.Render(view, target, true);
             view.Render();
+            if (scenePlayback != null)
+                scenePlayback.Render(view, target, false);
             RenderTexture.active = target;
             if (destination != null)
                 destination.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0, false);
@@ -1114,6 +1134,12 @@ public static class Replay3D
                 Visible(marker.Object, false);
             Visible(playerMarker, false);
         }
+        if (scenePlayback != null)
+        {
+            scenePlayback.Apply(seconds, !observer && (options & Replay3DOptions.Follow) == 0);
+            if (scenePlayback.Missing > 0)
+                message += " / missing scene assets or bindings: " + scenePlayback.Missing;
+        }
         if (replayBrightness != null)
             replayBrightness.SetActive((options & Replay3DOptions.Fullbright) != 0);
     }
@@ -1228,6 +1254,7 @@ public static class Replay3D
                 view = null;
                 analysis = null;
                 native = null;
+                scenePlayback = null;
                 audio = null;
                 audioPreviewDeadline = 0;
                 replayBrightness = null;

@@ -4,6 +4,7 @@
 #include "ReplayAudioIO.h"
 #include "ReplayHealth.h"
 #include "ReplayTextValidation.h"
+#include "SuiteUpdateModel.h"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -62,6 +63,7 @@ inline std::string ReplayName(const MapData &data)
 struct ReplayArchiveState
 {
     std::vector<ReplayInfo> runs;
+    std::shared_ptr<const ReplayRevalidation> revalidation;
     std::string error, motionError, exportPath;
     bool busy = false;
     uint64_t savedRevision = 0;
@@ -88,12 +90,14 @@ class ReplayArchive
         Stage3D,
         LoadAnnotations,
         SaveAnnotations,
+        Revalidate,
     };
 
     struct Job
     {
         JobKind kind = JobKind::Initialize;
         int64_t id = 0;
+        uint64_t request = 0;
         std::filesystem::path path;
         std::shared_ptr<const MapData> data;
         std::string name, category, notes;
@@ -112,6 +116,8 @@ class ReplayArchive
     std::shared_ptr<const ReplayArchiveState> state = std::make_shared<ReplayArchiveState>();
     std::shared_ptr<const MapData> loaded;
     std::shared_ptr<const ReplayMotion> motion;
+    std::shared_ptr<const ReplayRevalidation> revalidation;
+    std::atomic<uint64_t> nextRevalidation{0};
     std::shared_ptr<const ReplayAnnotations> annotations;
     int64_t annotationRun = 0;
     uint64_t annotationRevision = 0;
@@ -224,6 +230,7 @@ class ReplayArchive
     void Publish(bool busy = false)
     {
         auto snapshot = std::make_shared<ReplayArchiveState>();
+        snapshot->revalidation = revalidation;
         snapshot->annotationRun = annotationRun;
         snapshot->annotationRevision = annotationRevision;
         snapshot->annotationError = annotationError;
@@ -421,12 +428,12 @@ class ReplayArchive
         return {};
     }
 
-    std::shared_ptr<const ReplayMotion> ReadMotion(const MapData &d)
+    std::shared_ptr<const ReplayMotion> ReadMotion(const MapData &d, bool fresh = false)
     {
         if (!d.review || !d.review->motion)
             return {};
         auto current = std::atomic_load(&motion);
-        if (current && current->Matches(d) &&
+        if (!fresh && current && current->Matches(d) &&
             (!current->experience.audio.recorded || !current->audioFile.empty()))
             return current;
         auto file = Companion(d, ".isinput");
@@ -445,8 +452,8 @@ class ReplayArchive
                 auto audio = Companion(d, ".isaudio");
                 if (audio.empty())
                     throw std::runtime_error("Recorded audio is missing");
-                VerifyRecordedAudio(audio, value->id, value->scene, value->seed, value->hash,
-                                    &value->experience.audio);
+                writable->experience.audio = VerifyRecordedAudio(audio, value->id, value->scene, value->seed,
+                                                                 value->hash, &value->experience.audio);
                 writable->audioFile = audio;
             }
             catch (const std::exception &e)
@@ -507,7 +514,7 @@ class ReplayArchive
         ReplayFiles files;
         auto originalMap = Canonical(d);
         files[prefix + ".isrun"] = originalMap ? originalMap->bytes : d.bytes;
-        auto input = ReadMotion(d);
+        auto input = ReadMotion(d, true);
         if (input)
             files[prefix + ".isinput"] = input->bytes;
         if (input && input->experience.audio.recorded)
@@ -777,6 +784,85 @@ class ReplayArchive
         Publish();
     }
 
+    void RevalidateRecording(const Job &job)
+    {
+        auto result = std::make_shared<ReplayRevalidation>();
+        result->request = job.request;
+        result->run = job.data->review->id;
+        result->checkedUtc = int64_t(std::time(nullptr));
+        result->originalChecked = job.data->review->validationChecked;
+        result->originalValid = job.data->review->valid;
+        result->originalAids = job.data->review->aids;
+        result->originalWarnings = job.data->review->warnings;
+        result->originalReason = job.data->review->validityReason;
+        Publish(true);
+        try
+        {
+            auto original = Canonical(*job.data);
+            if (!original)
+                throw std::runtime_error(
+                    "Original replay is missing, damaged or differs from the selected run");
+            result->mapSha256 = ReplaySha256(original->bytes);
+            auto input = ReadMotion(*original, true);
+            if (!input)
+                throw std::runtime_error("This replay has no input recording to recheck");
+            result->inputSha256 = ReplaySha256(input->bytes);
+            result->coverage = RecordingCheckFor(*input);
+            if (input->experience.audio.recorded)
+            {
+                if (!input->audioError.empty())
+                    throw std::runtime_error(input->audioError);
+                result->audioSha256 = ReplayFileSha256(input->audioFile, AudioCapacity);
+            }
+            auto report = Companion(*original, ".validation.json");
+            if (!report.empty())
+            {
+                auto bytes = Read(report, 65536);
+                result->reportIncluded = true;
+                result->reportSha256 = ReplaySha256(bytes);
+                suite_update::Json json;
+                try
+                {
+                    json = suite_update::JsonReader(
+                               std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()))
+                               .Read();
+                }
+                catch (const std::exception &)
+                {
+                    throw std::runtime_error("Original validation report contains invalid JSON");
+                }
+                if (json.At("runId").UInt() != uint64_t(result->run))
+                    throw std::runtime_error("Original validation report belongs to a different run");
+                if (json.At("reportFormat").UInt() == 1)
+                {
+                    const auto &run = *original->review;
+                    double seconds = std::stod(json.At("observedSeconds").text);
+                    if (json.At("scene").UInt() != uint64_t(original->scene) || !std::isfinite(seconds) ||
+                        std::abs(seconds - run.seconds) > .000001 ||
+                        !json.At("validationChecked").IsBool(run.validationChecked) ||
+                        !json.At("observedFromStart").IsBool(run.observedFromStart) ||
+                        json.At("gameAssemblyFileSha256").String() != original->hash ||
+                        json.At("integrity").String() != (run.valid ? "VALID (LOCAL)" : "UNVALID"))
+                        throw std::runtime_error(
+                            "Original report disagrees with the recorded run observations");
+                    result->reportChecked = true;
+                }
+            }
+            // Replace cached motion only after all companions have been read.
+            // This never rewrites the run's original verdict or evidence.
+            std::atomic_store(&motion, input);
+            motionRun = result->run;
+            motionError.clear();
+            result->filesOk = true;
+        }
+        catch (const std::exception &e)
+        {
+            result->error = e.what();
+        }
+        revalidation = result;
+        Publish();
+    }
+
     void StageRecording3D(const Job &job)
     {
         stagedRun = 0;
@@ -885,6 +971,9 @@ class ReplayArchive
         case JobKind::ExportPackage:
             ExportRecording(job);
             break;
+        case JobKind::Revalidate:
+            RevalidateRecording(job);
+            break;
         case JobKind::LoadMotion:
             LoadRecordedMotion(job);
             break;
@@ -992,6 +1081,15 @@ class ReplayArchive
     void Load(int64_t id)
     {
         Queue({.kind = JobKind::LoadRecording, .id = id});
+    }
+
+    uint64_t Revalidate(std::shared_ptr<const MapData> data)
+    {
+        if (!data || !data->review)
+            return 0;
+        uint64_t request = ++nextRevalidation;
+        Queue({.kind = JobKind::Revalidate, .request = request, .data = std::move(data)});
+        return request;
     }
 
     void LoadMotion(std::shared_ptr<const MapData> data)

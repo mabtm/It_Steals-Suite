@@ -159,6 +159,7 @@ public sealed class ReplayColliderData
     public uint Flags;
     public int Dropped, Count;
     public bool Recorded;
+    public Func<int, bool> ReserveBytes;
     public readonly List<ReplayColliderTrack> Tracks = new List<ReplayColliderTrack>();
 
     public void Drop(uint flag)
@@ -170,7 +171,7 @@ public sealed class ReplayColliderData
 
     public void Add(ReplayColliderTrack track, ReplayColliderFrame sample)
     {
-        if (Count >= MaxSamples)
+        if (Count >= MaxSamples || ReserveBytes != null && !ReserveBytes(112))
         {
             Drop(1);
             return;

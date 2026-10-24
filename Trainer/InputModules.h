@@ -328,9 +328,12 @@ inline void Module(ImDrawList *d, int module, ImVec2 a, ImVec2 b, const Frame *f
         auto center = at(85, 92);
         d->AddCircle(center, 17 * u, c.edge, 0, 1.2f * u);
         if (f)
-            d->AddCircleFilled({center.x + std::clamp(f->lookX / 6, -1.f, 1.f) * 14 * u,
-                                center.y + std::clamp(f->lookY / 6, -1.f, 1.f) * 14 * u},
-                               4 * u, c.accent);
+        {
+            auto direction = MouseDirection(f->lookX, f->lookY);
+            ImVec2 tip{center.x + direction[0] * 14 * u, center.y + direction[1] * 14 * u};
+            d->AddLine(center, tip, Fade(c.accent, .65f), 1.5f * u);
+            d->AddCircleFilled(tip, 4 * u, c.accent);
+        }
     }
     else if (module == 2)
     {

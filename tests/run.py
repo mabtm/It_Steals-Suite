@@ -12,6 +12,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "recording_channels_tests": [
+        "ReplaySceneData.cs",
+        "ReplayExperienceData.cs",
+        "ReplayAudioFile.cs",
+    ],
     "adaptive_capture_tests": [
         "ReplayVisualData.cs",
         "AdaptivePoseSampler.cs",

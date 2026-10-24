@@ -1,6 +1,7 @@
 #pragma once
 #include "ClipModel.h"
 #include "ReplayAudioIO.h"
+#include "ReplayHealth.h"
 #include "SuiteBranding.h"
 #include <filesystem>
 #include <fstream>
@@ -9,6 +10,7 @@
 #include <memory>
 #include <functional>
 #include <cstring>
+#include <mutex>
 
 namespace suite_clip
 {
@@ -109,11 +111,38 @@ inline void VerifyAviTiming(const std::filesystem::path &path, const Options &op
         throw std::runtime_error("AVI audio and video timelines do not match");
 }
 
+struct ExportProgress
+{
+    uint64_t frames = 0, outputBytes = 0, trainerWorkingSet = 0, encoderWorkingSet = 0, gameWorkingSet = 0;
+    double wallSeconds = 0, encoderMilliseconds = 0, inputWaitMilliseconds = 0, sceneRenderMilliseconds = 0,
+           sceneTransferMilliseconds = 0;
+};
+
 struct ExportPipelineStats
 {
     std::atomic<uint64_t> sceneFrames{0}, asyncSceneFrames{0}, compositionFrames{0}, peakInFlight{0};
     std::atomic<uint64_t> sceneRenderMicros{0}, sceneReadbackMicros{0}, sceneTransferMicros{0},
         composeMicros{0}, compositionReadbackMicros{0};
+
+    std::atomic<uint64_t> gameWorkingSet{0};
+    mutable std::mutex progressGate;
+    std::vector<ExportProgress> progress;
+
+    void Mark(ExportProgress point)
+    {
+        point.gameWorkingSet = gameWorkingSet.load();
+        point.sceneRenderMilliseconds = sceneRenderMicros.load() / 1000.;
+        point.sceneTransferMilliseconds = sceneTransferMicros.load() / 1000.;
+        std::lock_guard lock(progressGate);
+        if (progress.size() < 1024)
+            progress.push_back(point);
+    }
+
+    std::vector<ExportProgress> Progress() const
+    {
+        std::lock_guard lock(progressGate);
+        return progress;
+    }
 
     static uint64_t Micros(double ms)
     {
@@ -129,6 +158,9 @@ struct ExportSource
     std::filesystem::path audioFile;
     practice::ReplayAudioInfo audio;
     std::shared_ptr<ExportPipelineStats> pipeline;
+    std::shared_ptr<const practice::ReplayRevalidation> revalidation;
+    bool recordedValid = false;
+    uint32_t recordedWarnings = 0;
 };
 
 inline void WriteExportReport(const std::filesystem::path &output, const Options &o, ExportSource source,
@@ -162,6 +194,26 @@ inline void WriteExportReport(const std::filesystem::path &output, const Options
          << ",\n  \"audioSourceFlags\": " << source.audio.flags
          << ",\n  \"audioSourceGaps\": " << source.audio.gaps
          << ",\n  \"audioOutputRate\": " << (o.AudioEnabled() ? 48000 : 0);
+    file << ",\n  \"verificationCardSeconds\": " << (o.verification ? Options::VerificationSeconds : 0)
+         << ",\n  \"sourceFrames\": " << o.SourceFrames();
+    if (o.verification && source.revalidation)
+    {
+        const auto &r = *source.revalidation;
+        file
+            << ",\n  \"recheckUtcUnix\": " << r.checkedUtc
+            << ",\n  \"replayFilesChecked\": " << (r.filesOk ? "true" : "false")
+            << ",\n  \"recordedValidLocal\": " << (source.recordedValid ? "true" : "false")
+            << ",\n  \"recordedWarnings\": " << source.recordedWarnings << ",\n  \"runSha256\": \""
+            << r.mapSha256 << "\""
+            << ",\n  \"inputSha256\": \"" << r.inputSha256 << "\""
+            << ",\n  \"audioSha256\": \"" << r.audioSha256 << "\""
+            << ",\n  \"originalReportSha256\": \"" << r.reportSha256 << "\""
+            << ",\n  \"recheckScope\": \"Local unsigned file checks; stored run observations stay unchanged; no authenticity or leaderboard certification\"";
+        if (r.coverage)
+            file << ",\n  \"coveragePartial\": " << r.coverage->partial
+                 << ",\n  \"coverageMissing\": " << r.coverage->missing
+                 << ",\n  \"coverageUnknown\": " << r.coverage->unknown;
+    }
     if (o.format == 4)
     {
         auto timing = ReadAviTiming(output);
@@ -183,6 +235,24 @@ inline void WriteExportReport(const std::filesystem::path &output, const Options
              << ",\n  \"compositionMilliseconds\": " << p.composeMicros.load() / 1000.
              << ",\n  \"compositionReadbackLatencyMilliseconds\": "
              << p.compositionReadbackMicros.load() / 1000.;
+        file << ",\n  \"exportProgress\": [";
+        bool comma = false;
+        for (const auto &point : p.Progress())
+        {
+            if (comma)
+                file << ',';
+            comma = true;
+            file << "\n    {\"frames\":" << point.frames << ",\"wallSeconds\":" << point.wallSeconds
+                 << ",\"encoderMilliseconds\":" << point.encoderMilliseconds
+                 << ",\"inputWaitMilliseconds\":" << point.inputWaitMilliseconds
+                 << ",\"sceneRenderMilliseconds\":" << point.sceneRenderMilliseconds
+                 << ",\"sceneTransferMilliseconds\":" << point.sceneTransferMilliseconds
+                 << ",\"trainerWorkingSetBytes\":" << point.trainerWorkingSet
+                 << ",\"encoderWorkingSetBytes\":" << point.encoderWorkingSet
+                 << ",\"gameWorkingSetBytes\":" << point.gameWorkingSet
+                 << ",\"outputBytes\":" << point.outputBytes << '}';
+        }
+        file << "\n  ]";
     }
     file << "\n}\n";
 }

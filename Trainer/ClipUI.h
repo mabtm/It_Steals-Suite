@@ -9,6 +9,8 @@ namespace suite_clip
 inline bool open = false, requestOpen = false, playPreview = false, startRequested = false,
             testRequested = false, fullRunRequested = false, cancelRequested = false, dirty = false,
             backendAvailable = false, actualSize = false;
+inline uint64_t fullRunRecheck = 0;
+inline bool awaitingFullRunCheck = false;
 inline bool focusWindow = false, started3d = false, editLayout = false, cameraEditing = false,
             shownPoseReady = false;
 inline int selectedBlock = Keyboard, selectedKey = -1, profileSlot = 0, dragBlock = -1;
@@ -297,6 +299,7 @@ inline Options FullRunOptions(const Options &output, const Content &source)
     full.timing.reset();
     full.audio = source.motion->experience.audio.recorded && !source.motion->audioFile.empty();
     full.audioVolume = 1;
+    full.verification = true;
     full.Validate(full.b);
     return full;
 }
@@ -308,6 +311,7 @@ inline void Close()
     if (saveProject)
         saveProject();
     open = playPreview = false;
+    awaitingFullRunCheck = false;
     previewRun = 0;
     if (started3d && g_pShared && content.analysis &&
         g_pShared->replay3dRunId == content.analysis->data->review->id)
@@ -1299,7 +1303,7 @@ inline void Render()
     content.palette = suite_input::Colors(1);
     guideCache.Bind(content, revision);
     const auto &run = *content.analysis->data->review;
-    bool busy = encoder.State() == 1;
+    bool busy = encoder.State() == 1 || awaitingFullRunCheck;
     auto display = ImGui::GetIO().DisplaySize;
     float unit = suite_ui::Unit();
     ImGui::SetNextWindowPos({display.x * .5f, display.y * .5f}, ImGuiCond_Appearing, {.5f, .5f});
@@ -1453,6 +1457,37 @@ inline void Render()
                 OutputPanel(changed);
                 ImGui::EndTabItem();
             }
+            if (ImGui::BeginTabItem("Run check"))
+            {
+                Help(
+                    "Full run videos include a fresh replay check and a five-second result card. Clip exports keep your chosen range and camera edits.");
+                auto result = practice::g_replayArchive.Get()->revalidation;
+                if (result && result->run == run.id)
+                    content.revalidation = result;
+                if (suite_ui::Button("Recheck this replay"))
+                    practice::g_replayArchive.Revalidate(content.analysis->data);
+                auto check = content.revalidation;
+                if (check)
+                {
+                    ImGui::TextColored(check->filesOk ? ImVec4(.3f, .88f, .63f, 1) : g_accentCol, "%s",
+                                       check->filesOk ? "Replay files checked" : "Check failed");
+                    if (!check->error.empty())
+                        Help(check->error.c_str());
+                    if (suite_ui::Button("Copy check report"))
+                        ImGui::SetClipboardText(practice::RevalidationReport(*check).c_str());
+                }
+                auto preview = options;
+                preview.width = 1280;
+                preview.height = 720;
+                auto origin = ImGui::GetCursorScreenPos();
+                float width = ImGui::GetContentRegionAvail().x;
+                ComposeViewport(ImGui::GetWindowDrawList(), preview, content, run.seconds, origin,
+                                {width, width * 9 / 16}, 1);
+                ImGui::Dummy({width, width * 9 / 16});
+                Help(
+                    "Local file checks preserve the original run verdict. They cannot make editable files tamper-proof or replace a leaderboard review.");
+                ImGui::EndTabItem();
+            }
             ImGui::EndTabBar();
         }
         ImGui::EndDisabled();
@@ -1472,7 +1507,14 @@ inline void Render()
     {
         invalid = e.what();
     }
-    if (busy)
+    if (awaitingFullRunCheck)
+    {
+        ImGui::TextColored(g_headerCol, "Checking replay files...");
+        SameLineIfFits("Cancel check");
+        if (suite_ui::Button("Cancel check"))
+            awaitingFullRunCheck = false;
+    }
+    else if (busy)
     {
         char count[80];
         std::snprintf(count, sizeof(count), "%llu / %llu frames",
@@ -1515,18 +1557,20 @@ inline void Render()
         {
             fullReady = false;
         }
-        ImGui::BeginDisabled(!fullReady);
+        ImGui::BeginDisabled(!fullReady || awaitingFullRunCheck);
         if (suite_ui::Button("Full run video"))
         {
+            content.revalidation.reset();
             startRequested = fullRunRequested = true;
             testRequested = playPreview = false;
             error.clear();
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("Export the whole run: original camera, 1x speed and recorded audio.\n"
-                              "Uses your video output settings; GIF / PNG use 1080p60 MP4.\n"
-                              "Clip edits stay saved. This exports a rendered replay.");
+            ImGui::SetTooltip(
+                "Export the whole run: original camera, 1x speed and recorded audio.\nA fresh file check and a 5-second replay-check card are included.\n"
+                "Uses your video output settings; GIF / PNG use 1080p60 MP4.\n"
+                "Clip edits stay saved. This exports a rendered replay.");
         SameLineIfFits("Close");
         if (suite_ui::Button("Close") || ImGui::IsKeyPressed(ImGuiKey_Escape))
             Close();

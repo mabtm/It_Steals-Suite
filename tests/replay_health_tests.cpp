@@ -69,9 +69,9 @@ int main(int argc, char **argv)
     auto check = BuildRecordingCheck(good);
     assert(check->complete == 6 && check->partial == 0 && check->missing == 0 && check->unknown == 0);
     auto scopeReport = RecordingCheckReport(good, *check);
-    assert(scopeReport.find("Particle simulation") != std::string::npos &&
-           scopeReport.find("original game UI") != std::string::npos &&
-           scopeReport.find("not every pixel") != std::string::npos);
+    assert(scopeReport.find("particle snapshots") != std::string::npos &&
+           scopeReport.find("game UI") != std::string::npos &&
+           scopeReport.find("not pixel-identical video") != std::string::npos);
     // Sparse unchanged inputs, constant collider shapes and poses remain complete
     // because successful observation heartbeats are independent of file changes.
     assert(check->channels[2].samples == 1 && check->channels[3].samples == 1 &&

@@ -11,6 +11,7 @@ public sealed class ReplayAudioTap : MonoBehaviour
     {
         public ReplayAudioSession Session;
         public double Origin;
+        public long OriginFrame;
         public int Rate;
     }
 
@@ -53,7 +54,7 @@ public sealed class ReplayAudioTap : MonoBehaviour
             for (int n = available; n > 0; n--)
             {
                 int i = (next - n + 4) % 4;
-                long first = (long)Math.Round((times[i] - binding.Origin) * binding.Rate);
+                long first = (long)Math.Round(times[i] * binding.Rate) - binding.OriginFrame;
                 if (first + counts[i] / channels[i] <= 0)
                     continue;
                 if (route.Lane == null)
@@ -82,7 +83,7 @@ public sealed class ReplayAudioTap : MonoBehaviour
                     history.Replay(route, binding);
                 attached = binding.Session;
             }
-            long first = (long)Math.Round((dsp - binding.Origin) * binding.Rate);
+            long first = (long)Math.Round(dsp * binding.Rate) - binding.OriginFrame;
             if (route.Lane == null)
                 binding.Session.Push(data, channels, first);
             else if (route.Gain > 0)
@@ -315,7 +316,9 @@ public static class ReplayAudioCapture
                 tap = listener.gameObject.AddComponent<ReplayAudioTap>();
             double now = SpeedrunManager.Instance == null ? 0 : SpeedrunManager.Instance.CurrentSeconds;
             clock = new ReplayAudioTap.Clock { Current = new ReplayAudioTap.Binding {
-                Origin = AudioSettings.dspTime - now, Rate = rate, Session = session
+                Origin = AudioSettings.dspTime - now,
+                OriginFrame = (long)Math.Round((AudioSettings.dspTime - now) * rate), Rate = rate,
+                Session = session
             } };
             tap.Current = new ReplayAudioTap.Route { Timeline = clock };
             motion.AudioSession = session;
@@ -340,7 +343,9 @@ public static class ReplayAudioCapture
         double dsp = AudioSettings.dspTime;
         if (Math.Abs(dsp - binding.Origin - seconds) > .05)
             clock.Current =
-                new ReplayAudioTap.Binding { Session = current, Origin = dsp - seconds, Rate = binding.Rate };
+                new ReplayAudioTap.Binding { Session = current, Origin = dsp - seconds,
+                                             OriginFrame = (long)Math.Round((dsp - seconds) * binding.Rate),
+                                             Rate = binding.Rate };
         foreach (var source in unobservable.Values)
             if (source != null && Bypasses(source) && source.isPlaying && !source.mute && source.volume > 0)
                 Missing(source, "listener bypass became audible on an unobservable route");

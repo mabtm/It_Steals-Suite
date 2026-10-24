@@ -81,7 +81,7 @@ public sealed class ReplayMotionInfo
 public sealed class ReplayMotionData
 {
     public const int MaxFrames = 262144, MaxTicks = 524288, MaxEvents = 131072, MaxBytes = 128 * 1024 * 1024;
-    public int InputFormat = 6;
+    public int InputFormat = 8;
     public long Id;
     public int Scene, Seed;
     public double Seconds;
@@ -90,6 +90,7 @@ public sealed class ReplayMotionData
     public ReplayColliderData Colliders = new ReplayColliderData();
     public ReplayVisualData Visuals = new ReplayVisualData();
     public ReplayExperienceData Experience = new ReplayExperienceData();
+    public ReplaySceneData SceneData = new ReplaySceneData();
     public ReplayAudioSession AudioSession;
     public ReplayCoverage Coverage = new ReplayCoverage();
     public readonly List<ReplayViewFrame> Frames = new List<ReplayViewFrame>(1024);
@@ -97,11 +98,17 @@ public sealed class ReplayMotionData
     public readonly List<InputDeviceFrame> Devices = new List<InputDeviceFrame>(128);
 
     // Reserve the remaining file budget for bounded collider/visual extensions.
+    public bool HasBudget(int extra)
+    {
+        return 65536L + Frames.Count * 168L + Ticks.Count * 56L + Events.Count * 36L +
+                   Devices.Count * InputDeviceFrame.WireSize + Colliders.EstimatedBytes + Visuals.WireBytes +
+                   Experience.WireBytes + SceneData.Bytes + extra <=
+               MaxBytes;
+    }
+
     private bool Budget()
     {
-        return Frames.Count * 168L + Ticks.Count * 56L + Events.Count * 36L +
-                   Devices.Count * InputDeviceFrame.WireSize <
-               56L * 1024 * 1024;
+        return HasBudget(172);
     }
 
     public long EstimatedBytes
@@ -109,7 +116,7 @@ public sealed class ReplayMotionData
         get {
             return 8192L + Frames.Capacity * 168L + Ticks.Capacity * 56L + Events.Capacity * 36L +
                    Devices.Capacity * InputDeviceFrame.WireSize + Colliders.EstimatedBytes * 2 +
-                   Visuals.EstimatedBytes + Experience.EstimatedBytes +
+                   Visuals.EstimatedBytes + Experience.EstimatedBytes + SceneData.Bytes +
                    (AudioSession == null ? 0 : AudioSession.MemoryBytes);
         }
     }
@@ -273,7 +280,7 @@ public sealed class ReplayMotionData
                    new ReplayHashStream(target)) using (var w = new BinaryWriter(hash, Encoding.UTF8, true))
         {
             w.Write(0x4e495349u);
-            w.Write(7);
+            w.Write(8);
             w.Write(Id);
             w.Write(Scene);
             w.Write(Seed);
@@ -342,6 +349,7 @@ public sealed class ReplayMotionData
             Experience.Write(w);
             Coverage.Write(w);
             Text(w, AudioNotes);
+            SceneData.Write(w);
             w.Flush();
             ulong sum = hash.Hash;
             hash.Hashing = false;
@@ -361,7 +369,7 @@ public sealed class ReplayMotionData
             if (r.ReadUInt32() != 0x4e495349u)
                 throw new InvalidDataException("Unsupported input recording");
             int format = r.ReadInt32();
-            if (format < 1 || format > 7)
+            if (format < 1 || format > 8)
                 throw new InvalidDataException("Unsupported input recording");
             var d = new ReplayMotionData { InputFormat = format,           Id = r.ReadInt64(),
                                            Scene = r.ReadInt32(),          Seed = r.ReadInt32(),
@@ -480,6 +488,8 @@ public sealed class ReplayMotionData
                 d.Coverage = ReplayCoverage.Read(r, d.Seconds);
             if (format >= 7)
                 d.AudioNotes = Text(r, 4096);
+            if (format >= 8)
+                d.SceneData = ReplaySceneData.Read(r, d.Seconds);
             r.ReadUInt64();
             if (r.BaseStream.Position != bytes.Length)
                 throw new InvalidDataException("Trailing input data");

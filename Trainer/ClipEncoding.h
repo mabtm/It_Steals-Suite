@@ -464,12 +464,17 @@ class Encoder
                         if (options.format == 1)
                             gif = std::make_unique<GifWriter>(temporary, options.width, options.height,
                                                               options.fps);
+                        double encodeMs = 0, inputWaitMs = 0;
                         while (true)
                         {
                             std::vector<uint8_t> bytes;
                             {
                                 std::unique_lock l(gate);
+                                auto waitStart = std::chrono::steady_clock::now();
                                 wake.wait(l, [&] { return abort || finish || !queue.empty(); });
+                                inputWaitMs += std::chrono::duration<double, std::milli>(
+                                                   std::chrono::steady_clock::now() - waitStart)
+                                                   .count();
                                 if (abort)
                                     break;
                                 if (queue.empty())
@@ -483,6 +488,7 @@ class Encoder
                             }
                             if (bytes.size() != size_t(options.width) * options.height * 4)
                                 throw std::runtime_error("Encoder frame size mismatch");
+                            auto encodeStart = std::chrono::steady_clock::now();
                             if (gif)
                                 gif->Write(bytes);
                             if (png)
@@ -500,7 +506,33 @@ class Encoder
                                 if (buffers.size() < 2)
                                     buffers.push_back(std::move(bytes));
                             }
-                            written++;
+                            encodeMs += std::chrono::duration<double, std::milli>(
+                                            std::chrono::steady_clock::now() - encodeStart)
+                                            .count();
+                            uint64_t count = ++written;
+                            if (source.pipeline && (count % 500 == 0 || count == options.Frames()))
+                            {
+                                ExportProgress point;
+                                point.frames = count;
+                                point.wallSeconds =
+                                    std::chrono::duration<double>(std::chrono::steady_clock::now() - started)
+                                        .count();
+                                point.encoderMilliseconds = encodeMs;
+                                point.inputWaitMilliseconds = inputWaitMs;
+                                std::error_code ec;
+                                point.outputBytes =
+                                    options.format == 3 ? 0 : std::filesystem::file_size(temporary, ec);
+                                if (ec)
+                                    point.outputBytes = 0;
+#ifdef _WIN32
+                                PROCESS_MEMORY_COUNTERS counters{};
+                                if (K32GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))
+                                    point.trainerWorkingSet = uint64_t(counters.WorkingSetSize);
+                                if (lossless)
+                                    point.encoderWorkingSet = lossless->WorkingSetBytes();
+#endif
+                                source.pipeline->Mark(point);
+                            }
                         }
                         bool cancelled;
                         {

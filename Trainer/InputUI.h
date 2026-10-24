@@ -176,6 +176,8 @@ inline void Customization(Preferences &p, int module = -1)
     }
     if ((module < 0 || module == 1) && p.mouse && ImGui::TreeNode("Mouse appearance"))
     {
+        Help(
+            "Movement shows the game's observed Mouse X / Y axes. Up is up; circular scaling preserves diagonal direction without hard clipping. These are game input values, not raw physical mouse counts.");
         ImGui::SliderFloat("Mouse size", &p.mouseScale, .5f, 2.5f, "%.2fx");
         for (int i = 0; i < 7; i++)
         {

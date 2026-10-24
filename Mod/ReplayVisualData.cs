@@ -51,6 +51,13 @@ public sealed class ReplayVisualData
     public bool Recorded, Full;
     public int Dropped, Count, TrackCount;
     private int estimated = 64;
+    public Func<int, bool> ReserveBytes;
+    public long WireBytes
+    {
+        get {
+            return estimated;
+        }
+    }
     public long EstimatedBytes
     {
         get {
@@ -60,7 +67,7 @@ public sealed class ReplayVisualData
 
     private bool Reserve(int bytes)
     {
-        if (estimated + bytes <= MaxWire)
+        if (estimated + bytes <= MaxWire && (ReserveBytes == null || ReserveBytes(bytes)))
             return true;
         Full = true;
         Drop();
@@ -132,7 +139,8 @@ public sealed class ReplayVisualData
     public void Add(ReplayVisualTrack track, ReplayVisualFrame frame)
     {
         int bytes = track.Kind == 1 ? 48 : track.Kind == 4 ? 72 : 36;
-        if (Count >= MaxSamples || estimated + bytes > MaxWire)
+        if (Count >= MaxSamples || estimated + bytes > MaxWire ||
+            ReserveBytes != null && !ReserveBytes(bytes))
         {
             Full = true;
             Drop();

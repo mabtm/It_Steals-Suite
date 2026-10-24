@@ -5,12 +5,13 @@
 #include <sstream>
 #include <iomanip>
 #include <map>
+#include <fstream>
 
 namespace practice
 {
 // Small, platform-independent SHA-256 for portable package verification.
 // These are unsigned consistency hashes, never an authenticity claim.
-inline std::string ReplaySha256(const std::vector<uint8_t> &data)
+template <class Reader> inline std::string ReplaySha256(size_t size, Reader read)
 {
     constexpr uint32_t k[] = {
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -24,16 +25,20 @@ inline std::string ReplaySha256(const std::vector<uint8_t> &data)
     uint32_t h[] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
                     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
     auto rr = [](uint32_t x, unsigned n) { return (x >> n) | (x << (32 - n)); };
-    size_t blocks = (data.size() + 9 + 63) / 64;
-    uint64_t bits = uint64_t(data.size()) * 8;
+    size_t blocks = (size + 9 + 63) / 64;
+    uint64_t bits = uint64_t(size) * 8;
     for (size_t b = 0; b < blocks; b++)
     {
         uint32_t w[64]{};
+        std::array<uint8_t, 64> chunk{};
+        size_t count = b * 64 < size ? std::min(size_t(64), size - b * 64) : 0;
+        if (count)
+            read(chunk.data(), count);
         for (size_t i = 0; i < 64; i++)
         {
             size_t p = b * 64 + i;
-            uint8_t v = p < data.size()        ? data[p]
-                        : p == data.size()     ? 0x80
+            uint8_t v = p < size               ? chunk[i]
+                        : p == size            ? 0x80
                         : p >= blocks * 64 - 8 ? uint8_t(bits >> (8 * (blocks * 64 - 1 - p)))
                                                : 0;
             w[i / 4] |= uint32_t(v) << (24 - (i % 4) * 8);
@@ -72,6 +77,28 @@ inline std::string ReplaySha256(const std::vector<uint8_t> &data)
     for (auto v : h)
         out << std::setw(8) << v;
     return out.str();
+}
+
+inline std::string ReplaySha256(const std::vector<uint8_t> &data)
+{
+    size_t at = 0;
+    return ReplaySha256(data.size(), [&](uint8_t *out, size_t count) {
+        std::memcpy(out, data.data() + at, count);
+        at += count;
+    });
+}
+
+inline std::string ReplayFileSha256(const std::filesystem::path &path, uint64_t limit)
+{
+    auto size = std::filesystem::file_size(path);
+    if (size > limit)
+        throw std::runtime_error("Replay hash exceeds file limit");
+    std::ifstream file(path, std::ios::binary);
+    return ReplaySha256(size_t(size), [&](uint8_t *out, size_t count) {
+        file.read(reinterpret_cast<char *>(out), std::streamsize(count));
+        if (!file)
+            throw std::runtime_error("Replay file changed during verification");
+    });
 }
 
 inline uint32_t ReplayCrc(const std::vector<uint8_t> &b)

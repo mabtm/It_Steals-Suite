@@ -455,7 +455,7 @@ class Surface
     std::vector<uint8_t> Render(ID3D11Device *d, ID3D11DeviceContext *gpu, const Options &o,
                                 const Content &content, double at, const std::vector<uint8_t> *scenePixels,
                                 bool readback = true, std::vector<uint8_t> reusable = {},
-                                bool deferred = false)
+                                bool deferred = false, double outro = -1)
     {
         Prepare(d, o.width, o.height);
         if (scenePixels)
@@ -495,7 +495,7 @@ class Surface
             io.FontDefault = content.font ? content.font : atlas->Fonts[0];
             ImGui::NewFrame();
             Compose(ImGui::GetBackgroundDrawList(), o, content, at,
-                    o.scene3d ? reinterpret_cast<ImTextureID>(sceneView) : ImTextureID{});
+                    o.scene3d ? reinterpret_cast<ImTextureID>(sceneView) : ImTextureID{}, outro);
             ImGui::Render();
             gpu->OMSetRenderTargets(1, &rtv, nullptr);
             float clear[] = {0, 0, 0, o.transparent ? 0.f : 1.f};

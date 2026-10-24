@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.13.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.13.1)**
+**[v7.14.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.14.0)**
 
-- Fixed a bug caused by slow shared-memory reads delaying the OBS menu. Capture now uses bulk copies, releases its lock before GPU uploads, and reuses the rendered menu instead of drawing it twice.
-- Improved Clip Studio with its own Full run video button. It exports the original camera at normal speed, keeps your video output settings, and preserves clip edits.
-- Improved video export transfers with a bounded bulk copy instead of byte-wise writes between the game and trainer.
+- Improved OBS mode by keeping menus on the trainer's normal render path. The capture option sends the compact and speedrun HUD to the game; record menus through a separate trainer-window source.
+- Improved new replay recordings with player arms, body/UI/radar cameras, game UI and particle snapshots. This includes the crystal counter and game messages such as RUN. Existing recordings keep their available tracks.
+- Improved replay checks with Recheck replay and a Run check tab in Clip Studio. Full-run video exports check the files again and finish with a five-second result card and a smooth transition. Stored validity and warnings stay unchanged.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -119,12 +119,12 @@ While the repository is private, open **Updates → Connect private releases** a
 - **3D playback:** Review movement with recorded, follow, or free cameras in the original or simplified scene.
 - **Timeline:** Seek, pause, loop, change speed, and add named markers.
 - **Replay layers:** Toggle captured colliders, speed trails, ceilings, fullbright, and scene overlays.
-- **Capture checks:** See which movement, camera, input, animation, visual, and audio tracks were recorded.
-- **Game events:** Review captured monster states, animation data, game queries, and game audio.
+- **Capture checks:** Inspect recorded coverage and recheck each replay and its companions from disk.
+- **Game events:** Review captured monster states, animation data, game queries, and game audio. New recordings include player arms, game UI and particle snapshots.
 - **Replay packages:** Import and export compatible runs with their companion tracks.
 - **Camera editing:** Add cuts and smooth camera moves, switch views, and keyframe playback speed or scene layers.
 - **Clip Studio:** Set a range and arrange information, input, and export layers before rendering.
-- **Export:** Create MP4, lossless MKV/AVI, editing MOV, GIF, or PNG sequences with supported 30/60/120 FPS presets.
+- **Export:** Create MP4, lossless MKV/AVI, editing MOV, GIF, or PNG sequences with supported 30/60/120 FPS presets. Full-run videos include a replay-check card at the end.
 - **File-size targets:** Re-encode a clip with two-pass compression to work toward a chosen size.
 
 **Settings & maintenance**

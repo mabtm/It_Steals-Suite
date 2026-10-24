@@ -6,6 +6,7 @@ import shlex
 import shutil
 import struct
 import subprocess
+import time
 from pathlib import Path
 
 parser = argparse.ArgumentParser(
@@ -48,8 +49,8 @@ def verify_clock(plan):
         plan[key] for key in ("width", "height", "fps", "frames")
     )
     assert (width, height) == (1920, 1080)
-    assert (fps, frames) in ((60, 653), (120, 587))
-    label = f"clock-1080p{fps}"
+    assert (fps, frames) in ((60, 653), (120, 587), (120, 3601))
+    label = f"clock-1080p{fps}" + ("-sustained" if frames > 3000 else "")
     samples = round(frames * 48000 / fps)
     pcm = b"".join(
         struct.pack("<ff", math.sin(n * 0.037) * 0.25, ((n % 997) / 997 - 0.5) * 0.3)
@@ -89,6 +90,8 @@ def verify_clock(plan):
         str(final),
     ]
     hashes = []
+    progress = []
+    started = time.monotonic()
     with (out / f"{label}-encoder.log").open("wb") as log:
         process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=log
@@ -109,6 +112,10 @@ def verify_clock(plan):
                 frame = row * height
                 hashes.append(hashlib.md5(frame).hexdigest())
                 process.stdin.write(frame)
+                if (n + 1) % 500 == 0 or n + 1 == frames:
+                    progress.append(
+                        {"frames": n + 1, "wallSeconds": time.monotonic() - started}
+                    )
             process.stdin.close()
             assert process.wait(timeout=120) == 0, (
                 out / f"{label}-encoder.log"
@@ -121,11 +128,14 @@ def verify_clock(plan):
         header = file.read(1024 * 1024)
     assert header[:4] == b"RIFF" and header[8:12] == b"AVI "
     streams = []
+    open_dml_frames = []
 
     def scan(start, end):
         for tag, body, size in chunks(header, start, end):
             if tag == b"LIST" and header[body : body + 4] != b"movi":
                 scan(body + 4, min(body + size, end))
+            elif tag == b"dmlh" and size >= 4:
+                open_dml_frames.append(struct.unpack_from("<I", header, body)[0])
             elif tag == b"strh":
                 scale, rate, first, count = struct.unpack_from(
                     "<IIII", header, body + 20
@@ -135,7 +145,11 @@ def verify_clock(plan):
     scan(12, len(header))
     video = next(s for s in streams if s[0] == b"vids")
     audio = next(s for s in streams if s[0] == b"auds")
-    assert video[2] / video[1] == fps and video[3] == 0 and video[4] == frames, video
+    assert (
+        video[2] / video[1] == fps
+        and video[3] == 0
+        and max([video[4], *open_dml_frames]) == frames
+    ), video
     assert audio[3] == 0 and audio[4] * audio[1] / audio[2] == samples / 48000, audio
     decoded = out / f"{label}-decoded.wav"
     subprocess.run(
@@ -228,6 +242,7 @@ def verify_clock(plan):
         "pcmExact": True,
         "independentFrameDecode": independent,
         "bytes": final.stat().st_size,
+        "progress": progress,
     }
     return report
 
@@ -338,6 +353,7 @@ for fmt, ext in [(2, "mkv"), (4, "avi"), (5, "mov"), (6, "mp4")]:
             "audioRate": a["sample_rate"],
             "pcmExact": fmt != 6,
             "bytes": final.stat().st_size,
+            "progress": progress,
             "duration": probe["format"]["duration"],
         }
     )

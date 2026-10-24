@@ -23,7 +23,7 @@ struct Options
     bool fullKeyboard = false, hideCeiling = false, fadeWalls = false;
     int camera = 0;
     bool transparent = false, simplified = false, fullbright = false;
-    bool speedKeys = true, audio = false;
+    bool speedKeys = true, audio = false, verification = false;
     float audioVolume = 1;
 
     bool AudioEnabled() const
@@ -58,9 +58,31 @@ struct Options
             throw std::runtime_error("Clip exceeds the 216,000-frame limit");
     }
 
-    double OutputDuration() const
+    static constexpr double VerificationSeconds = 5;
+
+    double SourceDuration() const
     {
         return timing && speedKeys ? timing->Output(b) - timing->Output(a) : std::max(0., b - a) / rate;
+    }
+
+    double OutputDuration() const
+    {
+        return SourceDuration() + (verification ? VerificationSeconds : 0);
+    }
+
+    uint64_t SourceFrames() const
+    {
+        return uint64_t(std::ceil(std::max(0., SourceDuration()) * fps - 1e-9));
+    }
+
+    bool IsOutro(uint64_t n) const
+    {
+        return verification && n >= SourceFrames();
+    }
+
+    double OutroAt(uint64_t n) const
+    {
+        return IsOutro(n) ? double(n - SourceFrames()) / fps : -1;
     }
 
     double SpeedAt(double t) const
@@ -75,7 +97,7 @@ struct Options
 
     uint64_t Frames() const
     {
-        return uint64_t(std::ceil(std::max(0., OutputDuration()) * fps - 1e-9));
+        return SourceFrames() + (verification ? uint64_t(VerificationSeconds * fps) : 0);
     }
 
     double At(uint64_t n) const

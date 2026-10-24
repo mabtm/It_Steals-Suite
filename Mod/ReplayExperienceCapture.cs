@@ -42,6 +42,7 @@ public static class ReplayExperienceCapture
     private static readonly Dictionary<FieldInfo, string> fields = new Dictionary<FieldInfo, string>();
     private static readonly Dictionary<MethodInfo, MethodInfo> audio =
         new Dictionary<MethodInfo, MethodInfo>();
+    private static MethodInfo spawn;
     private static readonly MethodInfo ray = typeof(Physics).GetMethod(
         "Raycast", new[] { typeof(Ray), typeof(RaycastHit).MakeByRefType(), typeof(float), typeof(int) });
     private static readonly MethodInfo line =
@@ -49,6 +50,7 @@ public static class ReplayExperienceCapture
     public static int HookFailures { get; private set; }
     public static string HookError { get; private set; }
     public static int AudioSites { get; private set; }
+    public static int ParticleSites { get; private set; }
     public static int QuerySites { get; private set; }
     public static int StateSites { get; private set; }
     private static double detailUntil;
@@ -520,7 +522,7 @@ public static class ReplayExperienceCapture
     {
         fields.Clear();
         audio.Clear();
-        AudioSites = QuerySites = StateSites = HookFailures = 0;
+        AudioSites = ParticleSites = QuerySites = StateSites = HookFailures = 0;
         HookError = null;
         foreach (var pair in new[] { new[] { "Play", "Play" }, new[] { "Stop", "AudioStop" },
                                      new[] { "Pause", "AudioPause" } })
@@ -530,6 +532,13 @@ public static class ReplayExperienceCapture
                   typeof(ReplayExperienceCapture).GetMethod("OneShot"));
         audio.Add(typeof(AudioSource).GetMethod("PlayOneShot", new[] { typeof(AudioClip), typeof(float) }),
                   typeof(ReplayExperienceCapture).GetMethod("OneShotScale"));
+        foreach (var method in typeof(UnityEngine.Object)
+                     .GetMethods(BindingFlags.Static | BindingFlags.Public))
+            if (method.Name == "Instantiate" && method.IsGenericMethodDefinition &&
+                method.GetParameters().Length == 3 &&
+                method.GetParameters()[1].ParameterType == typeof(Vector3) &&
+                method.GetParameters()[2].ParameterType == typeof(Quaternion))
+                spawn = method.MakeGenericMethod(typeof(GameObject));
         AddFields(typeof(MonsterController), "HasBeenSpotted", "IsStunned", "EnteringRageMode", "goBerserk");
         AddFields(typeof(HideAndSeekIt), "spottingPlayer", "FoundPlayer", "SeeingIt", "SeekingMode",
                   "startChase", "hiding", "running");
@@ -553,7 +562,7 @@ public static class ReplayExperienceCapture
                     {
                         var call = i.operand as MethodInfo;
                         var field = i.operand as FieldInfo;
-                        if (call != null && audio.ContainsKey(call) ||
+                        if (call != null && (audio.ContainsKey(call) || call == spawn) ||
                             Monster(Root(type)) && (call == ray || call == line) ||
                             field != null && i.opcode == OpCodes.Stfld && fields.ContainsKey(field))
                         {
@@ -613,6 +622,15 @@ public static class ReplayExperienceCapture
         {
             site++;
             var method = i.operand as MethodInfo;
+            if ((i.opcode == OpCodes.Call || i.opcode == OpCodes.Callvirt) && method != null &&
+                method == spawn)
+            {
+                i.opcode = OpCodes.Call;
+                i.operand = typeof(ReplaySceneCapture).GetMethod("Spawn");
+                ParticleSites++;
+                yield return i;
+                continue;
+            }
             MethodInfo replacement;
             if ((i.opcode == OpCodes.Call || i.opcode == OpCodes.Callvirt) && method != null &&
                 audio.TryGetValue(method, out replacement))

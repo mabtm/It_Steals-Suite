@@ -29,7 +29,7 @@ public static class ReplayVisualCapture
     private static readonly HashSet<int> owners = new HashSet<int>();
     private static readonly HashSet<Renderer> culling = new HashSet<Renderer>();
     private static int scene;
-    private static Transform observedBody;
+    private static Transform observedBody, observedArms;
     private static readonly HashSet<long> ownerIds = new HashSet<long>();
     private static readonly Dictionary<string, ReplayVisualTrack> globalPoses =
         new Dictionary<string, ReplayVisualTrack>();
@@ -109,10 +109,21 @@ public static class ReplayVisualCapture
         return id;
     }
 
+    public static Transform Arms(MouseLook player)
+    {
+        return player == null                 ? null
+               : player.ArmsAnimation != null ? player.ArmsAnimation.transform
+               : player.armsContainer == null ? null
+                                              : player.armsContainer.transform;
+    }
+
     public static bool Dynamic(Transform t)
     {
         var body = observedBody != null ? observedBody : PlayerContext.Body(PlayerContext.Observed);
         if (body != null && (t == body || t.IsChildOf(body)))
+            return true;
+        var arms = observedArms != null ? observedArms : Arms(PlayerContext.Observed);
+        if (arms != null && (t == arms || t.IsChildOf(arms)))
             return true;
         return t.GetComponentInParent<MouseLook>(true) != null ||
                t.GetComponentInParent<MonsterController>(true) != null ||
@@ -139,6 +150,7 @@ public static class ReplayVisualCapture
         data.Recorded = true;
         scene = source.gameObject.scene.handle;
         observedBody = PlayerContext.Body(source);
+        observedArms = Arms(source);
         world = data.Owner(0, 0, 0, "");
         try
         {
@@ -185,7 +197,9 @@ public static class ReplayVisualCapture
                 if (spin.gameObject.scene.handle == scene && !Dynamic(spin.transform) &&
                     !Point(spin.transform))
                     BindPose(world, spin.transform, Path(spin.transform), true, null);
-            BindOwner(1, 0, 0, PlayerContext.Body(source));
+            BindOwner(1, 0, 0, observedBody);
+            if (observedArms != null && observedArms != observedBody && !observedArms.IsChildOf(observedBody))
+                BindOwner(1, 1, 0, observedArms);
             if (source.gemsList != null)
                 foreach (var gem in source.gemsList)
                     if (gem != null)
@@ -424,7 +438,7 @@ public static class ReplayVisualCapture
         owners.Clear();
         culling.Clear();
         globalPoses.Clear();
-        observedBody = null;
+        observedBody = observedArms = null;
         ownerIds.Clear();
         spriteIds.Clear();
         textureIds.Clear();

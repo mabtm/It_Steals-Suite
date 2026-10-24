@@ -234,7 +234,7 @@ public sealed class ReplayNativeGraphics
     private Transform Source(ReplayVisualOwner owner, HashSet<Transform> used)
     {
         if (owner.Group == 1)
-            return PlayerContext.Body(player);
+            return owner.Id == 0 ? PlayerContext.Body(player) : ReplayVisualCapture.Arms(player);
         if (owner.Group == 3)
         {
             if (player.gemsList != null)
@@ -856,7 +856,7 @@ public sealed class ReplayNativeGraphics
             if (!motion.Visuals.Recorded)
                 foreach (var p in proxies)
                 {
-                    if (p.Owner.Group == 1)
+                    if (p.Owner.Group == 1 && p.Owner.Id == 0)
                     {
                         p.Root.position = camera.Body;
                         p.Root.rotation = camera.BodyRotation;
@@ -871,7 +871,7 @@ public sealed class ReplayNativeGraphics
                     }
                 }
             foreach (var p in proxies)
-                if (p.Owner.Group == 1)
+                if (p.Owner.Group == 1 && p.Owner.Id == 0)
                 {
                     p.Root.SetPositionAndRotation(camera.Body, camera.BodyRotation);
                 }

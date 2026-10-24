@@ -7,6 +7,7 @@
 #include <set>
 #include <tuple>
 #include "ReplayCoverage.h"
+#include "ReplayScene.h"
 
 namespace practice
 {
@@ -56,6 +57,7 @@ struct ReplayMotion
     ReplayColliderData colliders;
     ReplayExperience experience;
     ReplayCoverage coverage;
+    ReplaySceneInfo sceneData;
     mutable std::shared_ptr<const RecordingCheck> recordingCheck;
     std::filesystem::path audioFile;
     std::string audioError;
@@ -106,7 +108,7 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
         if (r.Read<uint32_t>() != 0x4e495349)
             throw std::runtime_error("Unsupported input recording");
         int format = r.Read<int32_t>();
-        if (format < 1 || format > 7)
+        if (format < 1 || format > 8)
             throw std::runtime_error("Unsupported input recording");
         auto d = std::make_shared<ReplayMotion>();
         d->inputFormat = format;
@@ -369,6 +371,8 @@ inline std::shared_ptr<const ReplayMotion> DecodeMotion(std::vector<uint8_t> byt
             d->coverage = ReadCoverage(r, d->seconds);
         if (format >= 7)
             d->audioNotes = r.Text(4096);
+        if (format >= 8)
+            d->sceneData = ReadReplayScene(r, d->seconds);
         r.Read<uint64_t>();
         if (!r.Done())
             throw std::runtime_error("Trailing input data");

@@ -7,9 +7,10 @@
 namespace practice
 {
 inline constexpr const char *ReplayFidelityScope =
-    "Visual coverage checks recorded poses, renderers, sprites, lights and animation metadata. "
-    "Particle simulation, the original game UI, every material property and objects spawned after "
-    "discovery are not fully captured. Complete describes the observed tracks, not every pixel of the game.";
+    "New recordings include player arms, extra cameras, game UI and particle snapshots at up to 60 Hz. "
+    "Poses, sprites, lights and animation metadata have separate tracks. Assets come from the installed game. "
+    "Older replays cannot recover missing channels. Unobserved effects and material properties may still differ; "
+    "complete describes captured tracks, not pixel-identical video.";
 
 enum class RecordingStatus
 {
@@ -36,6 +37,20 @@ struct RecordingCheck
     int complete = 0, partial = 0, missing = 0, unknown = 0;
 };
 
+// A new file check is separate from the observations stored during gameplay.
+// It cannot retrospectively scan that game's process or certify replay origin.
+struct ReplayRevalidation
+{
+    uint64_t request = 0;
+    int64_t run = 0, checkedUtc = 0;
+    bool filesOk = false, reportIncluded = false, reportChecked = false, originalChecked = false,
+         originalValid = false;
+    uint32_t originalAids = 0, originalWarnings = 0;
+    std::string originalReason;
+    std::string error, mapSha256, inputSha256, audioSha256, reportSha256;
+    std::shared_ptr<const RecordingCheck> coverage;
+};
+
 inline const char *RecordingStatusName(RecordingStatus status)
 {
     switch (status)
@@ -51,6 +66,37 @@ inline const char *RecordingStatusName(RecordingStatus status)
     default:
         return "Unknown";
     }
+}
+
+inline std::string RevalidationReport(const ReplayRevalidation &r)
+{
+    std::ostringstream out;
+    out << "PracticeSuite replay recheck\nRun: " << r.run << " / checked UTC (Unix): " << r.checkedUtc
+        << "\nFiles: " << (r.filesOk ? "CHECKED" : "FAILED") << "\n"
+        << r.error << "\nRun SHA-256: " << r.mapSha256 << "\nInput SHA-256: " << r.inputSha256
+        << "\nAudio SHA-256: " << r.audioSha256 << "\nOriginal report SHA-256: " << r.reportSha256
+        << "\nOriginal report: "
+        << (r.reportChecked    ? "identity and stored observations checked"
+            : r.reportIncluded ? "historical schema"
+                               : "unavailable")
+        << "\nFresh checks cover stored files and their timelines. The recorded run verdict and warnings stay unchanged."
+        << "\nLocal, unsigned evidence; editable software and files cannot prove authenticity or leaderboard eligibility.\n";
+    out << "\nStored run verdict: "
+        << (!r.originalChecked ? "unavailable"
+            : r.originalValid  ? "VALID (local)"
+                               : "UNVALID")
+        << "\nStored aids: " << r.originalAids << " / stored warnings: " << r.originalWarnings << "\n"
+        << r.originalReason << "\n";
+    if (r.coverage)
+        for (const auto &channel : r.coverage->channels)
+        {
+            out << channel.name << ": " << RecordingStatusName(channel.status) << " / " << channel.samples
+                << " samples\n"
+                << channel.detail << "\n";
+            for (const auto &gap : channel.gaps)
+                out << "  Gap: " << gap.begin << " - " << gap.end << " s\n";
+        }
+    return out.str();
 }
 
 inline void RecordingIssue(RecordingChannel &c, std::string reason, bool missing = false)
@@ -179,6 +225,22 @@ inline std::shared_ptr<const RecordingCheck> BuildRecordingCheck(const ReplayMot
                 break;
             }
     }
+    if (!m.sceneData.recorded)
+        rows[4].detail += " This recording has no game-UI, extra-camera or particle channel.";
+    else
+    {
+        rows[4].samples += size_t(m.sceneData.samples);
+        rows[4].detail += " Scene: " + std::to_string(m.sceneData.cameras) + " cameras / " +
+                          std::to_string(m.sceneData.ui) + " UI tracks / " +
+                          std::to_string(m.sceneData.particles) + " particle tracks.";
+        if (m.sceneData.dropped)
+            RecordingIssue(rows[4], std::to_string(m.sceneData.dropped) + " omitted scene observations.");
+        if (m.sceneData.through + .05 < m.seconds)
+        {
+            RecordingIssue(rows[4], "Scene observation ended before the run.");
+            rows[4].gaps.push_back({m.sceneData.through, m.seconds});
+        }
+    }
     auto &sound = rows[5];
     sound.name = "Audio";
     const auto &audio = m.experience.audio;
@@ -212,8 +274,31 @@ inline std::shared_ptr<const RecordingCheck> BuildRecordingCheck(const ReplayMot
     {
         if (sound.status != RecordingStatus::Missing)
             sound.status = RecordingStatus::Partial;
-        if ((audio.flags & 1) || audio.gaps)
-            sound.detail += " Missing PCM blocks or queue overrun.";
+        if (((audio.flags & 1) || audio.gaps) && !audio.diagnostics)
+            sound.detail +=
+                " Missing PCM blocks or queue overrun; this older audio header has no precise cause or timestamps.";
+        if (audio.diagnostics)
+        {
+            if (audio.missingFrames)
+                sound.detail += " Missing PCM: " + std::to_string(audio.missingFrames) + " sample frames.";
+            if (audio.listenerOverruns)
+                sound.detail += " Listener queue overruns: " + std::to_string(audio.listenerOverruns) + ".";
+            if (audio.bypassOverruns)
+                sound.detail += " Bypass queue overruns: " + std::to_string(audio.bypassOverruns) + ".";
+            for (const auto &gap : audio.gapDetails)
+            {
+                std::ostringstream line;
+                line << std::fixed << std::setprecision(6) << "\nPCM "
+                     << (gap.reason == 1   ? "start boundary"
+                         : gap.reason == 3 ? "finish boundary"
+                                           : "timeline gap")
+                     << ": " << double(gap.first) / audio.rate << " - "
+                     << double(gap.first + gap.frames) / audio.rate << " s.";
+                sound.detail += line.str();
+                sound.gaps.push_back(
+                    {double(gap.first) / audio.rate, double(gap.first + gap.frames) / audio.rate});
+            }
+        }
         if (audio.flags & 2)
             sound.detail += " Audio file limit reached.";
         if (audio.flags & 4)

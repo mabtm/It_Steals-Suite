@@ -42,6 +42,11 @@ int main(int argc, char **argv)
     o.Validate(10);
     assert(o.Frames() == 210);
     assert(o.At(0) == o.a && o.At(209) < o.b && o.Stamp(210) == 35000000);
+    auto full = o;
+    full.verification = true;
+    assert(full.SourceFrames() == 210 && full.Frames() == 510 && !full.IsOutro(209) && full.IsOutro(210) &&
+           full.OutroAt(210) == 0 && full.OutroAt(509) == 299. / 60 && full.Stamp(510) == 85000000);
+    assert(full.At(210) == full.b && EncodedSeconds(full) == 8.5);
     o.rate = .5;
     assert(o.Frames() == 420);
     o.rate = 1;

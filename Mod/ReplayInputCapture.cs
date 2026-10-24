@@ -61,6 +61,9 @@ public static class ReplayInputCapture
         horizontal = vertical = mx = my = jx = jy = 0;
         var e = record.Environment;
         active = new ReplayMotionData { Id = record.Id, Scene = map.Scene, Seed = map.Seed, Hash = map.Hash };
+        var recording = active;
+        active.Visuals.ReserveBytes = active.Colliders.ReserveBytes = active.Experience.ReserveBytes =
+            active.SceneData.ReserveBytes = recording.HasBudget;
         active.Info.Tool = e == null ? ItStealsMod.Version : e.ToolVersion;
         active.Info.Game = e == null ? "" : e.GameVersion;
         active.Info.Unity = e == null ? "" : e.UnityVersion;
@@ -78,6 +81,15 @@ public static class ReplayInputCapture
         ReplayExperienceCapture.Begin(active, player);
         ReplayColliderCapture.Begin(active, player, map);
         ReplayVisualCapture.Begin(active, player, map);
+        try
+        {
+            ReplaySceneCapture.Begin(active, player);
+        }
+        catch (Exception failure)
+        {
+            active.SceneData.Drop();
+            MelonLoader.MelonLogger.Warning("Replay scene observations: " + failure.Message);
+        }
         Camera.onPreCull += CameraFrame;
         Capture(PlayerContext.View(player), 0);
     }
@@ -88,6 +100,7 @@ public static class ReplayInputCapture
         inside = false;
         ReplayColliderCapture.Stop();
         ReplayVisualCapture.Stop();
+        ReplaySceneCapture.Stop();
         ReplayExperienceCapture.Stop();
         ReplayAudioCapture.Stop(keepAudioPrepared);
         active = null;
@@ -361,6 +374,7 @@ public static class ReplayInputCapture
             return;
         ReplayColliderCapture.Camera(seconds);
         ReplayAudioCapture.Sync(seconds);
+        ReplaySceneCapture.Sample(seconds);
         bool animationCut = ReplayExperienceCapture.Sample(seconds);
         ReplayVisualCapture.Sample(seconds, false, animationCut);
         try
@@ -449,6 +463,7 @@ public static class ReplayInputCapture
         ReplayAudioCapture.Sync(seconds);
         ReplayExperienceCapture.Sample(seconds, true);
         ReplayVisualCapture.Sample(seconds, true);
+        ReplaySceneCapture.Sample(seconds, true);
         ReplayAudioCapture.Finish(seconds);
         done.Coverage.Seal(seconds);
         Stop();

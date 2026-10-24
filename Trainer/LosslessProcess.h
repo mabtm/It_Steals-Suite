@@ -3,6 +3,7 @@
 #ifdef _WIN32
 #include <atomic>
 #include <bcrypt.h>
+#include <psapi.h>
 
 namespace suite_clip
 {
@@ -286,6 +287,14 @@ class LosslessWriter
             std::filesystem::remove(logPath, ec);
     }
 
+    uint64_t WorkingSetBytes() const
+    {
+        PROCESS_MEMORY_COUNTERS counters{};
+        return K32GetProcessMemoryInfo(process, &counters, sizeof(counters))
+                   ? uint64_t(counters.WorkingSetSize)
+                   : 0;
+    }
+
     void Write(const std::vector<uint8_t> &bytes)
     {
         size_t at = 0;
@@ -296,8 +305,7 @@ class LosslessWriter
             OVERLAPPED operation{};
             operation.hEvent = event;
             DWORD count = 0;
-            BOOL ok = WriteFile(pipe, bytes.data() + at, DWORD(std::min(size_t(1048576), bytes.size() - at)),
-                                &count, &operation);
+            BOOL ok = WriteFile(pipe, bytes.data() + at, DWORD(bytes.size() - at), &count, &operation);
             if (!ok)
             {
                 if (GetLastError() != ERROR_IO_PENDING)

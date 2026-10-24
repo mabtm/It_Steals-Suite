@@ -13,10 +13,8 @@ class CaptureOverlay
     DWORD pid = 0;
     uint32_t acknowledged = 0;
     ULONGLONG lastAck = 0, nextConnect = 0;
-    LayeredHud menu;
     const LayeredHud *lastSource = nullptr;
     uint64_t lastFrame = 0;
-    ULONGLONG nextMenu = 0;
 
     static const std::array<uint8_t, 65536> &StraightAlpha()
     {
@@ -67,8 +65,7 @@ class CaptureOverlay
     {
         lastAck = 0;
         lastSource = nullptr;
-        lastFrame = nextMenu = 0;
-        menu.Reset();
+        lastFrame = 0;
     }
 
     void Close()
@@ -184,27 +181,5 @@ class CaptureOverlay
         lastSource = &source;
         lastFrame = source.Generation();
         ReleaseMutex(mutex);
-    }
-
-    void CopyMenu(ID3D11Device *device, ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
-                  const RECT &client, const WNDCLASSEXW &wc, const std::vector<HudRegion> &regions)
-    {
-        auto now = GetTickCount64();
-        if (!enabled || !data || !target || now < nextMenu)
-            return;
-        nextMenu = now + 16;
-        ID3D11Resource *resource = nullptr;
-        ID3D11Texture2D *texture = nullptr;
-        target->GetResource(&resource);
-        if (resource)
-        {
-            resource->QueryInterface(IID_PPV_ARGS(&texture));
-            resource->Release();
-        }
-        bool ready = texture && menu.UseTexture(texture);
-        if (texture)
-            texture->Release();
-        if (ready && menu.Present(device, context, nullptr, nullptr, wc, client, regions, {}, 0, false))
-            Publish(menu);
     }
 };

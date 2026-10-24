@@ -275,7 +275,7 @@ inline void TickExportPipeline(ID3D11Device *device, ID3D11DeviceContext *gpu, D
     // Credit is returned only after a complete frame reaches the encoder.
     // At most three frames span all GPU and transfer stages together.
     if (scene)
-        while (exportWindow.CanRequest() && bridge.Available())
+        while (exportWindow.CanRequest() && bridge.Available() && exportWindow.Requested() < o.SourceFrames())
         {
             auto index = exportWindow.Requested();
             double at = o.At(index);
@@ -294,7 +294,8 @@ inline void TickExportPipeline(ID3D11Device *device, ID3D11DeviceContext *gpu, D
     {
         double at = o.At(composed);
         auto resolved = ResolveFrame(o, c, at);
-        if (scene)
+        bool sceneFrame = scene && !o.IsOutro(composed);
+        if (sceneFrame)
         {
             if (composed >= exportWindow.Requested())
                 break;
@@ -324,8 +325,20 @@ inline void TickExportPipeline(ID3D11Device *device, ID3D11DeviceContext *gpu, D
             pipelineStats->peakInFlight =
                 std::max(pipelineStats->peakInFlight.load(), exportWindow.InFlight());
         }
+        if (pid && (composed == 0 || composed % 500 == 0))
+        {
+            HANDLE process = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+            if (process)
+            {
+                PROCESS_MEMORY_COUNTERS counters{};
+                if (K32GetProcessMemoryInfo(process, &counters, sizeof(counters)))
+                    pipelineStats->gameWorkingSet = uint64_t(counters.WorkingSetSize);
+                CloseHandle(process);
+            }
+        }
         auto start = std::chrono::steady_clock::now();
-        surface.Render(device, gpu, resolved.options, c, at, scene ? &scenePixels : nullptr, false, {}, true);
+        surface.Render(device, gpu, resolved.options, c, at, sceneFrame ? &scenePixels : nullptr, false, {},
+                       true, o.OutroAt(composed));
         surface.QueueReadback(device, gpu, composed, resolved.options);
         pipelineStats->composeMicros += uint64_t(
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start)
@@ -394,6 +407,33 @@ inline void Tick(ID3D11Device *device, ID3D11DeviceContext *gpu, DWORD pid)
     }
     if (g_pShared && g_pShared->replay3dState == 2)
         PauseViewer();
+    if (awaitingFullRunCheck)
+    {
+        auto result = practice::g_replayArchive.Get()->revalidation;
+        if (result && result->request >= fullRunRecheck)
+        {
+            awaitingFullRunCheck = false;
+            if (!result->filesOk)
+                error = "Full run check failed: " + result->error;
+            else if (content.analysis && content.analysis->data->review->id == result->run)
+            {
+                content.revalidation = result;
+                content.motion = practice::g_replayArchive.Motion();
+                startRequested = fullRunRequested = true;
+            }
+            else
+                error = "The selected replay changed during its file check. Start full run export again.";
+        }
+        else
+            status = "Checking replay files before full run export";
+    }
+    if (startRequested && fullRunRequested && !content.revalidation)
+    {
+        startRequested = fullRunRequested = false;
+        fullRunRecheck = practice::g_replayArchive.Revalidate(content.analysis->data);
+        awaitingFullRunCheck = true;
+        status = "Checking replay files before full run export";
+    }
     if (startRequested)
     {
         startRequested = false;
@@ -445,6 +485,9 @@ inline void Tick(ID3D11Device *device, ID3D11DeviceContext *gpu, DWORD pid)
                 throw std::runtime_error("Not enough disk space for this export");
             ExportSource exportSource;
             exportSource.pipeline = pipelineStats;
+            exportSource.revalidation = frozenContent.revalidation;
+            exportSource.recordedValid = frozenContent.analysis->data->review->valid;
+            exportSource.recordedWarnings = frozenContent.analysis->data->review->warnings;
             exportSource.run = id;
             exportSource.seed = frozenContent.analysis->data->seed;
             exportSource.scene = frozenContent.analysis->data->scene;

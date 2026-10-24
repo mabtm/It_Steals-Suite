@@ -44,6 +44,35 @@ inline ReplayAudioInfo VerifyRecordedAudio(std::istream &file, uint64_t size, in
         size != AudioHeaderBytes + uint64_t(i.frames) * i.channels * 4 + 8 || i.flags < 0 ||
         (i.flags & ~31) || i.gaps < 0)
         throw std::runtime_error("Invalid recorded audio header");
+    file.seekg(128);
+    uint32_t diagnosticMagic = read.operator()<uint32_t>();
+    if (diagnosticMagic)
+    {
+        if (diagnosticMagic != 0x47445349u || read.operator()<int32_t>() != 1)
+            throw std::runtime_error("Invalid audio diagnostics");
+        i.diagnostics = true;
+        i.listenerOverruns = read.operator()<int32_t>();
+        i.bypassOverruns = read.operator()<int32_t>();
+        i.missingFrames = read.operator()<int64_t>();
+        i.peakListener = read.operator()<int32_t>();
+        i.peakBypass = read.operator()<int32_t>();
+        int count = read.operator()<int32_t>();
+        if (i.listenerOverruns < 0 || i.bypassOverruns < 0 || i.missingFrames < 0 ||
+            i.missingFrames > i.frames || i.peakListener < 0 || i.peakListener > 63 || i.peakBypass < 0 ||
+            i.peakBypass > 15 || count < 0 || count > 3)
+            throw std::runtime_error("Invalid audio diagnostics");
+        for (int k = 0; k < count; k++)
+        {
+            ReplayAudioGap gap;
+            gap.first = read.operator()<int64_t>();
+            gap.frames = read.operator()<int64_t>();
+            gap.reason = read.operator()<int32_t>();
+            if (read.operator()<int32_t>() != 0 || gap.first < 0 || gap.frames <= 0 ||
+                gap.first > i.frames - gap.frames || gap.reason < 1 || gap.reason > 3)
+                throw std::runtime_error("Invalid audio gap");
+            i.gapDetails.push_back(gap);
+        }
+    }
     file.seekg(std::streamoff(size - 8));
     i.checksum = read.operator()<uint64_t>();
     file.seekg(0);

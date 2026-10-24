@@ -5,12 +5,23 @@ using UnityEngine;
 
 // Additional passive observations. Existing input/run identity and validation
 // remain authoritative; gaps in optional channels are explicit.
+public struct ReplayAudioGap
+{
+    public long First, Frames;
+    public int Reason; // 1 start boundary, 2 interior, 3 finish boundary
+}
+
 public sealed class ReplayAudioInfo
 {
     public bool Recorded;
     public int Rate, Channels, Flags, Gaps;
     public long Frames, Bytes;
     public ulong Checksum;
+    // Loaded from the checksummed audio header; the input metadata stays compatible.
+    public bool Diagnostics;
+    public int ListenerOverruns, BypassOverruns, PeakListener, PeakBypass;
+    public long MissingFrames;
+    public readonly List<ReplayAudioGap> GapDetails = new List<ReplayAudioGap>();
     public double Duration
     {
         get {
@@ -139,6 +150,19 @@ public sealed class ReplayExperienceData
                    Animations.Count * 128L + Names.Count * 1100L;
         }
     }
+    public Func<int, bool> ReserveBytes;
+    public long WireBytes
+    {
+        get {
+            return Wire;
+        }
+    }
+
+    private bool Budget(int extra)
+    {
+        return ReserveBytes == null || ReserveBytes(extra);
+    }
+
     private long Wire
     {
         get {
@@ -160,7 +184,7 @@ public sealed class ReplayExperienceData
         int n;
         if (names.TryGetValue(value, out n))
             return n;
-        if (Names.Count >= 2048 || System.Text.Encoding.UTF8.GetByteCount(value) > 512)
+        if (Names.Count >= 2048 || !Budget(1100) || System.Text.Encoding.UTF8.GetByteCount(value) > 512)
         {
             Drop();
             return 0;
@@ -178,7 +202,7 @@ public sealed class ReplayExperienceData
             Drop();
             return;
         }
-        if (Probes.Count >= MaxProbes || Wire + 56 > MaxWire)
+        if (Probes.Count >= MaxProbes || Wire + 56 > MaxWire || !Budget(56))
         {
             Drop();
             return;
@@ -200,7 +224,7 @@ public sealed class ReplayExperienceData
             Drop();
             return;
         }
-        if (Events.Count >= MaxEvents || Wire + 36 > MaxWire)
+        if (Events.Count >= MaxEvents || Wire + 36 > MaxWire || !Budget(36))
         {
             Drop();
             return;
@@ -215,7 +239,7 @@ public sealed class ReplayExperienceData
 
     public void Add(ReplayAnimationTrack t, ReplayAnimationFrame f)
     {
-        if (AnimationCount >= MaxAnimation || Wire + 48 > MaxWire)
+        if (AnimationCount >= MaxAnimation || Wire + 48 > MaxWire || !Budget(48))
         {
             Drop();
             return;

@@ -87,7 +87,7 @@ jobs:
         run: |
           & .\Installer\Release.ps1 -PlatformToolset v143 -SourceCommit $env:GITHUB_SHA
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Release packaging failed.' }
-      - name: Verify 1080p60 and 1080p120 AVI timing and recorded audio with the shipped encoder
+      - name: Verify 1080p60/120 and sustained AVI timing with the shipped encoder
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

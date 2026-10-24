@@ -314,6 +314,28 @@ inline void RenderReplayTransfer(std::shared_ptr<const practice::MapData> data, 
 {
     static int64_t requested = 0;
     auto state = practice::g_replayArchive.Get();
+    static uint64_t recheckRequest = 0;
+    bool checking = recheckRequest && (!state->revalidation || state->revalidation->request < recheckRequest);
+    ImGui::BeginDisabled(!retained || checking);
+    if (suite_ui::Button(checking ? "Checking replay..." : "Recheck replay"))
+        recheckRequest = practice::g_replayArchive.Revalidate(data);
+    ImGui::EndDisabled();
+    Help(
+        "Read this replay and its companions again from disk. Checks identity, checksums, timelines and stored validation evidence. Historical warnings stay unchanged; this is a local file check.");
+    auto checked = state->revalidation;
+    if (checked && checked->run == data->review->id)
+    {
+        ImGui::TextColored(checked->filesOk ? ImVec4(.3f, .88f, .63f, 1) : g_accentCol, "%s",
+                           checked->filesOk ? "Replay files checked" : "Replay check failed");
+        if (!checked->error.empty())
+            Help(checked->error.c_str());
+        if (checked->coverage)
+            ImGui::TextDisabled("Coverage: %d complete / %d partial / %d missing / %d unknown",
+                                checked->coverage->complete, checked->coverage->partial,
+                                checked->coverage->missing, checked->coverage->unknown);
+        if (suite_ui::Button("Copy replay check"))
+            ImGui::SetClipboardText(practice::RevalidationReport(*checked).c_str());
+    }
     ImGui::BeginDisabled(!retained);
     if (suite_ui::Button("Export package"))
     {
