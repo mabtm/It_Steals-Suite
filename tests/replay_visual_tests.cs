@@ -996,6 +996,8 @@ public static class ReplayVisualTests
             v.Update(40, 0, camera, focus, options, true);
             Check(Near(owned.color.a, .18f),
                   "offscreen capture reaches deterministic wall alpha without advancing time");
+            using (v.Preserve()) v.Update(40, 0, camera, focus, Replay3DOptions.Free, true);
+            Check(Near(owned.color.a, .18f), "Nested visibility scopes retain their own snapshot buffers");
             v.Update(40, 0, camera, focus, Replay3DOptions.Free, true);
             Check(Near(owned.color.a, 1) && ReferenceEquals(mixed.sharedMaterials[1], normal[8]),
                   "capture uses its own ceiling/camera options immediately");
@@ -1024,9 +1026,34 @@ public static class ReplayVisualTests
                   ReferenceEquals(mixed.sharedMaterials[0], normal[0]) &&
                   ReferenceEquals(mixed.sharedMaterials[1], normal[8]),
               "owned fade materials are released once, source material slots restored");
+        VisibilityAllocationCase(normal, transparent, hidden, bounds);
         LayerAndFloorCases(normal, transparent, hidden, bounds, camera, focus, options);
         Console.WriteLine(
             "Replay visibility: non-instanced shader state, actual owned-material alpha, physical normals, floor/prop protection, 20 Hz, reversed hits, original scene slots and idempotent material cleanup: PASS");
+    }
+
+    static void VisibilityAllocationCase(Material[] normal, Material[] transparent, Material hidden,
+                                         Bounds bounds)
+    {
+        using (var v = new ReplaySceneVisibility(new Collider[0]))
+        {
+            for (int i = 0; i < 2000; i++)
+            {
+                var r = new Renderer { transform = new Transform(), bounds = bounds,
+                                       sharedMaterials = new[] { normal[0] } };
+                v.Add(r, r.sharedMaterials, new[] { 0 }, transparent, hidden, true);
+            }
+            using (v.Preserve()) {}
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int i = 0; i < 500; i++)
+                using (v.Preserve()) {}
+            long bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            Check(
+                bytes < 128 * 1024,
+                "Visibility snapshots must not allocate arrays proportional to scene size for every export frame");
+            Console.WriteLine("Visibility snapshots: 500 frames / 2,000 surfaces / allocated " + bytes +
+                              " bytes: PASS");
+        }
     }
 
     static void LayerAndFloorCases(Material[] normal, Material[] transparent, Material hidden, Bounds bounds,

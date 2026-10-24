@@ -9,7 +9,7 @@ Changes by version. The full development history is in Git.
 - Improved replay checks with Recheck replay and a Run check tab in Clip Studio. Full-run video exports check the files again and finish with a five-second result card and a smooth transition. Stored validity and warnings stay unchanged.
 - Improved audio capture with integer sample clocks, larger bounded queues and exact PCM gap diagnostics. Recording check now separates missing timeline samples from listener and bypass queue overruns.
 - Improved mouse movement with the correct vertical direction and circular scaling that preserves diagonals.
-- Improved encoder transfers with one cancellable write per frame. Export reports track speed, stage timings, output size and memory every 500 frames; release checks now include a 3,601-frame 1080p120 AVI.
+- Improved long exports by reusing visibility snapshot buffers and sending one cancellable encoder write per frame. Export reports track speed, stage timings, output size and memory every 500 frames; release checks now include a 3,601-frame 1080p120 AVI.
 
 ### v7.13.1 Changelog
 

@@ -255,6 +255,12 @@ public sealed class ReplaySceneVisibility : IDisposable
 
     // Offscreen frames must not depend on export speed or advance the viewer's
     // fades. Preserve the exact visible state around a deterministic capture.
+    // Borrow one reusable array set. Each scope remains a distinct object, so
+    // nested saves and repeated Dispose calls cannot alias an active snapshot.
+    private float[] savedAlpha;
+    private bool[] savedBlocked;
+    private int[] savedVariant;
+
     private sealed class SavedVisibility : IDisposable
     {
         private ReplaySceneVisibility owner;
@@ -269,9 +275,15 @@ public sealed class ReplaySceneVisibility : IDisposable
         {
             owner = value;
             int count = value.surfaces.Count;
-            alpha = new float[count];
-            blocked = new bool[count];
-            variant = new int[count];
+            alpha = value.savedAlpha != null && value.savedAlpha.Length == count ? value.savedAlpha
+                                                                                 : new float[count];
+            blocked = value.savedBlocked != null && value.savedBlocked.Length == count ? value.savedBlocked
+                                                                                       : new bool[count];
+            variant = value.savedVariant != null && value.savedVariant.Length == count ? value.savedVariant
+                                                                                       : new int[count];
+            value.savedAlpha = null;
+            value.savedBlocked = null;
+            value.savedVariant = null;
             for (int i = 0; i < count; i++)
             {
                 var e = value.surfaces[i];
@@ -318,6 +330,12 @@ public sealed class ReplaySceneVisibility : IDisposable
             value.Fading = fading;
             value.Revision = revision;
             value.Status = status;
+            if (value.savedAlpha == null || value.savedAlpha.Length < alpha.Length)
+            {
+                value.savedAlpha = alpha;
+                value.savedBlocked = blocked;
+                value.savedVariant = variant;
+            }
         }
     }
 

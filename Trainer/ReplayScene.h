@@ -86,13 +86,13 @@ inline ReplaySceneInfo ReadReplayScene(MapReader &r, double duration)
                 floats(3);
                 rotation();
                 floats(3);
-                float fov = r.Coordinate(), near = r.Coordinate(), far = r.Coordinate();
+                float fov = r.Coordinate(), clipNear = r.Coordinate(), clipFar = r.Coordinate();
                 floats(3);
                 r.Read<int32_t>();
                 int clear = r.Count(4);
                 r.Flag();
                 floats(4);
-                if (fov < 1 || fov > 179 || near <= 0 || far <= near || !clear)
+                if (fov < 1 || fov > 179 || clipNear <= 0 || clipFar <= clipNear || !clear)
                     throw std::runtime_error("Invalid recorded camera");
             }
             else if (kind == 2)
