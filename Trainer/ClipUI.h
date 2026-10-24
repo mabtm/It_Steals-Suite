@@ -294,6 +294,7 @@ inline Options FullRunOptions(const Options &output, const Content &source)
     full.rate = 1;
     full.camera = 0;
     full.scene3d = true;
+    full.monster = true;
     full.speedKeys = full.route = full.colliders = full.fullbright = full.hideCeiling = full.fadeWalls =
         full.simplified = full.transparent = false;
     full.timing.reset();

@@ -1527,6 +1527,7 @@ void Workshop740Cases(const std::string &output)
     suite_clip::options.rate = .5;
     suite_clip::options.camera = 2;
     suite_clip::options.fullbright = true;
+    suite_clip::options.monster = false;
     auto fullMotion = std::make_shared<practice::ReplayMotion>(*motion);
     practice::ReplayViewFrame first, last;
     last.seconds = review->seconds;
@@ -1537,7 +1538,7 @@ void Workshop740Cases(const std::string &output)
     suite_clip::options.fps = 120;
     auto fullOptions = suite_clip::FullRunOptions(suite_clip::options, fullContent);
     assert(fullOptions.a == 0 && fullOptions.b == analysis->data->review->seconds && fullOptions.rate == 1 &&
-           fullOptions.camera == 0 && fullOptions.scene3d && !fullOptions.speedKeys &&
+           fullOptions.camera == 0 && fullOptions.scene3d && fullOptions.monster && !fullOptions.speedKeys &&
            !fullOptions.fullbright && !fullOptions.route && fullOptions.format == 4 &&
            fullOptions.fps == 120 && fullOptions.verification &&
            fullOptions.Frames() == fullOptions.SourceFrames() + 600);
