@@ -2158,7 +2158,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                                                      g_mainRenderTargetView, *ImGui::GetDrawData());
                     HRESULT present =
                         g_surfaceInteractive
-                            ? g_pSwapChain->Present(0, 0)
+                            // The acknowledged game image is the visible surface.
+                            // Do not queue presents on a fully transparent native
+                            // visual: DWM may stop consuming that swapchain.
+                            ? (g_captureOverlay.Active() ? S_OK : g_pSwapChain->Present(0, 0))
                             : (g_layeredHud.Present(
                                    g_pd3dDevice, g_pd3dDeviceContext, g_hWnd, g_gameWnd, g_wc,
                                    binding.clientRect,
