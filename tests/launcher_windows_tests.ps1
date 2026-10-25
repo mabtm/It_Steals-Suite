@@ -60,10 +60,36 @@ function Read-StartedPid {
     return 0
 }
 try {
+    # Exercise production file replacement on Windows as well as Linux.
+    $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+    $msbuild=& $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
+    if (-not $msbuild) { throw 'MSBuild is required for the native startup checks.' }
+    $nativeSource=[Security.SecurityElement]::Escape((Join-Path $repo 'tests/startup_logos_tests.cpp'))
+    $nativeOutput=[Security.SecurityElement]::Escape((Join-Path $work 'native'))
+    $nativeProject=Join-Path $work 'startup-tests.vcxproj'
+    [IO.File]::WriteAllText($nativeProject,@"
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations"><ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration></ItemGroup>
+  <PropertyGroup Label="Globals"><WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion></PropertyGroup>
+  <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration"><ConfigurationType>Application</ConfigurationType><PlatformToolset>v143</PlatformToolset></PropertyGroup>
+  <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup><OutDir>$nativeOutput\</OutDir><IntDir>$nativeOutput\obj\</IntDir><TargetName>startup-tests</TargetName></PropertyGroup>
+  <ItemDefinitionGroup><ClCompile><LanguageStandard>stdcpp20</LanguageStandard><PreprocessorDefinitions>NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions><AdditionalOptions>/utf-8 /UNDEBUG %(AdditionalOptions)</AdditionalOptions><RuntimeLibrary>MultiThreaded</RuntimeLibrary></ClCompile><Link><SubSystem>Console</SubSystem></Link></ItemDefinitionGroup>
+  <ItemGroup><ClCompile Include="$nativeSource" /></ItemGroup>
+  <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
+"@)
+    & $msbuild $nativeProject /p:Configuration=Release /p:Platform=x64 /nologo /verbosity:minimal
+    if ($LASTEXITCODE -ne 0) { throw 'Native startup-check compilation failed.' }
+    & (Join-Path $work 'native/startup-tests.exe') $work
+    if ($LASTEXITCODE -ne 0) { throw 'Native startup settings or recovery failed.' }
     $game=Join-Path $work ('Game & caf' + [char]0xe9 + ' ' + [char]0x6e2c + [char]0x8a66)
     $fixtureExecutable=Join-Path $game 'It Steals.exe'
     $null=[IO.Directory]::CreateDirectory((Join-Path $game 'It Steals_Data/Managed'))
     [IO.File]::WriteAllText((Join-Path $game 'It Steals_Data/Managed/Assembly-CSharp.dll'),'controlled test marker')
+    $startupSettings=Join-Path $game 'It Steals_Data/globalgamemanagers'
+    [IO.File]::WriteAllText($startupSettings,'unknown build must stay untouched')
     $source=Join-Path $work 'Game.cs'
     [IO.File]::WriteAllText($source,@'
 using System;
@@ -89,6 +115,8 @@ public class ControlledGame {
     $launchArguments=[IO.File]::ReadAllLines((Join-Path $game 'arguments.txt'))
     Assert ($launchArguments -contains '--practice-suite-skip-intro') 'Saved intro preference did not reach the game before startup.'
     Assert ($launchArguments -contains '--melonloader.disablestartscreen') 'Loader startup screen was not suppressed.'
+    Assert ([IO.File]::ReadAllText($startupSettings) -eq 'unknown build must stay untouched') 'An unsupported startup file was changed.'
+    Assert (-not (Test-Path -LiteralPath ($startupSettings+'.practicesuite-original'))) 'An unsupported startup file was backed up or patched.'
     $gameProcess=[Diagnostics.Process]::GetProcessById((Read-StartedPid))
     $owned.Add($gameProcess)
     Close-ControlledTrainer $trainer
@@ -129,7 +157,7 @@ public class ControlledGame {
     Assert ($trainer.WaitForExit(5000) -and $trainer.ExitCode -eq 0) 'The updater did not close the native hidden control window normally.'
     $output=Join-Path $repo 'build/windows-launcher-tests'
     $null=[IO.Directory]::CreateDirectory($output)
-    @{passed=$true; checks=@('native auto-start with Unicode path','early intro and loader arguments','saved intro opt-out','existing game reused','trainer closes with the game','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out','updater gracefully closes actual hidden native control window')} |
+    @{passed=$true; checks=@('native startup file replacement and recovery','unsupported startup settings preserved','native auto-start with Unicode path','early intro and loader arguments','saved intro opt-out','existing game reused','trainer closes with the game','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out','updater gracefully closes actual hidden native control window')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'summary.json') -Encoding UTF8
     Write-Output 'Windows native launcher smoke tests passed (controlled game, not Unity).'
 } catch {

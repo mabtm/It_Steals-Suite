@@ -315,6 +315,22 @@ function Restore-Installation($Journal) {
     if ($errors.Count) { throw ($errors -join '; ') }
 }
 
+function Restore-StartupSettings([string]$Game) {
+    $file = Get-ContainedPath $Game 'It Steals_Data/globalgamemanagers'
+    $backup = $file + '.practicesuite-original'
+    if (-not (Test-Path -LiteralPath $backup -PathType Leaf)) { return }
+    Assert-NoReparsePoint $file
+    Assert-NoReparsePoint $backup
+    $originalHash = '32bf65a2ebc50fcae74103293bbfff572374e0c507e38b38cc2cea84d807ec55'
+    $patchedHash = 'de13aa2df1085ae10c0f12d90571682165544f8c2f5e074ec369d4e51d94c0a6'
+    if ((Get-FileHash -LiteralPath $backup -Algorithm SHA256).Hash -ne $originalHash) { throw 'Startup backup is not the verified original. Both files were kept.' }
+    if (-not (Test-Path -LiteralPath $file)) { [IO.File]::Copy($backup, $file); [IO.File]::Delete($backup); return }
+    $current = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    if ($current -eq $patchedHash) { [IO.File]::Replace($backup, $file, $null) }
+    elseif ($current -eq $originalHash) { [IO.File]::Delete($backup) }
+    else { throw 'Startup settings changed externally. Both files were kept.' }
+}
+
 function Install-Suite([string]$Game, [string]$Application, [string]$Package) {
     if (-not (Test-GameFolder $Game)) { throw 'Choose the Windows x64 Mono It Steals game folder.' }
     $Game = [IO.Path]::GetFullPath($Game)
@@ -326,6 +342,7 @@ function Install-Suite([string]$Game, [string]$Application, [string]$Package) {
     }
     Write-Output '[1/4] Checking package and game installation...'
     $manifest = Read-PackageManifest $Package
+    Restore-StartupSettings $Game
     $hasLoader = Test-ExistingLoader $Game
     $work = Join-Path ([IO.Path]::GetTempPath()) ('PracticeSuite-' + [guid]::NewGuid().ToString('N'))
     $null = [IO.Directory]::CreateDirectory($work)
@@ -385,6 +402,7 @@ function Uninstall-Suite([string]$Application) {
         if ($entry.sha256 -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid receipt checksum.' }
         $targets += [pscustomobject]@{ path = $target; hash = $entry.sha256 }
     }
+    Restore-StartupSettings $receipt.gameDirectory
     foreach ($entry in $targets) {
         if (Test-Path -LiteralPath $entry.path -PathType Leaf) {
             if ((Get-FileHash -LiteralPath $entry.path -Algorithm SHA256).Hash -eq $entry.hash) { [IO.File]::Delete($entry.path) }

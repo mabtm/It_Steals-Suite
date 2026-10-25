@@ -20,6 +20,7 @@
 #include "HudEditorModel.h"
 #include "TrainerTray.h"
 #include "GameLaunch.h"
+#include "StartupLogos.h"
 #include "SuiteUpdater.h"
 
 #include "imgui.h"
@@ -56,6 +57,7 @@ bool g_autoStartGame = true;
 bool g_skipGameIntro = true;
 bool g_captureOverlayEnabled = false;
 std::string g_gameLaunchStatus = "Not requested";
+game_launch::StartupLogos g_startupLogos;
 bool g_overlayVisible = false;
 bool g_allOverlayEnabled = true, g_quit = false, g_resetLayout = false;
 bool g_softwareRenderer = false;
@@ -293,15 +295,19 @@ bool StartInstalledGame()
         }
         if (GetProcessIdByName(L"It Steals.exe"))
             return true;
+        bool startupReady = g_startupLogos.Prepare(location.game, g_skipGameIntro);
         DWORD error = 0;
         if (!game_launch::Start(location, g_skipGameIntro, error))
         {
+            g_startupLogos.Restore();
             g_gameLaunchStatus = "Game launch failed (Windows error " + std::to_string(error) + ")";
             return false;
         }
         g_gameLaunchStatus =
             location.steam.empty() ? "Started configured game" : "Requested game through Steam";
-        return true;
+        if (!startupReady)
+            g_gameLaunchStatus += "; startup logos unchanged: " + g_startupLogos.status;
+        return startupReady;
     }
     catch (const std::exception &)
     {
@@ -959,8 +965,8 @@ std::string BuildDiagnostics()
         << " / protocol " << kProtocolVersion << "\nMod: " << (g_pShared ? g_pShared->version : "--")
         << "\nAuto-start game: " << (g_autoStartGame ? "enabled" : "disabled")
         << "\nSkip game intro: " << (g_skipGameIntro ? "enabled" : "disabled")
-        << "\nLast game launch: " << g_gameLaunchStatus << "\nStatus: " << g_connectionStatus
-        << "\nGame PID: " << g_gamePid;
+        << "\nStartup logos: " << g_startupLogos.status << "\nLast game launch: " << g_gameLaunchStatus
+        << "\nStatus: " << g_connectionStatus << "\nGame PID: " << g_gamePid;
     if (g_pShared)
         out << "\nGame reported version: " << g_pShared->gameVersion << "; Unity: " << g_pShared->unityVersion
             << "\nGame assembly file SHA256: " << g_pShared->gameAssemblyHash << "\nModule base: 0x"
@@ -1597,6 +1603,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             }
             tray.Update(g_gamePid ? g_connectionStatus : "Waiting for It Steals (automatic reconnect)",
                         IsWindow(binding.Game()));
+            if (g_handshake && g_startupLogos.Pending())
+                g_startupLogos.Restore();
         }
         binding.Refresh(OverlayRequested());
         g_gameWnd = binding.Game();
@@ -2247,6 +2255,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                                     QS_ALLINPUT, MWMO_INPUTAVAILABLE);
     }
     g_interfaceAudio.Shutdown();
+    if (g_startupLogos.Pending())
+        g_startupLogos.Restore();
     ClearTrainerCommands();
     CloseSharedMemory();
     SavePreferencesNow();

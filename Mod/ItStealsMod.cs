@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.16.1";
+    public const string Version = "7.16.2";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -49,14 +49,7 @@ public sealed class ItStealsMod : MelonMod
         originalRunInBackground = Application.runInBackground;
         try
         {
-            try
-            {
-                framePolicy.Initialize(Environment.GetCommandLineArgs());
-            }
-            catch (Exception error)
-            {
-                MelonLogger.Warning("Startup splash: " + error.Message);
-            }
+            framePolicy.Initialize(Environment.GetCommandLineArgs());
             string gameRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             build = new GameBuildInfo(typeof(MouseLook).Assembly.Location, Application.version,
                                       Application.unityVersion);

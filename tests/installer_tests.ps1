@@ -40,6 +40,15 @@ function Make-Package([string]$Folder, [string]$Tag) {
     @{ version='7.12.0'; files=@($entries) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Folder 'manifest.json') -Encoding UTF8
 }
 try {
+    $startupGame=Join-Path $testRoot 'Startup recovery'
+    $startupFile=Join-Path $startupGame 'It Steals_Data/globalgamemanagers'
+    Write-TestFile $startupFile 'external settings'
+    Restore-StartupSettings $startupGame
+    Write-TestFile ($startupFile+'.practicesuite-original') 'unverified backup'
+    Reject { Restore-StartupSettings $startupGame } 'An unverified startup backup was restored.'
+    Assert ([IO.File]::ReadAllText($startupFile) -eq 'external settings') 'Startup recovery changed external settings.'
+    Assert ([IO.File]::ReadAllText($startupFile+'.practicesuite-original') -eq 'unverified backup') 'Startup recovery discarded an unverified backup.'
+    $passed.Add('startup recovery preserves unknown files and backups')
     $game = Join-Path $testRoot 'Game & spaces'
     $application = Join-Path $testRoot 'Suite'
     $package = Join-Path $testRoot 'package'

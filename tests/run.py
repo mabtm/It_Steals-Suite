@@ -77,6 +77,7 @@ def arguments(name, work, fixtures):
         "portable_search_tests": [fixtures],
         "settings_tests": [work],
         "game_launch_tests": [work],
+        "startup_logos_tests": [work],
         "update_tests": [work],
         "clip_camera_tests": [work],
         "clip_tests": [work],

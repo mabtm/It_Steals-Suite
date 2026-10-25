@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 // Startup convenience and reversible display overrides; keep saved game preferences intact.
@@ -9,13 +8,11 @@ public sealed class FramePolicy
     private bool startupIntro, introChecked, owned;
     private int frames, sync;
 
-    // The splash runs before the first Update/IPC heartbeat. The launcher passes
-    // the saved preference for this process only; no game preferences are edited.
+    // The launcher prepares Unity's logos before process creation. This flag
+    // handles the later Intro scene without waiting for an IPC heartbeat.
     public void Initialize(string[] arguments)
     {
         startupIntro = Array.IndexOf(arguments, "--practice-suite-skip-intro") >= 0;
-        if (startupIntro && !SplashScreen.isFinished)
-            SplashScreen.Stop(SplashScreen.StopBehavior.StopImmediate);
     }
 
     public bool Tick(TrainerCommands command, bool connected)

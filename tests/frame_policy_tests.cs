@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 public static class FramePolicyTests
@@ -16,12 +15,11 @@ public static class FramePolicyTests
         var command = new TrainerCommands { TelemetryOptions = 4096 };
         var policy = new FramePolicy();
         policy.Initialize(new[] { "game.exe", "--practice-suite-skip-intro=0" });
-        Check(SplashScreen.Stops == 0, "only the exact launch flag enables startup skipping");
+        SceneManager.Active = new Scene { buildIndex = 0, isLoaded = true };
         Check(!policy.Tick(command, false), "ordinary disconnected startup is unchanged");
+        SceneManager.Active = new Scene();
         Check(!policy.Tick(command, true), "unloaded startup is not entered");
         policy.Initialize(new[] { "game.exe", "--practice-suite-skip-intro" });
-        Check(SplashScreen.Stops == 1 && SplashScreen.Last == SplashScreen.StopBehavior.StopImmediate,
-              "launcher preference stops the Unity logos before any Update or heartbeat");
         policy.SceneLoaded();
         Check(!policy.Tick(command, false), "startup launch preference waits for a loaded scene");
         // Unity calls every Start before the first Update. No initialized-scene
@@ -57,7 +55,6 @@ public static class FramePolicyTests
 
         var disabled = new FramePolicy();
         disabled.Initialize(new[] { "--practice-suite-skip-intro" });
-        Check(SplashScreen.Stops == 1, "an already finished splash is not stopped again");
         SceneManager.Active = new Scene { buildIndex = 0, isLoaded = true };
         Check(!disabled.Tick(new TrainerCommands(), true) && !disabled.Tick(command, false),
               "a live opt-out overrides the launch preference and survives disconnect");
@@ -90,7 +87,7 @@ public static class FramePolicyTests
         Check(Application.targetFrameRate == 72 && QualitySettings.vSyncCount == 2,
               "scene change restores original display settings");
         Console.WriteLine(
-            "Early splash, pre-connection startup, missing callbacks, opt-out, scene isolation and display restoration: PASS");
+            "Pre-connection intro, missing callbacks, opt-out, scene isolation and display restoration: PASS");
     }
 }
 
@@ -161,29 +158,6 @@ public static class SceneManager
         if (!DeferLoad)
             Active = new Scene { buildIndex = 2, isLoaded = true };
         Loads++;
-    }
-}
-}
-
-namespace UnityEngine.Rendering
-{
-public static class SplashScreen
-{
-    public enum StopBehavior
-    {
-        StopImmediate,
-        FadeOut
-    }
-
-    public static bool isFinished;
-    public static int Stops;
-    public static StopBehavior Last;
-
-    public static void Stop(StopBehavior behavior)
-    {
-        Last = behavior;
-        Stops++;
-        isFinished = true;
     }
 }
 }

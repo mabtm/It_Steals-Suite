@@ -25,10 +25,10 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.16.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.16.1)**
+**[v7.16.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.16.2)**
 
-- Fixed a bug caused by applying Skip game intro only after the Unity startup logos and trainer handshake. Suite launches now pass the saved preference directly to the mod, stop the Unity splash and suppress the loader start screen before the first game update.
-- Fixed a bug caused by requiring an initial scene-initialized callback to leave the intro. The first game update now checks the loaded scene directly, after the game's original startup setup, with a single menu transition.
+- Fixed a bug caused by trying to stop Unity's logos from a mod that loads after their playback. The trainer now prepares the verified game's splash settings before launching the game process, then restores the original file after the mod connects or the trainer exits.
+- Improved startup recovery with an original-file backup, complete file checks and visible diagnostics for unsupported builds or write failures. Interrupted launches are repaired on the next Suite launch; externally changed files are preserved.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

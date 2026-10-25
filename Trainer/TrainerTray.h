@@ -247,10 +247,9 @@ class TrainerTray
         auto data = Data();
         data.uFlags = NIF_INFO;
         data.dwInfoFlags = NIIF_WARNING;
-        CopyText(data.szInfoTitle, L"It Steals could not be started");
-        CopyText(
-            data.szInfo,
-            L"Run PracticeSuite Setup or start the game manually. Details are available in Diagnostics.");
+        CopyText(data.szInfoTitle, L"Game startup needs attention");
+        CopyText(data.szInfo,
+                 L"The game launch or intro setup needs attention. Details are available in Diagnostics.");
         Shell_NotifyIconW(NIM_MODIFY, &data);
     }
 };

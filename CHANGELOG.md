@@ -2,6 +2,11 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.16.2 Changelog
+
+- Fixed a bug caused by trying to stop Unity's logos from a mod that loads after their playback. The trainer now prepares the verified game's splash settings before launching the game process, then restores the original file after the mod connects or the trainer exits.
+- Improved startup recovery with an original-file backup, complete file checks and visible diagnostics for unsupported builds or write failures. Interrupted launches are repaired on the next Suite launch; externally changed files are preserved.
+
 ### v7.16.1 Changelog
 
 - Fixed a bug caused by applying Skip game intro only after the Unity startup logos and trainer handshake. Suite launches now pass the saved preference directly to the mod, stop the Unity splash and suppress the loader start screen before the first game update.
