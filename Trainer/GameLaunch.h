@@ -253,6 +253,17 @@ struct Location
     fs::path game, steam;
 };
 
+inline std::wstring CommandLine(const Location &location, bool skipIntro)
+{
+    auto executable = location.steam.empty() ? location.game : location.steam;
+    std::wstring command = L"\"" + executable.wstring() + L"\"";
+    if (!location.steam.empty())
+        command += L" -applaunch 1349060";
+    if (skipIntro)
+        command += L" --practice-suite-skip-intro --melonloader.disablestartscreen";
+    return command;
+}
+
 inline Location Resolve(const fs::path &application, const std::vector<fs::path> &steamRoots)
 {
     auto configured = ConfiguredGame(application);
@@ -344,12 +355,10 @@ inline bool NoLaunchFlag()
     return suppressed;
 }
 
-inline bool Start(const Location &location, DWORD &error)
+inline bool Start(const Location &location, bool skipIntro, DWORD &error)
 {
     auto executable = location.steam.empty() ? location.game : location.steam;
-    std::wstring command = L"\"" + executable.wstring() + L"\"";
-    if (!location.steam.empty())
-        command += L" -applaunch 1349060";
+    auto command = CommandLine(location, skipIntro);
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
     PROCESS_INFORMATION process{};

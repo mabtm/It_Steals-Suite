@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 public static class FramePolicyTests
@@ -12,38 +13,64 @@ public static class FramePolicyTests
 
     public static void Main()
     {
-        var policy = new FramePolicy();
         var command = new TrainerCommands { TelemetryOptions = 4096 };
-        Check(!policy.Tick(command, true) && SceneManager.Loads == 0,
-              "startup must finish its original initialization first");
+        var policy = new FramePolicy();
+        policy.Initialize(new[] { "game.exe", "--practice-suite-skip-intro=0" });
+        Check(SplashScreen.Stops == 0, "only the exact launch flag enables startup skipping");
+        Check(!policy.Tick(command, false), "ordinary disconnected startup is unchanged");
+        Check(!policy.Tick(command, true), "unloaded startup is not entered");
+        policy.Initialize(new[] { "game.exe", "--practice-suite-skip-intro" });
+        Check(SplashScreen.Stops == 1 && SplashScreen.Last == SplashScreen.StopBehavior.StopImmediate,
+              "launcher preference stops the Unity logos before any Update or heartbeat");
         policy.SceneLoaded();
-        Check(!policy.Tick(command, true), "scene-loaded alone does not bypass original Start");
-        policy.SceneInitialized(0);
-        Check(!policy.Tick(command, false) && SceneManager.Loads == 0,
-              "disconnected trainer does not skip the game intro");
-        Check(!policy.Tick(new TrainerCommands(), true) && SceneManager.Loads == 0,
-              "intro preference can be disabled");
-        Check(policy.Tick(command, true) && SceneManager.Loads == 1 && SceneManager.Last == "TitleScreen" &&
+        Check(!policy.Tick(command, false), "startup launch preference waits for a loaded scene");
+        // Unity calls every Start before the first Update. No initialized-scene
+        // notification or trainer heartbeat is required to finish startup.
+        Application.targetFrameRate = 72;
+        QualitySettings.vSyncCount = 2;
+        SceneManager.Active = new Scene { buildIndex = 0, isLoaded = true };
+        SceneManager.DeferLoad = true;
+        Check(policy.Tick(command, false) && SceneManager.Loads == 1 && SceneManager.Last == "TitleScreen" &&
                   Cursor.visible && Cursor.lockState == CursorLockMode.None,
-              "ready startup enters the main menu with its normal cursor");
-        Check(!policy.Tick(command, true) && SceneManager.Loads == 1, "startup skip occurs once");
-        foreach (int scene in new[] { 1, 2, 3, 7, 13 })
+              "launcher enters the main menu without waiting for the trainer connection");
+        Check(Application.targetFrameRate == 72 && QualitySettings.vSyncCount == 2,
+              "game startup display settings are preserved");
+        Check(!policy.Tick(command, true) && SceneManager.Loads == 1,
+              "a deferred scene switch is requested only once");
+        SceneManager.DeferLoad = false;
+        foreach (int scene in new[] { -1, 1, 2, 3, 7, 13 })
         {
+            SceneManager.Active = new Scene { buildIndex = scene, isLoaded = true };
             policy.SceneLoaded();
-            policy.SceneInitialized(scene);
             Check(!policy.Tick(command, true) && SceneManager.Loads == 1,
                   "menu, death and run scenes cannot be skipped");
+            int reads = SceneManager.Reads;
+            Check(!policy.Tick(command, true) && SceneManager.Reads == reads,
+                  "non-intro scenes are checked once, not on every frame");
         }
-        policy.SceneInitialized(0);
-        Check(!policy.Tick(command, true), "stale startup readiness cannot skip another active scene");
+        SceneManager.Active = new Scene { buildIndex = 0, isLoaded = true };
         policy.SceneLoaded();
-        Check(!policy.Tick(command, true) && SceneManager.Loads == 1, "scene change clears a pending intro");
-        SceneManager.Active = new Scene { buildIndex = 0 };
-        policy.SceneLoaded();
-        Check(!policy.Tick(command, true), "returning to startup still waits for initialization");
-        policy.SceneInitialized(0);
+        Check(!policy.Tick(command, false), "consumed launch flag does not survive later scene changes");
+        Check(!policy.Tick(new TrainerCommands(), true), "connected preference can be disabled");
         Check(policy.Tick(command, true) && SceneManager.Loads == 2,
-              "a later startup initializes a fresh one-shot skip");
+              "connected intro skip works even without the initial scene callback");
+
+        var disabled = new FramePolicy();
+        disabled.Initialize(new[] { "--practice-suite-skip-intro" });
+        Check(SplashScreen.Stops == 1, "an already finished splash is not stopped again");
+        SceneManager.Active = new Scene { buildIndex = 0, isLoaded = true };
+        Check(!disabled.Tick(new TrainerCommands(), true) && !disabled.Tick(command, false),
+              "a live opt-out overrides the launch preference and survives disconnect");
+        var late = new FramePolicy();
+        late.Initialize(new[] { "--practice-suite-skip-intro" });
+        SceneManager.Active = new Scene { buildIndex = 2, isLoaded = true };
+        Check(!late.Tick(command, false), "a completed menu startup consumes the launch preference");
+        SceneManager.Active = new Scene { buildIndex = 0, isLoaded = true };
+        late.SceneLoaded();
+        Check(!late.Tick(command, false), "a launch flag cannot skip a later intro visit");
+        policy.SceneLoaded();
+        Check(policy.Tick(command, true) && SceneManager.Loads == 3,
+              "a later startup honors the current connected preference");
         Application.targetFrameRate = 72;
         QualitySettings.vSyncCount = 2;
         command.FrameLimitMode = 2;
@@ -63,7 +90,7 @@ public static class FramePolicyTests
         Check(Application.targetFrameRate == 72 && QualitySettings.vSyncCount == 2,
               "scene change restores original display settings");
         Console.WriteLine(
-            "Startup initialization gate, opt-out, connection, scene isolation and display restoration: PASS");
+            "Early splash, pre-connection startup, missing callbacks, opt-out, scene isolation and display restoration: PASS");
     }
 }
 
@@ -111,24 +138,52 @@ namespace UnityEngine.SceneManagement
 public struct Scene
 {
     public int buildIndex;
+    public bool isLoaded;
 }
 
 public static class SceneManager
 {
     public static int Loads;
+    public static int Reads;
     public static string Last;
     public static Scene Active;
+    public static bool DeferLoad;
 
     public static Scene GetActiveScene()
     {
+        Reads++;
         return Active;
     }
 
     public static void LoadScene(string name)
     {
         Last = name;
-        Active = new Scene { buildIndex = 2 };
+        if (!DeferLoad)
+            Active = new Scene { buildIndex = 2, isLoaded = true };
         Loads++;
+    }
+}
+}
+
+namespace UnityEngine.Rendering
+{
+public static class SplashScreen
+{
+    public enum StopBehavior
+    {
+        StopImmediate,
+        FadeOut
+    }
+
+    public static bool isFinished;
+    public static int Stops;
+    public static StopBehavior Last;
+
+    public static void Stop(StopBehavior behavior)
+    {
+        Last = behavior;
+        Stops++;
+        isFinished = true;
     }
 }
 }

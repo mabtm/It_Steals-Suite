@@ -294,7 +294,7 @@ bool StartInstalledGame()
         if (GetProcessIdByName(L"It Steals.exe"))
             return true;
         DWORD error = 0;
-        if (!game_launch::Start(location, error))
+        if (!game_launch::Start(location, g_skipGameIntro, error))
         {
             g_gameLaunchStatus = "Game launch failed (Windows error " + std::to_string(error) + ")";
             return false;

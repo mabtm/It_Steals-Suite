@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.16.0";
+    public const string Version = "7.16.1";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -49,6 +49,14 @@ public sealed class ItStealsMod : MelonMod
         originalRunInBackground = Application.runInBackground;
         try
         {
+            try
+            {
+                framePolicy.Initialize(Environment.GetCommandLineArgs());
+            }
+            catch (Exception error)
+            {
+                MelonLogger.Warning("Startup splash: " + error.Message);
+            }
             string gameRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             build = new GameBuildInfo(typeof(MouseLook).Assembly.Location, Application.version,
                                       Application.unityVersion);
@@ -137,7 +145,6 @@ public sealed class ItStealsMod : MelonMod
     {
         if (connection == null)
             return;
-        framePolicy.SceneInitialized(buildIndex);
         // Fallback for a persistent player whose Start does not run again.
         Attach();
         // Attachment alone does not prove that the actual Start hook ran.

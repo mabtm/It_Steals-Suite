@@ -25,11 +25,10 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.16.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.16.0)**
+**[v7.16.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.16.1)**
 
-- Improved seed search on larger routes by reusing edge costs inside 2-opt and filling pickup lower bounds in one pass. Every starting route, improvement pass and seed remains covered.
-- Improved clip transfers by copying top-down pixel buffers in one block. Flipped images and color conversion retain their existing output.
-- Fixed a bug caused by relying on a separate Start hook to skip the intro. Skipping now waits for scene initialization, after the game's volume and first-launch quality setup.
+- Fixed a bug caused by applying Skip game intro only after the Unity startup logos and trainer handshake. Suite launches now pass the saved preference directly to the mod, stop the Unity splash and suppress the loader start screen before the first game update.
+- Fixed a bug caused by requiring an initial scene-initialized callback to leave the intro. The first game update now checks the loaded scene directly, after the game's original startup setup, with a single menu transition.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -204,3 +203,4 @@ The source and changes are tracked here. Bug reports and ideas are welcome throu
 Unofficial community project. Original game assets and game/Unity/MelonLoader assemblies are not included. Third-party code keeps its own credits and licenses.
 
 [Development](DEVELOPING.md) · [Changelog](CHANGELOG.md) · [Encoder licenses](Encoder/NOTICE.md) · [ImGui license](Trainer/imgui/LICENSE.txt)
+

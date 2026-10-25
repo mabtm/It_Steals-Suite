@@ -1,29 +1,45 @@
+using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 // Startup convenience and reversible display overrides; keep saved game preferences intact.
 public sealed class FramePolicy
 {
-    private bool introReady, owned;
+    private bool startupIntro, introChecked, owned;
     private int frames, sync;
 
-    // Use the existing scene lifecycle instead of depending on a Start detour.
-    // Melon initializes the scene after the game's volume/quality setup.
-    public void SceneInitialized(int buildIndex)
+    // The splash runs before the first Update/IPC heartbeat. The launcher passes
+    // the saved preference for this process only; no game preferences are edited.
+    public void Initialize(string[] arguments)
     {
-        introReady = buildIndex == 0;
+        startupIntro = Array.IndexOf(arguments, "--practice-suite-skip-intro") >= 0;
+        if (startupIntro && !SplashScreen.isFinished)
+            SplashScreen.Stop(SplashScreen.StopBehavior.StopImmediate);
     }
 
     public bool Tick(TrainerCommands command, bool connected)
     {
-        if (connected && (command.TelemetryOptions & 4096u) != 0 && introReady &&
-            SceneManager.GetActiveScene().buildIndex == 0)
+        bool skipIntro = connected ? (command.TelemetryOptions & 4096u) != 0 : startupIntro;
+        if (connected)
+            startupIntro = false;
+        if (skipIntro && !introChecked)
         {
-            introReady = false;
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-            SceneManager.LoadScene("TitleScreen");
-            return true;
+            // Called from Update, after the game's Start methods. Inspect the
+            // active scene so a missed initial scene callback cannot block this.
+            Scene scene = SceneManager.GetActiveScene();
+            if (scene.isLoaded)
+            {
+                introChecked = true;
+                startupIntro = false;
+                if (scene.buildIndex == 0)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    SceneManager.LoadScene("TitleScreen");
+                    return true;
+                }
+            }
         }
         bool requested = connected && (command.FrameLimitMode != 0 || command.VSyncMode != 0);
         if (!requested)
@@ -50,7 +66,7 @@ public sealed class FramePolicy
 
     public void SceneLoaded()
     {
-        introReady = false;
+        introChecked = false;
         Restore();
     }
 

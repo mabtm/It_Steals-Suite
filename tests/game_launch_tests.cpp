@@ -46,6 +46,13 @@ int main(int argc, char **argv)
     preferences.autoStartGame = false;
     assert(!TrainerPreferences::Decode(preferences.Encode()).autoStartGame);
 
+    const Location direct{"C:/Games/It Steals.exe", {}}, steamStart{direct.game, "C:/Steam/Steam.exe"};
+    const std::wstring skip = L" --practice-suite-skip-intro --melonloader.disablestartscreen";
+    assert(CommandLine(direct, false) == L"\"C:/Games/It Steals.exe\"");
+    assert(CommandLine(direct, true) == CommandLine(direct, false) + skip);
+    assert(CommandLine(steamStart, false) == L"\"C:/Steam/Steam.exe\" -applaunch 1349060");
+    assert(CommandLine(steamStart, true) == CommandLine(steamStart, false) + skip);
+
     assert(KeyValues("\"root\" { \"a\" \"b\" } // comment\n").Parse());
     assert(!KeyValues("\"root\" { \"a\"").Parse());
     assert(!KeyValues(std::string(MetadataLimit + 1, ' ')).Parse());

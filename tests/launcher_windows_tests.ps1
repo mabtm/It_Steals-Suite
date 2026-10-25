@@ -72,6 +72,7 @@ using System.IO;
 using System.Threading;
 public class ControlledGame {
     [STAThread] public static void Main() {
+        File.WriteAllLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"arguments.txt"),Environment.GetCommandLineArgs());
         File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"started.txt"),Process.GetCurrentProcess().Id.ToString());
         while(true) Thread.Sleep(100);
     }
@@ -85,6 +86,9 @@ public class ControlledGame {
     $script:started=Join-Path $game 'started.txt'
     $trainer=Start-ControlledTrainer
     Wait-Until { (Read-StartedPid) -gt 0 } 'Automatic game startup did not occur.'
+    $launchArguments=[IO.File]::ReadAllLines((Join-Path $game 'arguments.txt'))
+    Assert ($launchArguments -contains '--practice-suite-skip-intro') 'Saved intro preference did not reach the game before startup.'
+    Assert ($launchArguments -contains '--melonloader.disablestartscreen') 'Loader startup screen was not suppressed.'
     $gameProcess=[Diagnostics.Process]::GetProcessById((Read-StartedPid))
     $owned.Add($gameProcess)
     Close-ControlledTrainer $trainer
@@ -105,13 +109,16 @@ public class ControlledGame {
     Close-ControlledTrainer $trainer
     $settings=Join-Path $work 'LocalAppData/ItStealsPracticeSuite'
     $null=[IO.Directory]::CreateDirectory($settings)
-    [IO.File]::WriteAllText((Join-Path $settings 'trainer.ini'),"version=18" + [Environment]::NewLine + "autoStartGame=0" + [Environment]::NewLine)
+    [IO.File]::WriteAllText((Join-Path $settings 'trainer.ini'),"version=18" + [Environment]::NewLine + "autoStartGame=0" + [Environment]::NewLine + "skipGameIntro=0" + [Environment]::NewLine)
     $trainer=Start-ControlledTrainer
     Start-Sleep -Milliseconds 1500
     Assert (-not (Test-Path -LiteralPath $script:started)) 'Saved startup preference was ignored.'
     Close-ControlledTrainer $trainer
     $trainer=Start-ControlledTrainer '--restart-after-update'
     Wait-Until { (Read-StartedPid) -gt 0 } 'Explicit update restart did not override the ordinary startup opt-out.'
+    $launchArguments=[IO.File]::ReadAllLines((Join-Path $game 'arguments.txt'))
+    Assert ($launchArguments -notcontains '--practice-suite-skip-intro') 'Saved intro opt-out was ignored.'
+    Assert ($launchArguments -notcontains '--melonloader.disablestartscreen') 'Intro opt-out still suppressed the loader screen.'
     $restartedGame=[Diagnostics.Process]::GetProcessById((Read-StartedPid))
     $owned.Add($restartedGame)
     Close-ControlledTrainer $trainer
@@ -122,7 +129,7 @@ public class ControlledGame {
     Assert ($trainer.WaitForExit(5000) -and $trainer.ExitCode -eq 0) 'The updater did not close the native hidden control window normally.'
     $output=Join-Path $repo 'build/windows-launcher-tests'
     $null=[IO.Directory]::CreateDirectory($output)
-    @{passed=$true; checks=@('native auto-start with Unicode path','existing game reused','trainer closes with the game','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out','updater gracefully closes actual hidden native control window')} |
+    @{passed=$true; checks=@('native auto-start with Unicode path','early intro and loader arguments','saved intro opt-out','existing game reused','trainer closes with the game','no automatic restart','one-time suppression','saved preference','explicit post-update restart overrides saved opt-out','updater gracefully closes actual hidden native control window')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'summary.json') -Encoding UTF8
     Write-Output 'Windows native launcher smoke tests passed (controlled game, not Unity).'
 } catch {

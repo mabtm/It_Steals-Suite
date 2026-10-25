@@ -488,7 +488,7 @@ inline void RenderSystemSettings()
         "Start the installed game once when the trainer opens. An existing game is reused. The trainer closes when that game exits. Use --no-launch to skip automatic startup once.");
     suite_ui::Checkbox("Skip game intro", &g_skipGameIntro);
     Help(
-        "Go straight to the main menu after the game's startup initialization. Applies while the trainer is connected; game preferences and run scenes are unchanged.");
+        "Skip the Unity logos, loader start screen and game intro when launching through the Suite. Restart the game to apply startup changes. The game's sound and first-launch setup still run before the main menu.");
     ImGui::Separator();
     ImGui::TextColored(g_headerCol, "Interface");
     suite_ui::Checkbox("UI sounds", &suite_ui::preferences.sounds);

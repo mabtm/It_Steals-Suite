@@ -2,6 +2,11 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.16.1 Changelog
+
+- Fixed a bug caused by applying Skip game intro only after the Unity startup logos and trainer handshake. Suite launches now pass the saved preference directly to the mod, stop the Unity splash and suppress the loader start screen before the first game update.
+- Fixed a bug caused by requiring an initial scene-initialized callback to leave the intro. The first game update now checks the loaded scene directly, after the game's original startup setup, with a single menu transition.
+
 ### v7.16.0 Changelog
 
 - Improved seed search on larger routes by reusing edge costs inside 2-opt and filling pickup lower bounds in one pass. Every starting route, improvement pass and seed remains covered.
@@ -251,3 +256,4 @@ Changes by version. The full development history is in Git.
 ### v5.0.0 Changelog
 
 - Improved overlays by implementing configurable HUD profiles, interpolated telemetry, and scoped menu input ownership.
+
