@@ -145,64 +145,8 @@ inline bool BlockEnabled(int block, const Options &o, const Content &c)
     return block == RunInfo ? !o.transparent : o.inputs && suite_input::ModuleVisible(block - 1, c.input);
 }
 
-inline void VerificationCard(ImDrawList *draw, const Options &o, const Content &c, double elapsed)
-{
-    if (!c.analysis || !c.analysis->data->review)
-        return;
-    const auto &run = *c.analysis->data->review;
-    const auto report = c.revalidation && c.revalidation->run == run.id ? c.revalidation : nullptr;
-    float a = float(std::clamp(elapsed / .6, 0., 1.));
-    a = a * a * (3 - 2 * a);
-    if (a <= 0)
-        return;
-    float u = o.width / 1280.f, w = float(o.width), h = float(o.height);
-    float top = (h - 480 * u) * .5f + (1 - a) * 12 * u;
-    auto color = [&](int r, int g, int b, int alpha = 255) { return IM_COL32(r, g, b, int(alpha * a)); };
-    auto *font = c.font ? c.font : ImGui::GetFont();
-    auto text = [&](float x, float y, float size, ImU32 ink, const std::string &s) {
-        draw->AddText(font, size * u, {x * u, top + y * u}, ink, s.c_str());
-    };
-    draw->AddRectFilled({0, 0}, {w, h}, color(7, 12, 18, 242));
-    draw->AddRectFilled({100 * u, top}, {w - 100 * u, top + 480 * u}, color(16, 25, 34), 16 * u);
-    draw->AddRect({100 * u, top}, {w - 100 * u, top + 480 * u}, color(53, 76, 88), 16 * u);
-    auto ink = color(235, 242, 245), muted = color(149, 168, 180), accent = color(100, 220, 183);
-    text(132, 30, 15, accent, "PRACTICESUITE  /  REPLAY CHECK");
-    text(132, 62, 34, ink, run.outcome == 1 ? "Run complete" : "Run ended");
-    text(132, 112, 22, ink,
-         FormatRunTime(run.seconds) + "   /   Seed " + std::to_string(c.analysis->data->seed));
-    text(132, 150, 15, muted, "Run " + std::to_string(run.id) + "  /  rendered replay at 1x");
-    auto row = [&](float y, const char *label, const std::string &value, bool ok) {
-        text(132, y, 18, muted, label);
-        text(530, y, 18, ok ? accent : color(255, 193, 113), value);
-    };
-    row(204, "Recorded run verdict",
-        !run.validationChecked ? "Unavailable"
-        : run.valid            ? "VALID (local)"
-                               : "UNVALID",
-        run.validationChecked && run.valid);
-    row(240, "Replay files",
-        report ? report->filesOk ? "Checked again from disk" : "Check failed" : "Not checked",
-        report && report->filesOk);
-    auto coverage = report ? report->coverage : nullptr;
-    bool complete = coverage && !coverage->partial && !coverage->missing && !coverage->unknown;
-    row(276, "Recording coverage",
-        !coverage  ? "Unavailable"
-        : complete ? "Observed tracks complete"
-                   : std::to_string(coverage->partial + coverage->missing + coverage->unknown) +
-                         " channels need attention",
-        complete);
-    row(312, "Original validation report",
-        report && report->reportChecked    ? "Stored observations checked"
-        : report && report->reportIncluded ? "Historical report preserved"
-                                           : "Unavailable",
-        report && report->reportChecked);
-    text(132, 362, 13, muted, "INPUT SHA-256");
-    text(132, 384, 14, ink,
-         report && !report->inputSha256.empty() ? report->inputSha256 : "No verified input hash");
-    text(132, 424, 14, muted,
-         "Local, unsigned checks. Original warnings remain. Leaderboard approval is a separate decision.");
-    text(132, 448, 13, muted, "The export sidecar contains the file hashes and check details.");
-}
+// Defined beside the live run-result renderer, after the application UI.
+inline void (*verificationRenderer)(const Content &, double) = nullptr;
 
 inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Content &content, double seconds,
                     ImTextureID image = {}, double outro = -1)
@@ -404,8 +348,7 @@ inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Conten
         if (latest && seconds - latest->seconds < 3)
             text(24, options.scene3d ? 92 : 102, 18, IM_COL32(255, 190, 105, 255), latest->name);
     }
-    if (outro >= 0)
-        VerificationCard(draw, options, content, outro);
+    (void)outro;
 }
 
 // The same 2D composition can be drawn directly into a preview viewport.

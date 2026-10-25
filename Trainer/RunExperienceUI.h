@@ -22,7 +22,7 @@ inline void ResultText(ImFont *font, ImVec2 at, float width, ImVec4 color, const
         return;
     if (!font)
         font = ImGui::GetFont();
-    float pixels = font->FontSize;
+    float pixels = font->FontSize * ImGui::GetIO().FontGlobalScale;
     std::string shown = text;
     if (font->CalcTextSizeA(pixels, FLT_MAX, 0, text.c_str()).x > width)
     {
@@ -71,7 +71,9 @@ inline bool RenderResultCheck(int index, suite_run::Check check, const std::arra
             ImGui::GetColorU32(suite_ui::Alpha(state, .09f)),
             ImGui::GetColorU32(suite_ui::Alpha(state, .09f)), ImGui::GetColorU32(suite_ui::Alpha(state, 0)));
     }
-    const char *tag = complete ? (check.state == suite_run::CheckState::Pass ? "[VALID]" : "[INVALID]")
+    const char *tag = complete ? (check.state == suite_run::CheckState::Pass      ? "[VALID]"
+                                  : check.state == suite_run::CheckState::Unknown ? "[MISSING]"
+                                                                                  : "[INVALID]")
                       : active ? "[SCANNING]"
                                : "[QUEUED]";
     ResultText(nullptr, {at.x + 14 * u, at.y + 11 * u}, 122 * u, state, tag);
@@ -107,7 +109,7 @@ inline void RenderTechnicalScan(suite_run::Presentation &p, bool motion, float h
     float u = g_dpiScale;
     int selected = p.Inspecting(motion);
     const auto &fields = p.Technical();
-    auto checks = suite_run::Checks(p.completed);
+    auto checks = p.ResultChecks();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {12 * u, 10 * u});
     ImGui::PushStyleColor(
         ImGuiCol_ChildBg,
@@ -164,7 +166,7 @@ inline void RenderTechnicalScan(suite_run::Presentation &p, bool motion, float h
     if (suite_ui::resultDetailFont)
         ImGui::PopFont();
     if (suite_ui::Button("Copy report"))
-        suite_ui::CopyText(suite_run::TechnicalReport(p.completed, p.completedSession).c_str());
+        suite_ui::CopyText(p.Report().c_str());
     Help(
         "Copy all 42 captured fields, complete file SHA256, run identity and check results. Snapshot-only values and limitations are labelled in the report.");
     SameLineIfFits("Follow scan");
@@ -180,11 +182,9 @@ inline void RenderTechnicalScan(suite_run::Presentation &p, bool motion, float h
     ImGui::PopStyleVar();
 }
 
-inline void RenderRunExperience()
+inline void RenderRunExperience(suite_run::Presentation &p, double now, bool exported = false)
 {
-    auto &p = suite_run::presentation;
-    double now = suite_ui::LifecycleNow();
-    bool resultVisible = p.WantsInput(g_pShared, g_runReviewOpen);
+    bool resultVisible = p.replay ? p.hasResult : p.WantsInput(g_pShared, g_runReviewOpen);
     if (!resultVisible && !p.CanAnalyze(g_pShared, now) && now - p.toastAt >= 3)
         return;
     auto size = ImGui::GetIO().DisplaySize;
@@ -207,14 +207,14 @@ inline void RenderRunExperience()
     };
     if (resultVisible)
     {
-        p.scan.Tick(now, true);
-        bool motion = suite_ui::preferences.motion, done = p.scan.Done(motion);
-        if (p.scan.TakeCompletion(motion))
-            suite_ui::Request(suite_run::PersonalBest(p.completed) ? suite_ui::Tone::PersonalBest
-                                                                   : suite_ui::Tone::Complete);
-        if (done && suite_run::PersonalBest(p.completed) && p.awardAt < 0)
+        if (!exported)
+            p.scan.Tick(now, true);
+        bool motion = exported || suite_ui::preferences.motion, done = p.scan.Done(motion);
+        if (!exported && p.scan.TakeCompletion(motion))
+            suite_ui::Request(p.Pb() ? suite_ui::Tone::PersonalBest : suite_ui::Tone::Complete);
+        if (done && p.Pb() && p.awardAt < 0)
             p.awardAt = now;
-        bool splitInspection = size.x >= 1620 * u && size.y >= 900 * u;
+        bool splitInspection = exported || (size.x >= 1620 * u && size.y >= 900 * u);
         float w = std::min((splitInspection ? 1120 : 780) * u, size.x - 24),
               h = std::min(864 * u, size.y - 24);
         auto r = suite_run::Place(size.x, size.y, w, h, occupied, true);
@@ -224,9 +224,9 @@ inline void RenderRunExperience()
         bool openTechnical = false;
         float age = float(std::max(0., now - p.ended)), fade = motion ? suite_ui::Ease(age / .18f) : 1;
         const auto &d = p.completed;
-        bool valid = suite_run::FinalValid(d);
-        auto access = FinishedReplayAvailable();
-        card("##RunResult", *r, fade, true, [&] {
+        bool valid = p.Valid();
+        auto access = p.replay ? FinishedReplayAccess{} : FinishedReplayAvailable();
+        card("##RunResult", *r, fade, !exported, [&] {
             auto white = ImVec4(.95f, .97f, .98f, 1), muted = ImVec4(.57f, .65f, .70f, 1),
                  verdict = valid ? ImVec4(.34f, .94f, .61f, 1) : ImVec4(1, .36f, .38f, 1);
             auto *draw = ImGui::GetWindowDrawList();
@@ -280,7 +280,7 @@ inline void RenderRunExperience()
             if (content > 460 * u)
                 suite_ui::Logo(draw, {hero.x + content - 83 * u, hero.y + 3 * u}, 76 * u,
                                done ? 1 : .2f + .8f * p.scan.Fraction(motion), .65f);
-            if (done && suite_run::PersonalBest(d))
+            if (done && p.Pb())
             {
                 auto at = ImGui::GetCursorScreenPos();
                 float width = ImGui::GetContentRegionAvail().x;
@@ -297,7 +297,9 @@ inline void RenderRunExperience()
                 suite_ui::DrawIcon(draw, suite_ui::Icon::Trophy, {at.x + 9 * u, at.y + 5 * u}, 26 * u,
                                    ImGui::GetColorU32(gold));
                 char text[100];
-                if (d.previousBestSeconds > 0)
+                if (!p.previousBestKnown)
+                    snprintf(text, sizeof(text), "LOCAL PB (recorded)");
+                else if (d.previousBestSeconds > 0)
                     snprintf(text, sizeof(text), "NEW LOCAL PB   /   %+.3f s",
                              d.currentRunTimeSeconds - d.previousBestSeconds);
                 else
@@ -323,7 +325,7 @@ inline void RenderRunExperience()
             ImGui::Spacing();
             auto bar = ImGui::GetCursorScreenPos();
             content = ImGui::GetContentRegionAvail().x;
-            auto checks = suite_run::Checks(d);
+            auto checks = p.ResultChecks();
             ImGui::TextColored(done ? verdict : suite_ui::heading, "%s",
                                done ? (valid ? "[VALID]" : "[INVALID]") : "[SCANNING]");
             ImGui::SameLine();
@@ -415,8 +417,11 @@ inline void RenderRunExperience()
                 if (suite_ui::resultDetailFont)
                     ImGui::PopFont();
             }
-            ResultText(suite_ui::resultDetailFont, caption, captionWidth, muted,
-                       access ? "Player route + suggested route  /  Replay ready" : access.detail);
+            ResultText(suite_ui::resultDetailFont, caption, captionWidth,
+                       p.replay && !p.filesOk ? verdict : muted,
+                       p.replay ? p.fileStatus
+                       : access ? "Player route + suggested route  /  Replay ready"
+                                : access.detail);
             if (openTechnical)
                 ImGui::OpenPopup("Technical evidence");
             ImGui::SetNextWindowSize({std::min(520 * u, size.x - 36), std::min(580 * u, size.y - 36)},
@@ -438,8 +443,14 @@ inline void RenderRunExperience()
         else if (action == 2)
             AnalyseFinishedRun();
         else if (action == 3)
+        {
+            if (p.replay)
+                p.Acknowledge();
             OpenReplayLibrary();
+        }
     }
+    if (p.replay || exported)
+        return;
     bool analyze = p.CanAnalyze(g_pShared, now);
     bool toast = now - p.toastAt >= 0 && now - p.toastAt < 3;
     if (!analyze && !toast)
@@ -463,3 +474,84 @@ inline void RenderRunExperience()
             ImGui::TextUnformatted(p.toastOn ? "Shift+T to disable" : "Shift+T to enable");
     });
 }
+
+// Both replay buttons and the video tail use the existing run-result renderer.
+inline void RenderRunExperience()
+{
+    const double now = suite_ui::LifecycleNow();
+    if (g_pShared && g_pShared->timerState == 1)
+    {
+        suite_run::replayPresentation.Acknowledge();
+        suite_run::replayRequest = 0;
+    }
+    auto checked = practice::g_replayArchive.Get()->revalidation;
+    if (suite_run::replayRequest && checked && checked->request == suite_run::replayRequest)
+    {
+        suite_run::replayRequest = 0;
+        if (checked->verification)
+        {
+            checked->verification->Present(suite_run::replayPresentation, now, checked->filesOk,
+                                           checked->filesOk ? "Stored run checks / replay files checked"
+                                                            : "Replay file check failed: " + checked->error);
+            SetOverlayInteractive(true);
+        }
+    }
+    if (suite_run::replayPresentation.hasResult && (!g_pShared || g_pShared->timerState != 1))
+        RenderRunExperience(suite_run::replayPresentation, now);
+    else
+        RenderRunExperience(suite_run::presentation, now);
+}
+
+namespace suite_clip
+{
+inline void RenderRecordedVerification(const Content &content, double elapsed)
+{
+    if (elapsed < 0 || !content.revalidation || !content.revalidation->verification)
+        return;
+    const auto &checked = *content.revalidation;
+    static suite_run::Presentation result;
+    static const practice::ReplayRevalidation *previous = nullptr;
+    if (previous != &checked || elapsed == 0)
+    {
+        checked.verification->Present(result, 0, checked.filesOk,
+                                      checked.filesOk ? "Stored run checks / replay files checked"
+                                                      : "Replay file check failed: " + checked.error);
+        previous = &checked;
+    }
+    result.scan.elapsed = std::clamp(elapsed, 0., suite_run::ScanTimeline::Duration);
+    result.scan.last = elapsed;
+    result.scan.visible = true;
+    result.awardAt = suite_run::ScanTimeline::Duration;
+    result.inspected = -1;
+    auto size = ImGui::GetIO().DisplaySize;
+    ImGui::GetBackgroundDrawList()->AddRectFilled(
+        {0, 0}, size, IM_COL32(5, 10, 15, int(220 * suite_ui::Ease(float(elapsed / .3)))));
+
+    struct ScaleRestore
+    {
+        float dpi = g_dpiScale, fonts = ImGui::GetIO().FontGlobalScale;
+        ImGuiStyle style = ImGui::GetStyle();
+
+        ~ScaleRestore()
+        {
+            g_dpiScale = dpi;
+            ImGui::GetIO().FontGlobalScale = fonts;
+            ImGui::GetStyle() = style;
+        }
+    } restore;
+
+    g_dpiScale = std::min({g_dpiScale, (size.y - 24) / 864.f, (size.x - 24) / 1120.f});
+    float scale = g_dpiScale / restore.dpi;
+    ImGui::GetIO().FontGlobalScale *= scale;
+    ImGui::GetStyle().ScaleAllSizes(scale);
+    RenderRunExperience(result, elapsed, true);
+}
+} // namespace suite_clip
+
+namespace suite_clip
+{
+inline const bool verificationRegistered = [] {
+    verificationRenderer = RenderRecordedVerification;
+    return true;
+}();
+} // namespace suite_clip

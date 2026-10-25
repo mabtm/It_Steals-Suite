@@ -318,10 +318,10 @@ inline void RenderReplayTransfer(std::shared_ptr<const practice::MapData> data, 
     bool checking = recheckRequest && (!state->revalidation || state->revalidation->request < recheckRequest);
     ImGui::BeginDisabled(!retained || checking);
     if (suite_ui::Button(checking ? "Checking replay..." : "Recheck replay"))
-        recheckRequest = practice::g_replayArchive.Revalidate(data);
+        suite_run::replayRequest = recheckRequest = practice::g_replayArchive.Revalidate(data);
     ImGui::EndDisabled();
     Help(
-        "Read this replay and its companions again from disk. Checks identity, checksums, timelines and stored validation evidence. Historical warnings stay unchanged; this is a local file check.");
+        "Read this replay and its companions again from disk. Checks identity, checksums, timelines and stored validation evidence. Reopens the animated run verification with its recorded checks and technical evidence.");
     auto checked = state->revalidation;
     if (checked && checked->run == data->review->id)
     {

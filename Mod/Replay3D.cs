@@ -51,6 +51,7 @@ public static class Replay3D
     private static bool nativeStyle;
     private static ReplayNativeGraphics native;
     private static ReplayScenePlayback scenePlayback;
+    private static RenderTexture recordedSceneTarget;
     private static ReplayAudioPlayback audio;
     private static double audioPreviewAt, audioPreviewClock, audioPreviewDeadline;
     private static float audioPreviewRate, audioPreviewVolume;
@@ -520,6 +521,7 @@ public static class Replay3D
                             }
                         });
             view = original;
+            recordedSceneTarget = original.targetTexture;
             cameraObject = original.gameObject;
             sceneMask = original.cullingMask;
             view.cullingMask = sceneMask | (1 << layer);
@@ -529,6 +531,7 @@ public static class Replay3D
         }
         else
         {
+            recordedSceneTarget = null;
             cameraObject = new GameObject("Recorded camera");
             cameraObject.transform.SetParent(root.transform, false);
             view = cameraObject.AddComponent<Camera>();
@@ -912,14 +915,15 @@ public static class Replay3D
             }
             if (native != null)
                 native.Face(view);
-            view.targetTexture = target;
             view.aspect = (float)target.width / target.height;
             view.rect = new Rect(0, 0, 1, 1);
             if (scenePlayback != null)
-                scenePlayback.Render(view, target, true);
-            view.Render();
-            if (scenePlayback != null)
-                scenePlayback.Render(view, target, false);
+                scenePlayback.Render(view, target, view.targetTexture);
+            else
+            {
+                view.targetTexture = target;
+                view.Render();
+            }
             RenderTexture.active = target;
             if (destination != null)
                 destination.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0, false);
@@ -1136,7 +1140,9 @@ public static class Replay3D
         }
         if (scenePlayback != null)
         {
-            scenePlayback.Apply(seconds, !observer && (options & Replay3DOptions.Follow) == 0);
+            bool recordedCamera = !observer && (options & Replay3DOptions.Follow) == 0;
+            view.targetTexture = recordedCamera ? recordedSceneTarget : null;
+            scenePlayback.Apply(seconds, recordedCamera);
             if (scenePlayback.Missing > 0)
                 message += " / missing scene assets or bindings: " + scenePlayback.Missing;
         }

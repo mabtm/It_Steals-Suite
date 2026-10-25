@@ -325,8 +325,16 @@ public static class ReplayAudioCaptureTests
         ReplayAudioCapture.Sync(2.25);
         Callback(tap, block);
         Callback(go.GetComponent<ReplayAudioTap>(), block);
-        Check(lane.First == 108000 && session.First == 108000,
-              "published clock corrections reach every tap atomically");
+        Check(lane.First == 192000 && session.First == 192000,
+              "render-clock drift cannot rebase listener or source sample positions");
+        for (int n = 0; n < 8; n++)
+        {
+            AudioSettings.dspTime = 12 + n * .02;
+            ReplayAudioCapture.Sync(n == 0 ? 0 : 2.2 + n * .019);
+            Callback(go.GetComponent<ReplayAudioTap>(), block);
+            Check(session.First == 192000 + n * 960,
+                  "startup delay and render jitter cannot create PCM timestamp jumps");
+        }
         var dynamic = Source(true);
         ReplayAudioCapture.Track(dynamic);
         Check(session.LaneCount == 3, "new source tracked before original Play");

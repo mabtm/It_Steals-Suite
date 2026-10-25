@@ -78,8 +78,34 @@ public static class Time
     public static double timeSinceLevelLoadAsDouble = 99;
 }
 
+public sealed class RenderTexture
+{
+    public static RenderTexture active;
+    public int width = 1920, height = 1080, Value;
+}
+
+public static class Graphics
+{
+    public static void Blit(RenderTexture source, RenderTexture target)
+    {
+        target.Value = source.Value;
+    }
+}
+
 public sealed class Camera
 {
+    public RenderTexture targetTexture;
+    public float aspect = 1, depth;
+    public bool enabled = true;
+    public GameObject gameObject = new GameObject(true);
+    public Action Draw;
+
+    public void Render()
+    {
+        if (Draw != null)
+            Draw();
+    }
+
     public readonly Dictionary<CameraEvent, CommandBuffer> Buffers =
         new Dictionary<CameraEvent, CommandBuffer>();
 
@@ -121,6 +147,12 @@ public sealed class GameObject
     public static int Created;
     public bool activeSelf;
     public int Changes;
+    public bool activeInHierarchy
+    {
+        get {
+            return activeSelf;
+        }
+    }
 
     public GameObject(bool active)
     {
@@ -236,6 +268,49 @@ public static class ReplayRendererTests
 
     public static int Main()
     {
+        var world = new RenderTexture();
+        var output = new RenderTexture();
+        var radar = new RenderTexture();
+        var prior = new RenderTexture();
+        RenderTexture.active = prior;
+        var main = new Camera { targetTexture = world, depth = -1 };
+        var arms = new Camera { targetTexture = world, depth = 2 };
+        var ui = new Camera { depth = 1 };
+        var radarCamera = new Camera { targetTexture = radar, depth = -2 };
+        var stack = new List<Camera> { arms, ui, radarCamera };
+        int frame = 0;
+        main.Draw = () => main.targetTexture.Value = ++frame;
+        arms.Draw = () => arms.targetTexture.Value += 1000;
+        ui.Draw = () => ui.targetTexture.Value = world.Value + 10000;
+        radarCamera.Draw = () => radar.Value = frame;
+        for (int i = 1; i <= 120; i++)
+        {
+            ReplayCameraPipeline.Render(main, output, world, stack);
+            Check(output.Value == i + 11000 && world.Value == i + 1000 && radar.Value == i - 1,
+                  "world advances, then hands composite into the shared UI texture");
+            Check(main.targetTexture == world && arms.targetTexture == world && ui.targetTexture == null &&
+                      radarCamera.targetTexture == radar && main.aspect == 1 && ui.aspect == 1 &&
+                      RenderTexture.active == prior,
+                  "offscreen rendering restores every camera and active target");
+        }
+        arms.enabled = ui.enabled = radarCamera.enabled = false;
+        ReplayCameraPipeline.Render(main, output, null, stack);
+        Check(output.Value == 121, "follow/simplified camera renders directly without the recorded UI");
+        arms.enabled = true;
+        arms.Draw = () =>
+        { throw new InvalidOperationException("body render failed"); };
+        bool renderFailed = false;
+        try
+        {
+            ReplayCameraPipeline.Render(main, output, world, stack);
+        }
+        catch (InvalidOperationException)
+        {
+            renderFailed = true;
+        }
+        Check(renderFailed && main.targetTexture == world && arms.targetTexture == world &&
+                  arms.aspect == 1 && RenderTexture.active == prior,
+              "render failure restores targets and does not strand the game camera");
         var asset = new Material("Eye");
         var instance = new Material("Eye (Instance)");
         var library = new ReplayMaterialLibrary(new[] { instance, asset });

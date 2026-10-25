@@ -208,6 +208,7 @@ inline void WriteExportReport(const std::filesystem::path &output, const Options
             << ",\n  \"inputSha256\": \"" << r.inputSha256 << "\""
             << ",\n  \"audioSha256\": \"" << r.audioSha256 << "\""
             << ",\n  \"originalReportSha256\": \"" << r.reportSha256 << "\""
+            << ",\n  \"verificationSnapshotSha256\": \"" << r.verificationSha256 << "\""
             << ",\n  \"recheckScope\": \"Local unsigned file checks; stored run observations stay unchanged; no authenticity or leaderboard certification\"";
         if (r.coverage)
             file << ",\n  \"coveragePartial\": " << r.coverage->partial

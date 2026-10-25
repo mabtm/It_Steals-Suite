@@ -164,7 +164,7 @@ bool OverlayRequested()
     bool hud = g_overlayVisible && g_compactMode && g_hudLayout.enabled &&
                CompactHudAllowed(g_speedrunMode, g_practiceMode);
     bool map = g_showMinimapWindow && !(g_speedrunMode && !g_practiceMode);
-    bool result = suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen);
+    bool result = suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen);
     bool startup = suite_ui::lifecycle.WantsStartup(suite_ui::LifecycleNow(), suite_ui::preferences,
                                                     (g_pShared && g_pShared->timerState == 1) || result);
     bool replay = g_pShared && g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3;
@@ -182,7 +182,7 @@ bool MenuInputRequested()
 {
     return UpdateInputRequested() || inspector::picking || inspector::dockInteractive || suite_hud::active ||
            ClipInputRequested() || suite_replay::ControlsRequested(g_pShared) ||
-           suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen) ||
+           suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen) ||
            (g_allOverlayEnabled && g_overlayVisible && !g_compactMode);
 }
 
@@ -222,7 +222,7 @@ void SetOverlayInteractive(bool interactive, bool userAction = true)
         !suite_ui::lifecycle.Exiting() &&
         (interactive || UpdateInputRequested() || inspector::picking || inspector::dockInteractive ||
          suite_hud::active || ClipInputRequested() || suite_replay::controls ||
-         suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen)) &&
+         suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen)) &&
         MenuInputRequested();
     interactive = g_overlayInteractive;
     if (ImGui::GetCurrentContext())
@@ -1784,7 +1784,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         bool introReady = visible && g_pShared && SnapshotAge() < .5;
         suite_ui::lifecycle.Consider(suite_ui::LifecycleNow(), introReady, suite_ui::preferences,
                                      ActiveSpeedrun() ||
-                                         suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen));
+                                         suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen));
         auto &updater = suite_update::service;
         updater.Poll();
         if (g_gamePid != updateSessionPid)
@@ -1811,7 +1811,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         bool updateBlocked = (g_pShared && g_pShared->timerState == 1) || suite_clip::open ||
                              suite_clip::exporting || suite_hud::active || inspector::picking ||
                              inspector::dockInteractive || suite_replay::ControlsRequested(g_pShared) ||
-                             suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen) ||
+                             suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen) ||
                              suite_ui::lifecycle.Exiting();
         updater.installBlocked = updateBlocked;
         bool introDone =
@@ -1899,9 +1899,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                                              suite_ui::preferences)))),
             suite_ui::preferences.volume);
         suite_run::presentation.Observe(g_pShared, g_session, suite_ui::LifecycleNow());
+        static int64_t recordedVerification = 0;
+        const auto &finished = suite_run::presentation.completed;
+        if (finished.reviewRunId != recordedVerification && finished.timerState == 2 &&
+            finished.runOutcome == 1 && finished.reviewReady && finished.reviewRetained)
+        {
+            recordedVerification = finished.reviewRunId;
+            practice::g_replayArchive.RecordVerification(finished, suite_run::presentation.completedSession);
+        }
         suite_run::presentation.scan.Tick(suite_ui::LifecycleNow(),
                                           visible &&
-                                              suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen));
+                                              suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen));
         bool gameSound = visible && !activeRun && (GetForegroundWindow() == g_gameWnd || audioFocused) &&
                          suite_ui::preferences.sounds && suite_ui::preferences.volume > 0 &&
                          suite_ui::GameTonePending();
@@ -2004,7 +2012,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 ImGui::NewFrame();
                 suite_ui::BeginFrame(g_surfaceInteractive, ActiveSpeedrun());
                 bool introBlocked =
-                    ActiveSpeedrun() || suite_run::presentation.WantsInput(g_pShared, g_runReviewOpen);
+                    ActiveSpeedrun() || suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen);
                 suite_ui::lifecycle.Consider(suite_ui::LifecycleNow(), introReady, suite_ui::preferences,
                                              introBlocked);
                 if (introReady &&

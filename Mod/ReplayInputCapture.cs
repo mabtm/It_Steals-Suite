@@ -77,6 +77,20 @@ public static class ReplayInputCapture
         LiveInputCapture.BeginRun();
         keys = KeyMask();
         active.Add(new ReplayInputEvent { Seconds = 0, Frame = 0, Tick = 0, Keys = keys, State = State });
+        var body = PlayerContext.Body(player);
+        double fixedAtStart = Time.fixedTimeAsDouble;
+        ReplayPhysicsFrame start = default(ReplayPhysicsFrame);
+        if (body != null && Finite(body.position) && Rotation(body.rotation))
+        {
+            start = new ReplayPhysicsFrame { Seconds = 0,
+                                             Frame = 0,
+                                             Tick = 0,
+                                             State = State,
+                                             Position = body.position,
+                                             Rotation = body.rotation };
+            active.Add(start);
+            active.Coverage.Observe(ReplayCoverage.Movement, 0);
+        }
         ReplayAudioCapture.Begin(active, player);
         ReplayExperienceCapture.Begin(active, player);
         ReplayColliderCapture.Begin(active, player, map);
@@ -89,6 +103,17 @@ public static class ReplayInputCapture
         {
             active.SceneData.Drop();
             MelonLoader.MelonLogger.Warning("Replay scene observations: " + failure.Message);
+        }
+        // Discovery runs on the main thread. Bracket a stationary interval only
+        // when no physics step occurred and both actual body observations agree.
+        if (body != null && Time.fixedTimeAsDouble == fixedAtStart && body.position.Equals(start.Position) &&
+            body.rotation.Equals(start.Rotation) && State == start.State && active.Ticks.Count == 1)
+        {
+            var ready = start;
+            ready.Seconds = Now;
+            active.Add(ready);
+            if (active.Ticks.Count == 2)
+                active.Coverage.StationaryStart(ready.Seconds);
         }
         Camera.onPreCull += CameraFrame;
         Capture(PlayerContext.View(player), 0);

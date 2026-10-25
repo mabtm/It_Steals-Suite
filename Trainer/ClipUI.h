@@ -1461,12 +1461,12 @@ inline void Render()
             if (ImGui::BeginTabItem("Run check"))
             {
                 Help(
-                    "Full run videos include a fresh replay check and a five-second result card. Clip exports keep your chosen range and camera edits.");
+                    "Full run videos include a fresh replay check and a eight-second run verification with the original check animation. Clip exports keep your chosen range and camera edits.");
                 auto result = practice::g_replayArchive.Get()->revalidation;
                 if (result && result->run == run.id)
                     content.revalidation = result;
                 if (suite_ui::Button("Recheck this replay"))
-                    practice::g_replayArchive.Revalidate(content.analysis->data);
+                    suite_run::replayRequest = practice::g_replayArchive.Revalidate(content.analysis->data);
                 auto check = content.revalidation;
                 if (check)
                 {
@@ -1477,14 +1477,8 @@ inline void Render()
                     if (suite_ui::Button("Copy check report"))
                         ImGui::SetClipboardText(practice::RevalidationReport(*check).c_str());
                 }
-                auto preview = options;
-                preview.width = 1280;
-                preview.height = 720;
-                auto origin = ImGui::GetCursorScreenPos();
-                float width = ImGui::GetContentRegionAvail().x;
-                ComposeViewport(ImGui::GetWindowDrawList(), preview, content, run.seconds, origin,
-                                {width, width * 9 / 16}, 1);
-                ImGui::Dummy({width, width * 9 / 16});
+                ImGui::TextWrapped(
+                    "Recheck opens the same animated result window shown after a run. Full run videos include all seven checks and their technical evidence.");
                 Help(
                     "Local file checks preserve the original run verdict. They cannot make editable files tamper-proof or replace a leaderboard review.");
                 ImGui::EndTabItem();

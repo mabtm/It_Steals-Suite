@@ -1541,7 +1541,7 @@ void Workshop740Cases(const std::string &output)
            fullOptions.camera == 0 && fullOptions.scene3d && fullOptions.monster && !fullOptions.speedKeys &&
            !fullOptions.fullbright && !fullOptions.route && fullOptions.format == 4 &&
            fullOptions.fps == 120 && fullOptions.verification &&
-           fullOptions.Frames() == fullOptions.SourceFrames() + 600);
+           fullOptions.Frames() == fullOptions.SourceFrames() + 960);
     assert(suite_clip::options.a == 2 && suite_clip::options.b == 6 && suite_clip::options.rate == .5 &&
            suite_clip::options.camera == 2 && suite_clip::options.fullbright);
     auto imageOutput = suite_clip::options;
@@ -1553,16 +1553,58 @@ void Workshop740Cases(const std::string &output)
     checked->filesOk = true;
     checked->inputSha256 = std::string(64, 'a');
     checked->coverage = practice::BuildRecordingCheck(*fullMotion);
+    auto verification = std::make_shared<suite_run::Verification>();
+    verification->full = true;
+    auto &finished = verification->data;
+    finished.timerState = 2;
+    finished.runOutcome = 1;
+    finished.currentRunTimeSeconds = review->seconds;
+    finished.reviewRunId = review->id;
+    finished.reviewScene = finished.currentSceneIndex = 3;
+    finished.reviewReady = finished.reviewRetained = finished.runValidity = finished.seedKnown =
+        finished.seedKind = finished.seedSourcesVerified = finished.rngPatchComplete =
+            finished.observedFromStart = finished.externalScanStatus = 1;
+    std::strcpy(finished.gameAssemblyHash, std::string(64, 'a').c_str());
+    checked->verification = verification;
     fullContent.revalidation = checked;
-    for (int i = 0; i < 3; i++)
+    auto oldDisplay = io.DisplaySize;
+    float oldDpi = g_dpiScale;
+    for (auto dimensions : {ImVec2(1920, 1080), ImVec2(1280, 720)})
     {
-        ImGui::NewFrame();
-        suite_clip::ComposeViewport(ImGui::GetBackgroundDrawList(), fullOptions, fullContent, review->seconds,
-                                    {0, 0}, io.DisplaySize, 1);
-        ImGui::Render();
+        io.DisplaySize = dimensions;
+        for (double seconds : {.25, 1.3, 3.1, 5.04, 7.0})
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                ImGui::NewFrame();
+                suite_clip::ComposeViewport(ImGui::GetBackgroundDrawList(), fullOptions, fullContent,
+                                            review->seconds, {0, 0}, io.DisplaySize);
+                suite_clip::RenderRecordedVerification(fullContent, seconds);
+                ImGui::Render();
+                assert(g_dpiScale == oldDpi && ImGui::FindWindowByName("##RunResult"));
+            }
+            auto *result = ImGui::FindWindowByName("##RunResult");
+            assert(result->Pos.x >= 0 && result->Pos.y >= 0 &&
+                   result->Pos.x + result->Size.x <= dimensions.x &&
+                   result->Pos.y + result->Size.y <= dimensions.y);
+            for (auto *child : result->DC.ChildWindows)
+                if (child->ChildId == result->GetID("##RunResultDetails"))
+                    assert(child->ScrollMax.y < 1);
+            if (!output.empty())
+                Dump(output + "/verification-video-" + std::to_string(int(dimensions.y)) + "-" +
+                     std::to_string(int(seconds * 100)) + ".draw");
+        }
     }
-    if (!output.empty())
-        Dump(output + "/740-replay-check-card.draw");
+    io.DisplaySize = oldDisplay;
+    suite_run::Presentation replay;
+    verification->Present(replay, 100);
+    replay.scan.elapsed = 4;
+    verification->Present(replay, 110);
+    assert(replay.scan.elapsed == 0 && replay.Valid() &&
+           replay.Technical() == suite_run::TechnicalEvidence(finished, 0));
+    verification->Present(replay, 120, false, "Replay file check failed");
+    assert(!replay.Valid() && replay.ResultChecks()[0].state == suite_run::CheckState::Pass);
+
     for (const auto &test :
          std::array<std::array<float, 2>, 5>{{{{0, 0}}, {{1, 0}}, {{0, 1}}, {{6, 6}}, {{600, 300}}}})
     {

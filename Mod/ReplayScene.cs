@@ -780,32 +780,8 @@ public sealed class ReplayScenePlayback
         }
     }
 
-    // Radar cameras keep their own target; UI and body cameras composite onto
-    // the same export target after the main camera, retaining original effects.
-    public void Render(Camera main, RenderTexture target, bool before)
+    public void Render(Camera main, RenderTexture target, RenderTexture scene)
     {
-        cameras.Sort((a, b) => a.depth.CompareTo(b.depth));
-        foreach (var c in cameras)
-        {
-            if (c == null || !c.enabled || !c.gameObject.activeInHierarchy ||
-                (c.targetTexture != null) != before)
-                continue;
-            var saved = c.targetTexture;
-            float aspect = c.aspect;
-            try
-            {
-                if (!before)
-                {
-                    c.targetTexture = target;
-                    c.aspect = (float)target.width / target.height;
-                }
-                c.Render();
-            }
-            finally
-            {
-                c.targetTexture = saved;
-                c.aspect = aspect;
-            }
-        }
+        ReplayCameraPipeline.Render(main, target, scene, cameras);
     }
 }

@@ -91,6 +91,7 @@ class ReplayArchive
         LoadAnnotations,
         SaveAnnotations,
         Revalidate,
+        SaveVerification,
     };
 
     struct Job
@@ -102,6 +103,7 @@ class ReplayArchive
         std::shared_ptr<const MapData> data;
         std::string name, category, notes;
         std::shared_ptr<const ReplayAnnotations> annotations;
+        std::shared_ptr<const suite_run::Verification> verification;
     };
 
     struct Cached
@@ -527,6 +529,16 @@ class ReplayArchive
         bool report = !original.empty();
         if (report)
             files[prefix + ".validation.json"] = Read(original, 65536);
+        auto verification = Companion(d, ".verification.json");
+        if (!verification.empty())
+        {
+            auto bytes = Read(verification, 16384);
+            auto snapshot = suite_run::DecodeVerification(
+                std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+            if (!snapshot.Matches(d))
+                throw std::runtime_error("Run verification identity mismatch");
+            files[prefix + ".verification.json"] = std::move(bytes);
+        }
         auto note = File(d.review->id, ".meta");
         if (std::filesystem::exists(note))
         {
@@ -616,6 +628,14 @@ class ReplayArchive
                                     input->hash, &input->experience.audio);
             files[prefix + ".isinput"] = input->bytes;
         }
+        if (files.count(prefix + ".verification.json"))
+        {
+            const auto &bytes = files.at(prefix + ".verification.json");
+            auto snapshot = suite_run::DecodeVerification(
+                std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+            if (!snapshot.Matches(*d))
+                throw std::runtime_error("Package verification identity mismatch");
+        }
         bool hasMarks = files.count(prefix + ".ismarks") != 0;
         if (hasMarks)
         {
@@ -631,9 +651,9 @@ class ReplayArchive
         {
             (void)bytes;
             if (name != prefix + ".isrun" && name != prefix + ".isinput" && name != prefix + ".isaudio" &&
-                name != prefix + ".validation.json" && name != prefix + ".meta" &&
-                name != prefix + ".ismarks" && name != "manifest.json" && name != "SHA256SUMS.txt" &&
-                name != "README.txt")
+                name != prefix + ".validation.json" && name != prefix + ".verification.json" &&
+                name != prefix + ".meta" && name != prefix + ".ismarks" && name != "manifest.json" &&
+                name != "SHA256SUMS.txt" && name != "README.txt")
                 throw std::runtime_error("Unexpected package file");
         }
         // Preflight identity conflicts before committing any file.
@@ -733,6 +753,9 @@ class ReplayArchive
         auto report = Companion(*job.data, ".validation.json");
         if (!report.empty())
             Atomic(File(row.id, ".validation.json"), Read(report, 65536), false);
+        auto verification = Companion(*job.data, ".verification.json");
+        if (!verification.empty())
+            Atomic(File(row.id, ".verification.json"), Read(verification, 16384), false);
         Atomic(File(row.id, ".isrun"), bytes, false);
         auto target = File(row.id, ".meta");
         bool preserve = false;
@@ -795,6 +818,8 @@ class ReplayArchive
         result->originalAids = job.data->review->aids;
         result->originalWarnings = job.data->review->warnings;
         result->originalReason = job.data->review->validityReason;
+        result->verification =
+            std::make_shared<suite_run::Verification>(suite_run::HistoricalVerification(*job.data));
         Publish(true);
         try
         {
@@ -803,16 +828,16 @@ class ReplayArchive
                 throw std::runtime_error(
                     "Original replay is missing, damaged or differs from the selected run");
             result->mapSha256 = ReplaySha256(original->bytes);
-            auto input = ReadMotion(*original, true);
-            if (!input)
-                throw std::runtime_error("This replay has no input recording to recheck");
-            result->inputSha256 = ReplaySha256(input->bytes);
-            result->coverage = RecordingCheckFor(*input);
-            if (input->experience.audio.recorded)
+            auto snapshotFile = Companion(*original, ".verification.json");
+            if (!snapshotFile.empty())
             {
-                if (!input->audioError.empty())
-                    throw std::runtime_error(input->audioError);
-                result->audioSha256 = ReplayFileSha256(input->audioFile, AudioCapacity);
+                auto bytes = Read(snapshotFile, 16384);
+                auto snapshot = suite_run::DecodeVerification(
+                    std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+                if (!snapshot.Matches(*original))
+                    throw std::runtime_error("Verification snapshot disagrees with replay");
+                result->verificationSha256 = ReplaySha256(bytes);
+                result->verification = std::make_shared<suite_run::Verification>(std::move(snapshot));
             }
             auto report = Companion(*original, ".validation.json");
             if (!report.empty())
@@ -846,7 +871,21 @@ class ReplayArchive
                         throw std::runtime_error(
                             "Original report disagrees with the recorded run observations");
                     result->reportChecked = true;
+                    if (!result->verification->full)
+                        result->verification = std::make_shared<suite_run::Verification>(
+                            suite_run::HistoricalVerification(*original, &json));
                 }
+            }
+            auto input = ReadMotion(*original, true);
+            if (!input)
+                throw std::runtime_error("This replay has no input recording to recheck");
+            result->inputSha256 = ReplaySha256(input->bytes);
+            result->coverage = RecordingCheckFor(*input);
+            if (input->experience.audio.recorded)
+            {
+                if (!input->audioError.empty())
+                    throw std::runtime_error(input->audioError);
+                result->audioSha256 = ReplayFileSha256(input->audioFile, AudioCapacity);
             }
             // Replace cached motion only after all companions have been read.
             // This never rewrites the run's original verdict or evidence.
@@ -971,6 +1010,14 @@ class ReplayArchive
         case JobKind::ExportPackage:
             ExportRecording(job);
             break;
+        case JobKind::SaveVerification:
+            if (job.verification && job.verification->data.reviewRetained)
+            {
+                auto path = File(job.verification->data.reviewRunId, ".verification.json");
+                if (!std::filesystem::exists(path))
+                    Atomic(path, ReplayText(suite_run::EncodeVerification(*job.verification)), false);
+            }
+            break;
         case JobKind::Revalidate:
             RevalidateRecording(job);
             break;
@@ -1081,6 +1128,17 @@ class ReplayArchive
     void Load(int64_t id)
     {
         Queue({.kind = JobKind::LoadRecording, .id = id});
+    }
+
+    void RecordVerification(const GameData &data, uint32_t session)
+    {
+        if (!data.reviewReady || !data.reviewRetained || !suite_run::ReplayIdentityUsable(data))
+            return;
+        auto snapshot = std::make_shared<suite_run::Verification>();
+        snapshot->data = data;
+        snapshot->session = session;
+        snapshot->full = true;
+        Queue({.kind = JobKind::SaveVerification, .verification = std::move(snapshot)});
     }
 
     uint64_t Revalidate(std::shared_ptr<const MapData> data)

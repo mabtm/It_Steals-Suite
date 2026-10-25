@@ -76,6 +76,17 @@ int main(int argc, char **argv)
     // because successful observation heartbeats are independent of file changes.
     assert(check->channels[2].samples == 1 && check->channels[3].samples == 1 &&
            check->channels[4].samples == 2);
+    auto startup = Complete();
+    startup.ticks.erase(startup.ticks.begin() + 1, startup.ticks.begin() + 15);
+    check = BuildRecordingCheck(startup);
+    assert(check->channels[0].status == RecordingStatus::Complete);
+    startup.ticks[1].tick = 1;
+    check = BuildRecordingCheck(startup);
+    assert(check->channels[0].status == RecordingStatus::Partial);
+    startup.ticks[1].tick = 0;
+    startup.ticks[1].position.x = .01f;
+    check = BuildRecordingCheck(startup);
+    assert(check->channels[0].status == RecordingStatus::Partial);
     auto legacy = Complete();
     legacy.coverage = {};
     check = BuildRecordingCheck(legacy);

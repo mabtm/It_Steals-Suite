@@ -1,8 +1,8 @@
 #pragma once
 
-#define SUITE_VERSION "7.14.0"
-#define SUITE_VERSION_COMPONENTS 7, 14, 0, 0
-#define SUITE_MOD_VERSION "7.14.0"
+#define SUITE_VERSION "7.14.1"
+#define SUITE_VERSION_COMPONENTS 7, 14, 1, 0
+#define SUITE_MOD_VERSION "7.14.1"
 #define SUITE_AUTHOR "mab"
 
 #ifndef RC_INVOKED

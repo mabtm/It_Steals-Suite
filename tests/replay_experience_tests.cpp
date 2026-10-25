@@ -202,6 +202,52 @@ int main(int argc, char **argv)
         Until([&] { return archive.Get()->savedRevision > 0 || !archive.Get()->error.empty(); });
         if (!archive.Get()->error.empty())
             throw std::runtime_error(archive.Get()->error);
+        auto finish = suite_run::HistoricalVerification(*map);
+        finish.full = true;
+        finish.session = 713;
+        std::strcpy(finish.data.externalTool, "captured \"tool\"\nvalue");
+        auto encoded = suite_run::EncodeVerification(finish);
+        auto restored = suite_run::DecodeVerification(encoded);
+        assert(restored.Matches(*map) && suite_run::EncodeVerification(restored) == encoded);
+        auto mismatch = *map;
+        mismatch.seed++;
+        assert(!restored.Matches(mismatch));
+        auto missing = encoded;
+        missing.replace(missing.find("\"runValidity\""), 13, "\"missingValue\"");
+        Reject([&] { suite_run::DecodeVerification(missing); });
+        auto malformed = encoded;
+        auto flag = malformed.find("\"reviewReady\":1");
+        assert(flag != std::string::npos);
+        malformed.replace(flag, 15, "\"reviewReady\":9");
+        Reject([&] { suite_run::DecodeVerification(malformed); });
+        suite_run::Presentation shown;
+        restored.Present(shown, 10);
+        assert(shown.completedSession == 713 && shown.scan.elapsed == 0 && shown.hasResult &&
+               shown.Technical()[5][1].find("captured \"tool\"") != std::string::npos);
+        archive.RecordVerification(finish.data, finish.session);
+        Until([&] { return std::filesystem::exists(saved / (prefix + ".verification.json")); });
+        auto request = archive.Revalidate(map);
+        Until([&] { return archive.Get()->revalidation && archive.Get()->revalidation->request == request; });
+        auto checked = archive.Get()->revalidation;
+        assert(checked->filesOk && checked->verification && checked->verification->full &&
+               checked->verification->session == 713 && !checked->verificationSha256.empty());
+        auto inputFile = saved / (prefix + ".isinput");
+        auto inputBytes = Read(inputFile), damaged = inputBytes;
+        damaged.back() ^= 1;
+        Write(inputFile, damaged);
+        auto failedRequest = archive.Revalidate(map);
+        Until([&] {
+            return archive.Get()->revalidation && archive.Get()->revalidation->request == failedRequest;
+        });
+        auto failed = archive.Get()->revalidation;
+        assert(!failed->filesOk && failed->verification && failed->verification->full &&
+               !failed->error.empty());
+        Write(inputFile, inputBytes);
+        auto bytes = Read(saved / (prefix + ".verification.json"));
+        archive.RecordVerification(finish.data, 999);
+        archive.Refresh();
+        Until([&] { return !archive.Get()->busy; });
+        assert(Read(saved / (prefix + ".verification.json")) == bytes);
         archive.Export(map);
         Until([&] { return archive.Get()->exportedRun == motion->id || !archive.Get()->error.empty(); });
         if (!archive.Get()->error.empty())
@@ -211,12 +257,20 @@ int main(int argc, char **argv)
     }
     auto files = DecodeReplayZip(Read(package));
     assert(files.count(prefix + ".isaudio") && files[prefix + ".isaudio"] == Read(audioPath));
+    assert(files.count(prefix + ".verification.json"));
     {
         ReplayArchive archive;
         archive.SetDirectory(imported);
         archive.ImportPackage(package);
         Until([&] { return archive.Get()->savedRevision > 0 || !archive.Get()->error.empty(); });
         assert(archive.Get()->error.empty() && Read(imported / (prefix + ".isaudio")) == Read(audioPath));
+        auto verification = suite_run::DecodeVerification(
+            std::string_view(reinterpret_cast<const char *>(files.at(prefix + ".verification.json").data()),
+                             files.at(prefix + ".verification.json").size()));
+        assert(verification.Matches(*map) && verification.session == 713);
+        auto recheck = archive.Revalidate(map);
+        Until([&] { return archive.Get()->revalidation && archive.Get()->revalidation->request == recheck; });
+        assert(archive.Get()->revalidation->filesOk && archive.Get()->revalidation->verification->full);
         archive.SetSourceDirectory(game);
         archive.Stage3D(map);
         Until([&] { return archive.Get()->stagedRun == motion->id || !archive.Get()->error.empty(); });

@@ -10,7 +10,6 @@ public sealed class ReplayAudioTap : MonoBehaviour
     public sealed class Binding
     {
         public ReplayAudioSession Session;
-        public double Origin;
         public long OriginFrame;
         public int Rate;
     }
@@ -316,7 +315,6 @@ public static class ReplayAudioCapture
                 tap = listener.gameObject.AddComponent<ReplayAudioTap>();
             double now = SpeedrunManager.Instance == null ? 0 : SpeedrunManager.Instance.CurrentSeconds;
             clock = new ReplayAudioTap.Clock { Current = new ReplayAudioTap.Binding {
-                Origin = AudioSettings.dspTime - now,
                 OriginFrame = (long)Math.Round((AudioSettings.dspTime - now) * rate), Rate = rate,
                 Session = session
             } };
@@ -340,12 +338,8 @@ public static class ReplayAudioCapture
         var binding = clock.Current;
         if (binding == null || binding.Session != current)
             return;
-        double dsp = AudioSettings.dspTime;
-        if (Math.Abs(dsp - binding.Origin - seconds) > .05)
-            clock.Current =
-                new ReplayAudioTap.Binding { Session = current, Origin = dsp - seconds,
-                                             OriginFrame = (long)Math.Round((dsp - seconds) * binding.Rate),
-                                             Rate = binding.Rate };
+        // Setup and camera callbacks can lag behind run time. Rebasing moves
+        // existing PCM and creates artificial holes, so retain one DSP origin.
         foreach (var source in unobservable.Values)
             if (source != null && Bypasses(source) && source.isPlaying && !source.mute && source.volume > 0)
                 Missing(source, "listener bypass became audible on an unobservable route");

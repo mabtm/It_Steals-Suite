@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.14.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.14.0)**
+**[v7.14.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.14.1)**
 
-- Improved OBS mode by keeping menus on the trainer's normal render path. The capture option sends the compact and speedrun HUD to the game; record menus through a separate trainer-window source.
-- Improved new replay recordings with player arms, body/UI/radar cameras, game UI and particle snapshots. This includes the crystal counter and game messages such as RUN. Existing recordings keep their available tracks.
-- Improved replay checks with Recheck replay and a Run check tab in Clip Studio. Full-run video exports check the files again and finish with a five-second result card and a smooth transition. Stored validity and warnings stay unchanged.
+- Fixed a bug caused by Recorded game sending the world camera to a different texture from the hands and game UI. The view and video export now keep the game's camera chain intact.
+- Fixed a bug caused by resetting the audio clock during recorder setup. Each run now keeps one PCM timeline, so setup delays cannot create artificial audio gaps.
+- Improved movement recording from the start of a run. A stationary setup interval is recognised only when both body observations agree and no physics step occurred. Missing samples still appear in Recording check.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

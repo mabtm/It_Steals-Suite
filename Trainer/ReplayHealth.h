@@ -1,5 +1,6 @@
 #pragma once
 #include "ReplayMotion.h"
+#include "RunVerification.h"
 #include <sstream>
 #include <iomanip>
 #include <atomic>
@@ -49,6 +50,8 @@ struct ReplayRevalidation
     std::string originalReason;
     std::string error, mapSha256, inputSha256, audioSha256, reportSha256;
     std::shared_ptr<const RecordingCheck> coverage;
+    std::shared_ptr<const suite_run::Verification> verification;
+    std::string verificationSha256;
 };
 
 inline const char *RecordingStatusName(RecordingStatus status)
@@ -153,7 +156,8 @@ inline RecordingChannel CoverageChannel(const ReplayMotion &motion, const char *
 }
 
 template <class T>
-inline void RecordingTimes(RecordingChannel &c, const std::vector<T> &samples, double duration, double limit)
+inline void RecordingTimes(RecordingChannel &c, const std::vector<T> &samples, double duration, double limit,
+                           double knownStart = 0)
 {
     if (samples.empty())
     {
@@ -164,7 +168,7 @@ inline void RecordingTimes(RecordingChannel &c, const std::vector<T> &samples, d
     int gaps = 0;
     for (const auto &sample : samples)
     {
-        if (sample.seconds - prior > limit + .000001)
+        if (sample.seconds - prior > limit + .000001 && sample.seconds > knownStart)
         {
             gaps++;
             if (c.gaps.size() < 32)
@@ -188,7 +192,18 @@ inline std::shared_ptr<const RecordingCheck> BuildRecordingCheck(const ReplayMot
     auto check = std::make_shared<RecordingCheck>();
     auto &rows = check->channels;
     rows[0] = CoverageChannel(m, "Movement", 0, m.ticks.size());
-    RecordingTimes(rows[0], m.ticks, m.seconds, .12);
+    double stationaryStart = 0;
+    if (m.ticks.size() >= 2)
+    {
+        const auto &a = m.ticks[0], &b = m.ticks[1];
+        if (a.seconds == 0 && a.frame == 0 && b.frame == 0 && a.tick == 0 && b.tick == 0 &&
+            a.state == b.state && a.horizontal == b.horizontal && a.vertical == b.vertical &&
+            a.position.x == b.position.x && a.position.y == b.position.y && a.position.z == b.position.z &&
+            a.rotation.x == b.rotation.x && a.rotation.y == b.rotation.y && a.rotation.z == b.rotation.z &&
+            a.rotation.w == b.rotation.w)
+            stationaryStart = b.seconds;
+    }
+    RecordingTimes(rows[0], m.ticks, m.seconds, .12, stationaryStart);
     rows[1] = CoverageChannel(m, "Camera", 1, m.frames.size());
     RecordingTimes(rows[1], m.frames, m.seconds, .25);
     rows[2] = CoverageChannel(m, "Inputs", 2, m.devices.size());

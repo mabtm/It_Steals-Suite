@@ -231,3 +231,59 @@ public sealed class ReplayShaderClock : IDisposable
         end.Release();
     }
 }
+
+// Preserve the game's world/arms texture and the UI camera that presents it.
+public static class ReplayCameraPipeline
+{
+    private static void Render(Camera camera, RenderTexture target)
+    {
+        var saved = camera.targetTexture;
+        float aspect = camera.aspect;
+        try
+        {
+            camera.targetTexture = target;
+            if (target != null)
+                camera.aspect = (float)target.width / target.height;
+            camera.Render();
+        }
+        finally
+        {
+            camera.targetTexture = saved;
+            camera.aspect = aspect;
+        }
+    }
+
+    public static void Render(Camera main, RenderTexture output, RenderTexture scene, List<Camera> cameras)
+    {
+        var active = RenderTexture.active;
+        try
+        {
+            cameras.Sort((a, b) => a.depth.CompareTo(b.depth));
+            foreach (var camera in cameras)
+                if (camera != null && camera.enabled && camera.gameObject.activeInHierarchy &&
+                    camera.targetTexture != null && camera.targetTexture != scene)
+                    Render(camera, camera.targetTexture);
+            foreach (var camera in cameras)
+                if (scene != null && camera != null && camera.enabled &&
+                    camera.gameObject.activeInHierarchy && camera.targetTexture == scene &&
+                    camera.depth < main.depth)
+                    Render(camera, scene);
+            Render(main, scene ?? output);
+            foreach (var camera in cameras)
+                if (scene != null && camera != null && camera.enabled &&
+                    camera.gameObject.activeInHierarchy && camera.targetTexture == scene &&
+                    camera.depth >= main.depth)
+                    Render(camera, scene);
+            if (scene != null)
+                Graphics.Blit(scene, output);
+            foreach (var camera in cameras)
+                if (camera != null && camera.enabled && camera.gameObject.activeInHierarchy &&
+                    camera.targetTexture == null)
+                    Render(camera, output);
+        }
+        finally
+        {
+            RenderTexture.active = active;
+        }
+    }
+}

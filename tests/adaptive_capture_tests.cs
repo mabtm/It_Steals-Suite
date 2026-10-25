@@ -159,6 +159,16 @@ class AdaptiveCaptureTests
             coverage.Observe(0, i / 100.0);
         coverage.Seal(1);
         Check(coverage.Spans[0].GapCount == 0, "continuous heartbeat remains complete");
+        var startup = new ReplayCoverage();
+        startup.Start(0);
+        startup.Observe(0, 0);
+        startup.StationaryStart(.3);
+        startup.Observe(0, .32);
+        startup.Seal(.32);
+        Check(startup.Spans[0].GapCount == 0 && startup.Spans[0].Through == .32,
+              "observed startup with no physics step is a known hold");
+        startup.StationaryStart(1);
+        Check(startup.Spans[0].Through == .32, "a hold cannot conceal later or sealed recording gaps");
         var partial = new ReplayCoverage();
         partial.Start(0);
         partial.Observe(0, 0);

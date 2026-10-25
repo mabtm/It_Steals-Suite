@@ -2,6 +2,14 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.14.1 Changelog
+
+- Fixed a bug caused by Recorded game sending the world camera to a different texture from the hands and game UI. The view and video export now keep the game's camera chain intact.
+- Fixed a bug caused by resetting the audio clock during recorder setup. Each run now keeps one PCM timeline, so setup delays cannot create artificial audio gaps.
+- Improved movement recording from the start of a run. A stationary setup interval is recognised only when both body observations agree and no physics step occurred. Missing samples still appear in Recording check.
+- Improved Recheck replay to reopen the same animated run verification shown at a finish, with all seven checks and their technical evidence. New retained runs store those original values; missing historical values are labelled.
+- Improved full-run videos with the same validation window and an eight-second closing sequence. Replay packages keep the saved verification values and check their identity when imported or rechecked.
+
 ### v7.14.0 Changelog
 
 - Improved OBS mode by keeping menus on the trainer's normal render path. The capture option sends the compact and speedrun HUD to the game; record menus through a separate trainer-window source.

@@ -479,6 +479,8 @@ class Surface
         void *backend = source.BackendRendererUserData;
         auto flags = source.BackendFlags;
         bool locked = source.Fonts->Locked;
+        auto resultStyle = ImGui::GetStyle();
+        auto *resultFont = source.FontDefault;
         ID3D11RenderTargetView *oldTarget = nullptr;
         ID3D11DepthStencilView *oldDepth = nullptr;
         gpu->OMGetRenderTargets(1, &oldTarget, &oldDepth);
@@ -492,10 +494,17 @@ class Surface
             io.DeltaTime = 1.f / o.fps;
             io.BackendRendererUserData = backend;
             io.BackendFlags = flags;
-            io.FontDefault = content.font ? content.font : atlas->Fonts[0];
+            ImGui::GetStyle() = resultStyle;
+            io.FontDefault = outro >= 0 ? resultFont : content.font ? content.font : atlas->Fonts[0];
             ImGui::NewFrame();
             Compose(ImGui::GetBackgroundDrawList(), o, content, at,
                     o.scene3d ? reinterpret_cast<ImTextureID>(sceneView) : ImTextureID{}, outro);
+            if (outro >= 0)
+            {
+                if (!verificationRenderer)
+                    throw std::runtime_error("Run verification renderer unavailable");
+                verificationRenderer(content, outro);
+            }
             ImGui::Render();
             gpu->OMSetRenderTargets(1, &rtv, nullptr);
             float clear[] = {0, 0, 0, o.transparent ? 0.f : 1.f};

@@ -86,6 +86,17 @@ public sealed class ReplayCoverage
             span.Observations++;
     }
 
+    // Both endpoint poses were observed, with no simulation step in between.
+    public void StationaryStart(double through)
+    {
+        var span = Spans[Movement];
+        if (sealedRecording || span.Observations != 1 || span.First != 0 || span.Through != 0 ||
+            span.Errors != 0 || double.IsNaN(through) || double.IsInfinity(through) || through < 0)
+            return;
+        span.Through = through;
+        span.Observations++;
+    }
+
     public void Seal(double duration)
     {
         if (sealedRecording)

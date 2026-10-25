@@ -58,7 +58,7 @@ struct Options
             throw std::runtime_error("Clip exceeds the 216,000-frame limit");
     }
 
-    static constexpr double VerificationSeconds = 5;
+    static constexpr double VerificationSeconds = 8;
 
     double SourceDuration() const
     {

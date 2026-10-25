@@ -315,6 +315,33 @@ struct Presentation
     TechnicalRows technical;
     bool evidenceBuilt = false;
     int inspected = -1;
+    bool replay = false, filesOk = true, previousBestKnown = true;
+    std::string fileStatus;
+    std::optional<std::array<CheckState, 7>> recordedChecks;
+
+    std::array<Check, 7> ResultChecks() const
+    {
+        auto out = Checks(completed);
+        if (recordedChecks)
+            for (size_t i = 0; i < out.size(); i++)
+                out[i].state = (*recordedChecks)[i];
+        return out;
+    }
+
+    bool Valid() const
+    {
+        if (!filesOk || completed.runValidity != 1)
+            return false;
+        for (auto check : ResultChecks())
+            if (check.state != CheckState::Pass)
+                return false;
+        return true;
+    }
+
+    bool Pb() const
+    {
+        return Valid() && PersonalBest(completed);
+    }
 
     const EvidenceRows &RecordedEvidence()
     {
@@ -333,6 +360,31 @@ struct Presentation
         return technical;
     }
 
+    std::string Report()
+    {
+        std::ostringstream out;
+        out << "PracticeSuite run verification / captured evidence\nReplay ID: " << completed.reviewRunId
+            << "\nResult: " << (Valid() ? "VALID (local)" : "REVIEW REQUIRED")
+            << "\nEvidence fields: " << TechnicalFieldCount
+            << "\nGame file SHA256: " << CapturedText(completed.gameAssemblyHash) << "\n";
+        const auto &rows = Technical();
+        auto checks = ResultChecks();
+        for (size_t i = 0; i < checks.size(); i++)
+        {
+            out << "\n["
+                << (checks[i].state == CheckState::Pass      ? "VALID"
+                    : checks[i].state == CheckState::Unknown ? "MISSING"
+                                                             : "INVALID")
+                << "] " << checks[i].label << "\n";
+            for (const auto &field : rows[i])
+                out << "  " << field << "\n";
+        }
+        out << "\n"
+            << fileStatus
+            << "\nHistorical observations; no new scan of the recorded game's process. Local unsigned evidence.\n";
+        return out.str();
+    }
+
     int Inspecting(bool motion) const
     {
         if (inspected >= 0 && inspected < 7)
@@ -342,7 +394,7 @@ struct Presentation
             return active;
         if (!scan.Done(motion))
             return 0;
-        auto checks = Checks(completed);
+        auto checks = ResultChecks();
         for (int i = 0; i < 7; i++)
             if (checks[i].state != CheckState::Pass)
                 return i;
@@ -397,7 +449,8 @@ struct Presentation
             hasResult = ask = true;
         }
         if (hasResult && currentSession == completedSession && d->runEndedUtc == completed.runEndedUtc &&
-            d->reviewRunId == completed.reviewRunId && d->reviewReady && !completed.reviewReady)
+            d->reviewRunId == completed.reviewRunId && d->reviewReady &&
+            (!completed.reviewReady || d->reviewRetained != completed.reviewRetained))
         {
             completed.reviewReady = d->reviewReady;
             completed.reviewScene = d->reviewScene;
@@ -431,5 +484,12 @@ struct Presentation
     }
 };
 
-inline Presentation presentation;
+inline Presentation presentation, replayPresentation;
+inline uint64_t replayRequest = 0;
+
+inline bool VerificationWantsInput(const GameData *data, bool reviewOpen)
+{
+    return (replayPresentation.hasResult && (!data || data->timerState != 1)) ||
+           presentation.WantsInput(data, reviewOpen);
+}
 } // namespace suite_run
