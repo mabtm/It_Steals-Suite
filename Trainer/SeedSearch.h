@@ -92,9 +92,10 @@ class SearchDistances
                           : static_cast<int>(data.spawns.size()) + selection.crystals.at(index - 1);
     }
 
-    int FillMatrix(const Selection &selection, RouteWorkspace &work) const
+    int FillMatrix(const Selection &selection, RouteWorkspace &work, bool bound = false) const
     {
         int count = static_cast<int>(selection.crystals.size()) + 1;
+        bool contacts = bound && pickups->Active();
         std::array<int, 65> nodes;
         for (int i = 0; i < count; i++)
             nodes[i] = Node(selection, i);
@@ -107,7 +108,8 @@ class SearchDistances
             for (int to = from + 1; to < count; to++)
             {
                 int b = nodes[to];
-                work.matrix[from * count + to] = work.matrix[to * count + from] = lengths.at(b);
+                work.matrix[from * count + to] = work.matrix[to * count + from] =
+                    contacts ? pickups->Lower(nodes[from], b) : lengths.at(b);
                 if (estimatedPairs)
                     work.estimated |= estimates.at(b) != 0;
             }
@@ -117,13 +119,7 @@ class SearchDistances
 
     int FillBoundMatrix(const Selection &selection, RouteWorkspace &work) const
     {
-        int count = FillMatrix(selection, work);
-        if (pickups->Active())
-            for (int i = 0; i < count; i++)
-                for (int j = i + 1; j < count; j++)
-                    work.matrix[i * count + j] = work.matrix[j * count + i] =
-                        pickups->Lower(Node(selection, i), Node(selection, j));
-        return count;
+        return FillMatrix(selection, work, true);
     }
 
     RouteResult Score(const Selection &selection, bool fast, const Cancel &canceled, RouteWorkspace &work,

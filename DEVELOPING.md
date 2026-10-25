@@ -71,6 +71,40 @@ python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests 
 
 Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests; compile it separately against the matching game SDK and loader.
 
+### Performance comparison: 7.15.0 to 7.16.0
+
+Sequential Linux/GCC 13/Mono comparisons used the same benchmark sources and deterministic data on both revisions, without other builds or tests running. Values are medians. Scoring used five alternating before/after pairs; complete CPU searches used three repeats per worker count. These are synthetic CPU measurements, not live game FPS or a measured Hide & Seek Outside speedup.
+
+| Workload | 7.15.0 | 7.16.0 | Change |
+| --- | --- | --- | --- |
+| Heuristic scoring, 14 crystals | 63,451/s | 75,325/s | +18.7% |
+| Heuristic scoring, 22 crystals | 18,376/s | 23,823/s | +29.6% |
+| Heuristic scoring, 40 crystals | 3,245/s | 4,501/s | +38.7% |
+| Exact scoring, 14 crystals | 1,423/s | 1,397/s | -1.8%; no material improvement |
+| Complete 40-crystal CPU search, 1 worker | 3,138/s | 4,374/s | +39.4% |
+| Complete 40-crystal CPU search, 2 workers | 6,033/s | 8,371/s | +38.8% |
+| Complete 40-crystal CPU search, 6 workers | 16,897/s | 22,208/s | +31.4% |
+| Top-down BGRA layout, 120 frames at 1080p | 31.907 ms | 28.598 ms | 10.4% less copy time |
+
+The 2-opt loop reuses the fixed preceding edge and refreshes its first edge after each accepted reversal. It retains every start, pair, pass, comparison and cancellation check. Pickup lower-bound matrices now use one fill pass instead of writing center costs first. Search ranking, pruning rules, RNG and worker scheduling are unchanged. The exact solver itself is unchanged; it showed no throughput gain in this pass.
+
+Each scoring repeat covers 3,000 unique heuristic layouts per size and 1,000 exact layouts. Complete searches evaluate 12,000 seeds per repeat, including generation, scoring, ranking and drawing. Route lengths/order fingerprints and final winning seeds matched both revisions. A separate golden regression covers 288 tied, non-metric and grid matrices with 1–64 crystals, including exact and heuristic orders. Pixel comparisons check every output byte in both orientations and color formats; RGBA and flipped conversions showed no material overall gain.
+
+Startup now uses MelonLoader's existing scene-initialized callback after the game's `Start` methods, avoiding a separate intro detour. The supplied game's Intro scene is index 0 and TitleScreen is index 2. Connection, opt-out, delayed initialization, stale callbacks, repeated startup and display-setting restoration have contract coverage. Actual startup timing, game FPS, OBS focus changes and replay hands still need the live checks below. The camera chain, OBS GPU-sharing path, capture rates and recording formats remain intact.
+
+Use the current benchmark sources against each revision's headers/sources:
+
+```sh
+g++ -std=c++20 -O2 -pthread -DSEARCHLAB_WORKSPACE -ITrainer tests/route_order_benchmark.cpp -o build/route-benchmark
+build/route-benchmark
+g++ -std=c++20 -O2 -pthread -ITrainer tests/cpu_search_benchmark.cpp -o build/cpu-benchmark
+build/cpu-benchmark 12000 route 1 40
+build/cpu-benchmark 12000 route 2 40
+build/cpu-benchmark 12000 route 6 40
+mcs -langversion:7.2 -optimize+ -out:build/clip-pixel-benchmark.exe tests/clip_pixel_benchmark.cs Mod/ClipPixelLayout.cs
+mono build/clip-pixel-benchmark.exe 120
+```
+
 ### Performance comparison: 7.14.2 to 7.15.0
 
 Local Linux benchmarks used the same compiler, deterministic fixtures and interleaved before/after runs. Values below are medians. These measure isolated CPU paths, not game FPS or every map's search speed.
@@ -196,7 +230,7 @@ For a local Windows package build, install **NSIS 3**, then run:
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
-Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.15.0**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
+Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.16.0**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
 Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
 

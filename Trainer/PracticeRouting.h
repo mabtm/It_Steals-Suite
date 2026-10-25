@@ -1060,19 +1060,31 @@ inline RouteResult SolveOrderFlat(const double *matrix, int size, RouteWorkspace
                     throw std::runtime_error("Canceled");
                 bool improved = false;
                 for (int a = 0; a < n - 1; a++)
+                {
+                    // The preceding node stays fixed while this section is
+                    // reversed. Refresh its first edge only after an improvement.
+                    const double *previous = matrix + (a ? order[a - 1] + 1 : 0) * size;
+                    const double *first = matrix + (order[a] + 1) * size;
+                    double before = previous[order[a] + 1];
                     for (int b = a + 1; b < n; b++)
                     {
-                        int prev = a ? order[a - 1] + 1 : 0, next = b + 1 < n ? order[b + 1] + 1 : -1;
-                        double delta = distance(prev, order[b] + 1) - distance(prev, order[a] + 1);
-                        if (next >= 0)
-                            delta += distance(order[a] + 1, next) - distance(order[b] + 1, next);
+                        int last = order[b] + 1;
+                        double delta = previous[last] - before;
+                        if (b + 1 < n)
+                        {
+                            int next = order[b + 1] + 1;
+                            delta += first[next] - matrix[last * size + next];
+                        }
                         if (delta < -.000001)
                         {
                             std::reverse(order.begin() + a, order.begin() + b + 1);
                             current += delta;
                             improved = true;
+                            first = matrix + last * size;
+                            before = previous[last];
                         }
                     }
+                }
                 if (!improved)
                     break;
             }

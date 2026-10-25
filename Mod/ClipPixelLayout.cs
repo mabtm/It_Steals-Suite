@@ -28,9 +28,11 @@ public static class ClipPixelLayout
         if (width < 1 || height < 1 || source == null || destination == null || source.Length != size ||
             destination.Length != size || ReferenceEquals(source, destination))
             throw new ArgumentException("Invalid clip pixel buffer");
-        for (int y = 0; y < height; y++)
-            Buffer.BlockCopy(source, (bottomUp ? height - 1 - y : y) * stride, destination, y * stride,
-                             stride);
+        if (!bottomUp)
+            Buffer.BlockCopy(source, 0, destination, 0, size);
+        else
+            for (int y = 0; y < height; y++)
+                Buffer.BlockCopy(source, (height - 1 - y) * stride, destination, y * stride, stride);
         if (!bgra)
             for (int i = 0; i < size; i += 4)
             {

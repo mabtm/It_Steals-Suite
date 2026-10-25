@@ -16,7 +16,9 @@ public static class FramePolicyTests
         var command = new TrainerCommands { TelemetryOptions = 4096 };
         Check(!policy.Tick(command, true) && SceneManager.Loads == 0,
               "startup must finish its original initialization first");
-        FramePolicy.IntroStarted(new IntroScroll(0));
+        policy.SceneLoaded();
+        Check(!policy.Tick(command, true), "scene-loaded alone does not bypass original Start");
+        policy.SceneInitialized(0);
         Check(!policy.Tick(command, false) && SceneManager.Loads == 0,
               "disconnected trainer does not skip the game intro");
         Check(!policy.Tick(new TrainerCommands(), true) && SceneManager.Loads == 0,
@@ -28,13 +30,20 @@ public static class FramePolicyTests
         foreach (int scene in new[] { 1, 2, 3, 7, 13 })
         {
             policy.SceneLoaded();
-            FramePolicy.IntroStarted(new IntroScroll(scene));
+            policy.SceneInitialized(scene);
             Check(!policy.Tick(command, true) && SceneManager.Loads == 1,
                   "menu, death and run scenes cannot be skipped");
         }
-        FramePolicy.IntroStarted(new IntroScroll(0));
+        policy.SceneInitialized(0);
+        Check(!policy.Tick(command, true), "stale startup readiness cannot skip another active scene");
         policy.SceneLoaded();
         Check(!policy.Tick(command, true) && SceneManager.Loads == 1, "scene change clears a pending intro");
+        SceneManager.Active = new Scene { buildIndex = 0 };
+        policy.SceneLoaded();
+        Check(!policy.Tick(command, true), "returning to startup still waits for initialization");
+        policy.SceneInitialized(0);
+        Check(policy.Tick(command, true) && SceneManager.Loads == 2,
+              "a later startup initializes a fresh one-shot skip");
         Application.targetFrameRate = 72;
         QualitySettings.vSyncCount = 2;
         command.FrameLimitMode = 2;
@@ -64,23 +73,8 @@ public struct TrainerCommands
     public int GameFrameLimit;
 }
 
-public sealed class IntroScroll
-{
-    public GameObject gameObject;
-
-    public IntroScroll(int index)
-    {
-        gameObject = new GameObject { scene = new Scene { buildIndex = index } };
-    }
-}
-
 namespace UnityEngine
 {
-public sealed class GameObject
-{
-    public Scene scene;
-}
-
 public static class Application
 {
     public static int targetFrameRate;
@@ -123,10 +117,17 @@ public static class SceneManager
 {
     public static int Loads;
     public static string Last;
+    public static Scene Active;
+
+    public static Scene GetActiveScene()
+    {
+        return Active;
+    }
 
     public static void LoadScene(string name)
     {
         Last = name;
+        Active = new Scene { buildIndex = 2 };
         Loads++;
     }
 }
