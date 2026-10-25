@@ -6,6 +6,8 @@
 int main(int argc, char **argv)
 {
     const uint64_t count = argc > 1 ? std::stoull(argv[1]) : 1000000;
+    const int crystals = argc > 4 ? std::stoi(argv[4]) : 18;
+    assert(crystals >= 1 && crystals <= 64);
     auto fixture = SeedFixture();
     fixture.vertices.clear();
     fixture.indices.clear();
@@ -16,13 +18,13 @@ int main(int argc, char **argv)
     fixture.requested = fixture.completed = 0;
     for (int i = 0; i < 9; i++)
         fixture.spawns.push_back({float(i * 3 + .17), 1, float(i * i % 19 + .31)});
-    for (int i = 0; i < 34; i++)
+    for (int i = 0; i < std::max(34, crystals + 16); i++)
         fixture.points.push_back({float(i * 1.73 + .28), 1, float(i * i % 31 * 1.31 + .47)});
     fixture.selected.clear();
-    for (int i = 0; i < 18; i++)
+    for (int i = 0; i < crystals; i++)
         fixture.selected.push_back(i);
     fixture.liveSelected = fixture.selected;
-    fixture.keep = 18;
+    fixture.keep = crystals;
     fixture.flags = 1;
     fixture.rngStatus = 2;
     fixture.rngProbes = 4160;
@@ -42,7 +44,8 @@ int main(int argc, char **argv)
     source->live = true;
     assert(source->data);
     std::cout
-        << "Synthetic 9-spawn/34-point/18-crystal fixture; includes CPU generation, route distances, scoring, ranking and drawing. No live Unity or game FPS measurement.\n";
+        << "Synthetic 9-spawn/" << fixture.points.size() << "-point/" << crystals
+        << "-crystal fixture; includes CPU generation, route distances, scoring, ranking and drawing. No live Unity or game FPS measurement.\n";
     if (argc < 3 || std::string_view(argv[2]) != "layout")
         for (int workers : {1, 2, 6})
             for (int repeat = 0; repeat < 3; repeat++)
@@ -63,7 +66,7 @@ int main(int argc, char **argv)
                           << ',' << result->top.front().seed << ',' << result->top.front().route.length << ','
                           << result->scored << ',' << result->pruned << '\n';
             }
-    for (int repeat = 0; repeat < 3; repeat++)
+    for (int repeat = 0; repeat < (argc > 2 && std::string_view(argv[2]) == "route" ? 0 : 3); repeat++)
     {
         practice::SeedSearch million;
         auto request = StreamingRequest(*source, count * 10, 6, true);

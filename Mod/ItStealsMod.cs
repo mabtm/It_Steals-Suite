@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.15.0";
+    public const string Version = "7.16.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -137,6 +137,7 @@ public sealed class ItStealsMod : MelonMod
     {
         if (connection == null)
             return;
+        framePolicy.SceneInitialized(buildIndex);
         // Fallback for a persistent player whose Start does not run again.
         Attach();
         // Attachment alone does not prove that the actual Start hook ran.

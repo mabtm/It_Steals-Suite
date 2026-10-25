@@ -4,23 +4,22 @@ using UnityEngine.SceneManagement;
 // Startup convenience and reversible display overrides; keep saved game preferences intact.
 public sealed class FramePolicy
 {
-    private static IntroScroll intro;
-    private bool owned;
+    private bool introReady, owned;
     private int frames, sync;
 
-    // Postfix: the game's volume and first-launch quality initialization must
-    // complete before skipping its startup scene. No per-frame scene searches.
-    public static void IntroStarted(IntroScroll __instance)
+    // Use the existing scene lifecycle instead of depending on a Start detour.
+    // Melon initializes the scene after the game's volume/quality setup.
+    public void SceneInitialized(int buildIndex)
     {
-        if (__instance != null && __instance.gameObject.scene.buildIndex == 0)
-            intro = __instance;
+        introReady = buildIndex == 0;
     }
 
     public bool Tick(TrainerCommands command, bool connected)
     {
-        if (connected && (command.TelemetryOptions & 4096u) != 0 && intro != null)
+        if (connected && (command.TelemetryOptions & 4096u) != 0 && introReady &&
+            SceneManager.GetActiveScene().buildIndex == 0)
         {
-            intro = null;
+            introReady = false;
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             SceneManager.LoadScene("TitleScreen");
@@ -51,7 +50,7 @@ public sealed class FramePolicy
 
     public void SceneLoaded()
     {
-        intro = null;
+        introReady = false;
         Restore();
     }
 

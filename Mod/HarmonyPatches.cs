@@ -191,8 +191,6 @@ public static class HarmonyPatches
         }
         originalSources = gameSources == 22;
         RefreshSeedCoverage();
-        harmony.Patch(AccessTools.Method(typeof(IntroScroll), "Start"),
-                      postfix: new HarmonyMethod(typeof(FramePolicy), "IntroStarted"));
         harmony.Patch(AccessTools.Method(typeof(MouseLook), "Start"),
                       prefix: new HarmonyMethod(typeof(SeedMapPlanner), "BeforeStart"),
                       postfix: new HarmonyMethod(typeof(HarmonyPatches), "PlayerReady"),

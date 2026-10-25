@@ -20,7 +20,7 @@ int main()
         {
             if (!fast && n != 14)
                 continue;
-            int count = fast ? 3000 : 48;
+            int count = fast ? 3000 : 1000;
             std::vector<practice::Selection> choices;
             std::vector<int> points(64);
             std::iota(points.begin(), points.end(), 0);

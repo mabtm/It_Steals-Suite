@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.15.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.15.0)**
+**[v7.16.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.16.0)**
 
-- Improved seed search by sharing distance tables and reusing worker buffers. Layout scans and exact route scoring do less repeated work; seed coverage, route quality and Top 10 ordering stay the same.
-- Improved replay recording by skipping repeated pose calculations for stationary objects. Capture rates and stored poses stay the same. Diagnostics now include the OBS transfer work on the game thread.
-- Improved startup with a saved Skip game intro option under Settings > System. The game still initializes its sound and first-launch settings before opening the main menu.
+- Improved seed search on larger routes by reusing edge costs inside 2-opt and filling pickup lower bounds in one pass. Every starting route, improvement pass and seed remains covered.
+- Improved clip transfers by copying top-down pixel buffers in one block. Flipped images and color conversion retain their existing output.
+- Fixed a bug caused by relying on a separate Start hook to skip the intro. Skipping now waits for scene initialization, after the game's volume and first-launch quality setup.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
