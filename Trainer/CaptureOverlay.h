@@ -77,7 +77,6 @@ class CaptureOverlay
         if (data && Lock())
         {
             Write(36, 0u);
-            Write(44, 0u);
             ReleaseMutex(mutex);
         }
         lastAck = 0;
@@ -207,7 +206,8 @@ class CaptureOverlay
     {
         if (!enabled || !data || !Lock())
             return false;
-        if (Read<uint32_t>(44) == 2)
+        auto capability = Read<uint32_t>(44);
+        if (capability != 1 && capability != 4)
         {
             ReleaseMutex(mutex);
             return false;

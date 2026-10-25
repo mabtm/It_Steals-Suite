@@ -34,7 +34,7 @@ public sealed class CaptureOverlay : IDisposable
             view.Write(12, pid);
             view.Write(44,
                        SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D11
-                           ? 0u
+                           ? 4u
                            : 2u);
         }
         catch

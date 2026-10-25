@@ -78,7 +78,9 @@ int main()
             write(20, read(16));
             capture.Tick(GetCurrentProcessId(), true);
             Check(capture.Active(), "Presented game frame was not acknowledged");
-            write(44, 0);
+            Check(!capture.PublishGpu(device.Get(), gpu.Get(), target.Get()) && read(40) == 0,
+                  "Older consumers must stay on their compatible CPU transport");
+            write(44, 4);
             Check(capture.PublishGpu(device.Get(), gpu.Get(), target.Get()), "GPU capture creation failed");
             auto gpuSerial = read(16);
             Check(read(40) == 1 && read(24) == 4 && read(28) == 4, "Complete GPU image header differs");

@@ -20,9 +20,24 @@ public static class Native
 
 namespace UnityEngine
 {
+public static class SystemInfo
+{
+    public static UnityEngine.Rendering.GraphicsDeviceType graphicsDeviceType =
+        UnityEngine.Rendering.GraphicsDeviceType.Direct3D11;
+}
+
 public enum TextureFormat
 {
     BGRA32
+}
+
+namespace Rendering
+{
+public enum GraphicsDeviceType
+{
+    Direct3D11,
+    OpenGLCore
+}
 }
 
 public enum HideFlags
@@ -141,6 +156,18 @@ public static class CaptureGpuTests
         gpu.Dispose();
         Check(gpu.Failed && Native.CaptureReferences() == 5,
               "event submission failure cannot leak a resource");
+        UnityEngine.SystemInfo.graphicsDeviceType = UnityEngine.Rendering.GraphicsDeviceType.OpenGLCore;
+        bool unsupported = false;
+        try
+        {
+            new CaptureGpu(123, 1920, 1080);
+        }
+        catch (NotSupportedException)
+        {
+            unsupported = true;
+        }
+        Check(unsupported && Native.CaptureReferences() == 5,
+              "non-D3D11 pointers are rejected before accessing any COM interface");
         Console.WriteLine(
             "GPU consumer: real native COM vtables, render-thread handoff, bounded queue, busy/device failure, delayed shutdown and complete/idempotent rollback: PASS");
         return 0;

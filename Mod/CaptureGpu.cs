@@ -63,6 +63,10 @@ public sealed class CaptureGpu : IDisposable
 
     public CaptureGpu(long handle, int width, int height)
     {
+        // Other graphics APIs return different native pointer types. Never
+        // treat an OpenGL texture name or a D3D12 resource as D3D11 COM.
+        if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Direct3D11)
+            throw new NotSupportedException("GPU capture requires Direct3D 11");
         Handle = handle;
         Image = new Texture2D(width, height, TextureFormat.BGRA32,
                               false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Point,
