@@ -10,6 +10,7 @@ class GraphicsComposition
     IDCompositionDevice *device = nullptr;
     IDCompositionTarget *target = nullptr;
     IDCompositionVisual *visual = nullptr;
+    float opacity = 1;
 
   public:
     ~GraphicsComposition()
@@ -22,6 +23,7 @@ class GraphicsComposition
 
     void Reset()
     {
+        opacity = 1;
         if (visual)
         {
             visual->SetContent(nullptr);
@@ -44,6 +46,16 @@ class GraphicsComposition
         {
             FreeLibrary(module);
             module = nullptr;
+        }
+    }
+
+    void SetCaptured(bool captured)
+    {
+        float next = captured ? 0.f : 1.f;
+        if (visual && device && opacity != next && SUCCEEDED(visual->SetOpacity(next)))
+        {
+            if (SUCCEEDED(device->Commit()))
+                opacity = next;
         }
     }
 

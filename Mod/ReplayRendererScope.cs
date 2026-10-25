@@ -235,6 +235,16 @@ public sealed class ReplayShaderClock : IDisposable
 // Preserve the game's world/arms texture and the UI camera that presents it.
 public static class ReplayCameraPipeline
 {
+    public static HashSet<Camera> Sources(Camera main, IEnumerable<Camera> rig, params Camera[] references)
+    {
+        var result = new HashSet<Camera>(references);
+        foreach (var camera in rig)
+            result.Add(camera);
+        result.Remove(null);
+        result.Remove(main);
+        return result;
+    }
+
     private static void Render(Camera camera, RenderTexture target)
     {
         var saved = camera.targetTexture;

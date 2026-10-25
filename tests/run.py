@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "capture_gpu_tests": ["CaptureGpu.cs"],
     "recording_channels_tests": [
         "ReplaySceneData.cs",
         "ReplayExperienceData.cs",
@@ -41,6 +42,7 @@ MANAGED = {
     "replay_audio_capture_tests": ["ReplayAudioCapture.cs"],
     "clip_channel_tests": [
         "CaptureOverlay.cs",
+        "CaptureGpu.cs",
         "ReplayClipChannel.cs",
         "ClipGpuReadback.cs",
         "ClipPixelLayout.cs",
@@ -117,6 +119,21 @@ def execute(name, managed, args, root, output, fixtures):
     executable = folder / (name + (".exe" if managed or os.name == "nt" else ""))
     result = {"name": name, "managed": managed, "passed": False}
     try:
+        if name == "capture_gpu_tests":
+            fixture = work / "libcapture_gpu_fixture.so"
+            subprocess.run(
+                [
+                    args.compiler,
+                    "-std=c++20",
+                    "-shared",
+                    "-fPIC",
+                    str(root / "tests/capture_gpu_fixture.cpp"),
+                    "-o",
+                    str(fixture),
+                ],
+                check=True,
+                capture_output=True,
+            )
         if managed:
             sources = [root / "tests" / (name + ".cs")]
             sources += [root / "Mod" / source for source in MANAGED[name]]
@@ -186,6 +203,10 @@ def execute(name, managed, args, root, output, fixtures):
         if result["buildExitCode"]:
             raise RuntimeError("Compilation failed; see " + str(folder / "build.log"))
         environment = os.environ.copy()
+        if name == "capture_gpu_tests":
+            environment["LD_LIBRARY_PATH"] = (
+                str(work) + os.pathsep + environment.get("LD_LIBRARY_PATH", "")
+            )
         if args.sanitize:
             environment.setdefault("ASAN_OPTIONS", "detect_leaks=0:halt_on_error=1")
             environment.setdefault("UBSAN_OPTIONS", "halt_on_error=1")
@@ -244,7 +265,11 @@ def main():
         if unknown:
             parser.error("Unknown or disabled test: " + ", ".join(sorted(unknown)))
         selected = [(name, managed) for name, managed in selected if name in names]
-    required = [args.compiler] if any(not managed for _, managed in selected) else []
+    required = (
+        [args.compiler]
+        if any(not managed or name == "capture_gpu_tests" for name, managed in selected)
+        else []
+    )
     if any(managed for _, managed in selected):
         required += ["mcs", "mono"]
     for tool in required:

@@ -1517,7 +1517,7 @@ public static class ManagedTests
             var tracker = new RunTracker(store);
             tracker.Begin(3, now, RunAids.None, seed);
             Check(!tracker.ResetStatistics(), "statistics cannot reset during an active run");
-            tracker.End(RunOutcome.Reset, now + 5000000, .5, 0);
+            tracker.End(RunOutcome.Reset, now + 39990000, 3.999, 0);
             Check(store.Runs == 0 && store.Resets == 0 && tracker.SessionAttempts == 0 && store.Today(0) == 0,
                   "quick empty resets stay out of lifetime, daily and session counters");
             store.Save();
@@ -1528,7 +1528,7 @@ public static class ManagedTests
                   "restart does not restore ignored attempts from history");
             var tracker = new RunTracker(store);
             tracker.Begin(3, now, RunAids.None, seed);
-            tracker.End(RunOutcome.Reset, now + 20000000, 2, 0);
+            tracker.End(RunOutcome.Reset, now + 40000000, 4, 0);
             Check(store.Runs == 1 && store.Resets == 1 && tracker.SessionResets == 1,
                   "regular reset still counts");
             tracker.Begin(3, now + 30000000, RunAids.None, seed);

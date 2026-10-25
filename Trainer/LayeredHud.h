@@ -60,7 +60,7 @@ class LayeredHud
             presented = {};
         }
 
-        bool Prepare(ID3D11Device *device, UINT w, UINT h)
+        bool Prepare(ID3D11Device *device, UINT w, UINT h, bool rgba)
         {
             if (w == width && h == height && readback[0] && readback[1] && pixels)
                 return true;
@@ -71,7 +71,7 @@ class LayeredHud
             desc.Width = w;
             desc.Height = h;
             desc.MipLevels = desc.ArraySize = 1;
-            desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+            desc.Format = rgba ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_B8G8R8A8_UNORM;
             desc.SampleDesc.Count = 1;
             desc.Usage = D3D11_USAGE_STAGING;
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -103,6 +103,7 @@ class LayeredHud
     uint64_t generation = 0;
     UINT width = 0, height = 0;
     double uploadMs = 0;
+    bool rgba = false;
 
   public:
     ~LayeredHud()
@@ -126,16 +127,17 @@ class LayeredHud
         width = height = 0;
     }
 
-    bool Resize(ID3D11Device *device, UINT w, UINT h, ID3D11RenderTargetView **view)
+    bool Resize(ID3D11Device *device, UINT w, UINT h, ID3D11RenderTargetView **view, bool redFirst = false)
     {
         Reset();
+        rgba = redFirst;
         width = std::max(1u, w);
         height = std::max(1u, h);
         D3D11_TEXTURE2D_DESC desc{};
         desc.Width = width;
         desc.Height = height;
         desc.MipLevels = desc.ArraySize = 1;
-        desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc.Format = rgba ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_B8G8R8A8_UNORM;
         desc.SampleDesc.Count = 1;
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = D3D11_BIND_RENDER_TARGET;
@@ -199,7 +201,7 @@ class LayeredHud
                 if ((GetWindowLongPtrW(s.window, GWL_EXSTYLE) & required) != required)
                     return false;
             }
-            if (!s.Prepare(device, UINT(region.Width()), UINT(region.Height())))
+            if (!s.Prepare(device, UINT(region.Width()), UINT(region.Height()), rgba))
                 return false;
             if (s.pending[s.readIndex])
             {
@@ -264,6 +266,11 @@ class LayeredHud
             if (s.pixels && s.presented.Width() == int(s.width) && s.presented.Height() == int(s.height))
                 visit(s.presented, static_cast<const unsigned char *>(s.pixels));
         }
+    }
+
+    ID3D11Texture2D *Texture() const
+    {
+        return color;
     }
 
     ULONGLONG LastPresented() const

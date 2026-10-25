@@ -1,6 +1,6 @@
 #pragma once
 #include "windows.h"
-inline constexpr UINT DXGI_FORMAT_B8G8R8A8_UNORM=1,D3D11_USAGE_STAGING=2,D3D11_USAGE_DEFAULT=3,D3D11_CPU_ACCESS_READ=4,D3D11_BIND_RENDER_TARGET=8,D3D11_MAP_READ=1,D3D11_MAP_FLAG_DO_NOT_WAIT=1;
+inline constexpr UINT DXGI_FORMAT_B8G8R8A8_UNORM=1,DXGI_FORMAT_R8G8B8A8_UNORM=5,D3D11_USAGE_STAGING=2,D3D11_USAGE_DEFAULT=3,D3D11_CPU_ACCESS_READ=4,D3D11_BIND_RENDER_TARGET=8,D3D11_MAP_READ=1,D3D11_MAP_FLAG_DO_NOT_WAIT=1;
 struct D3D11_TEXTURE2D_DESC{UINT Width=0,Height=0,MipLevels=0,ArraySize=0,Format=0;struct {UINT Count=0,Quality=0;}SampleDesc;UINT Usage=0,CPUAccessFlags=0,BindFlags=0;};struct D3D11_BOX{UINT left,top,front,right,bottom,back;};struct D3D11_MAPPED_SUBRESOURCE{void* pData=nullptr;UINT RowPitch=0,DepthPitch=0;};
 inline int fakeTextureCount=0;
 struct ID3D11Texture2D{D3D11_TEXTURE2D_DESC desc;UINT pitch;std::vector<uint8_t> pixels;int references=1;bool busy=false;explicit ID3D11Texture2D(D3D11_TEXTURE2D_DESC d):desc(d),pitch(d.Width*4+(d.Usage==D3D11_USAGE_STAGING?64:0)),pixels(size_t(pitch)*d.Height){fakeTextureCount++;}void GetDesc(D3D11_TEXTURE2D_DESC* output){*output=desc;}void AddRef(){references++;}void Release(){if(--references==0){fakeTextureCount--;delete this;}}};

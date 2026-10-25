@@ -371,7 +371,7 @@ inline void RenderSpeedrunPage()
             value("Average pace", "AVERAGE FINISH", OverlayValue(OverlayField::AverageRun, data, "", 0),
                   "Completed runs");
             value("Deaths", "DEATHS", std::to_string(data.totalDeaths), "Observed deaths");
-            ImGui::TextWrapped("Resets under 1 second with no progress stay out of statistics.");
+            ImGui::TextWrapped("Resets under 4 seconds with no progress stay out of statistics.");
             ImGui::BeginDisabled(data.timerState == 1 || HasPendingRequest());
             if (suite_ui::Button("Reset statistics"))
                 ImGui::OpenPopup("Reset statistics?");
@@ -509,9 +509,9 @@ inline void RenderSystemSettings()
         "A one-time, locally blurred game image behind the intro card. No continuous capture or full-screen effect. If capture is unavailable, the card uses its normal background.");
     ImGui::Separator();
     ImGui::TextColored(g_headerCol, "Display");
-    suite_ui::Checkbox("Include HUD in game captures (OBS)", &g_captureOverlayEnabled);
+    suite_ui::Checkbox("Include trainer in game captures (OBS)", &g_captureOverlayEnabled);
     Help(
-        "Include the compact and speedrun HUD when OBS captures It Steals. Menus stay in the trainer window so input remains immediate; add that window as a separate OBS source to record menus.");
+        "Include the complete trainer UI, menus and HUD when OBS captures It Steals. DirectX 11 GPU sharing avoids CPU image copies. Native input stays active; if sharing is unavailable, the normal trainer window remains visible and HUD capture uses its fallback.");
     const char *rates[] = {"30 FPS", "60 FPS", "120 FPS"};
     int rate = g_renderFps == 30 ? 0 : g_renderFps == 120 ? 2 : 1;
     if (ImGui::Combo("Overlay frame limit", &rate, rates, 3))

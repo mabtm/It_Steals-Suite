@@ -77,7 +77,12 @@ public static class ReplaySceneCapture
         Stop();
         data = motion.SceneData;
         data.Recorded = true;
-        var cameras = new HashSet<Camera> { player.UICamera, player.armsBodyCam, player.radarCam };
+        var main = PlayerContext.View(player);
+        // Some shipped scenes leave armsBodyCam unassigned even though a
+        // BodyCam exists beneath the main camera. Observe the actual rig too.
+        var cameras = ReplayCameraPipeline.Sources(
+            main, main == null ? new Camera[0] : main.GetComponentsInChildren<Camera>(true), player.UICamera,
+            player.armsBodyCam, player.radarCam);
         foreach (var camera in cameras)
             if (camera != null && camera != PlayerContext.View(player))
             {

@@ -263,7 +263,7 @@ public sealed class RunTracker
         record.EndedUtc = Math.Max(record.StartedUtc, utcTicks);
         record.Outcome = outcome;
         bool quickReset = (outcome == RunOutcome.Reset || outcome == RunOutcome.Interrupted) &&
-                          record.Seconds < 1 && record.Progress <= 0;
+                          record.Seconds < 4 && record.Progress <= 0;
         if (quickReset)
         {
             store.UncountAttempt(record.StartedUtc);

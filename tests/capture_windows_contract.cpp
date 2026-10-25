@@ -78,6 +78,51 @@ int main()
             write(20, read(16));
             capture.Tick(GetCurrentProcessId(), true);
             Check(capture.Active(), "Presented game frame was not acknowledged");
+            write(44, 0);
+            Check(capture.PublishGpu(device.Get(), gpu.Get(), target.Get()), "GPU capture creation failed");
+            auto gpuSerial = read(16);
+            Check(read(40) == 1 && read(24) == 4 && read(28) == 4, "Complete GPU image header differs");
+            Check(capture.PublishGpu(device.Get(), gpu.Get(), target.Get()) && read(16) == gpuSerial,
+                  "A busy GPU consumer must skip without advancing or waiting");
+            ComPtr<ID3D11Device> consumer;
+            ComPtr<ID3D11DeviceContext> consumerGpu;
+            Check(SUCCEEDED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr,
+                                              D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
+                                              &consumer, nullptr, &consumerGpu)),
+                  "Consumer device creation failed");
+            uint64_t sharedHandle;
+            std::memcpy(&sharedHandle, bytes + 48, 8);
+            ComPtr<ID3D11Texture2D> sharedImage;
+            Check(SUCCEEDED(consumer->OpenSharedResource(reinterpret_cast<HANDLE>(uintptr_t(sharedHandle)),
+                                                         IID_PPV_ARGS(&sharedImage))),
+                  "Shared UI texture could not be opened on a second device");
+            ComPtr<IDXGIKeyedMutex> keyed;
+            Check(SUCCEEDED(sharedImage.As(&keyed)) && keyed->AcquireSync(1, 1000) == S_OK,
+                  "Consumer could not acquire the published GPU image");
+            D3D11_TEXTURE2D_DESC desc{};
+            sharedImage->GetDesc(&desc);
+            desc.Usage = D3D11_USAGE_STAGING;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            desc.BindFlags = desc.MiscFlags = 0;
+            ComPtr<ID3D11Texture2D> decoded;
+            Check(SUCCEEDED(consumer->CreateTexture2D(&desc, nullptr, &decoded)), "GPU test readback failed");
+            consumerGpu->CopyResource(decoded.Get(), sharedImage.Get());
+            Check(keyed->ReleaseSync(0) == S_OK, "Consumer did not release the GPU image");
+            D3D11_MAPPED_SUBRESOURCE mapped{};
+            Check(SUCCEEDED(consumerGpu->Map(decoded.Get(), 0, D3D11_MAP_READ, 0, &mapped)),
+                  "GPU test mapping failed");
+            auto *rgba = static_cast<uint8_t *>(mapped.pData);
+            bool correct = true;
+            for (UINT y = 0; y < 4; y++)
+                for (UINT x = 0; x < 4; x++)
+                {
+                    auto *p = rgba + size_t(y) * mapped.RowPitch + x * 4;
+                    correct &= p[0] == 0 && p[1] == 64 && p[2] == 128 && p[3] == 128;
+                }
+            consumerGpu->Unmap(decoded.Get(), 0);
+            Check(correct, "GPU straight alpha / BGRA conversion differs");
+            Check(capture.PublishGpu(device.Get(), gpu.Get(), target.Get()) && read(16) != gpuSerial,
+                  "GPU sharing did not resume after the consumer released it");
             capture.Tick(GetCurrentProcessId(), false);
             Check(!capture.Active() && read(36) == 0, "Alt-Tab must clear capture immediately");
             capture.enabled = false;
@@ -87,8 +132,9 @@ int main()
         UnmapViewOfFile(bytes);
         CloseHandle(mutex);
         CloseHandle(mapping);
-        std::cout << "Windows DX11 capture: real GPU readback, BGRA/alpha, bounded shared memory,"
-                     " acknowledgement, Alt-Tab and fallback: PASS\n";
+        std::cout
+            << "Windows DX11 capture: real GPU readback, BGRA/alpha, bounded shared memory,"
+               " acknowledgement, GPU sharing across devices, nonblocking handoff, Alt-Tab and fallback: PASS\n";
         return 0;
     }
     catch (const std::exception &error)

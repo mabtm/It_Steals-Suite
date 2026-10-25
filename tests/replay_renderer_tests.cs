@@ -278,6 +278,10 @@ public static class ReplayRendererTests
         var ui = new Camera { depth = 1 };
         var radarCamera = new Camera { targetTexture = radar, depth = -2 };
         var stack = new List<Camera> { arms, ui, radarCamera };
+        var discovered = ReplayCameraPipeline.Sources(main, new[] { main, arms, ui }, ui, null, radarCamera);
+        Check(discovered.Count == 3 && discovered.Contains(arms) && discovered.Contains(radarCamera) &&
+                  !discovered.Contains(main),
+              "unassigned body-camera field still discovers the actual hand camera, without duplicates");
         int frame = 0;
         main.Draw = () => main.targetTexture.Value = ++frame;
         arms.Draw = () => arms.targetTexture.Value += 1000;

@@ -1778,9 +1778,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         binding.Apply();
         bool visible = binding.state.ShouldShow() && IsWindow(g_hWnd);
         g_captureOverlay.enabled = g_captureOverlayEnabled;
-        // Interactive menus always present directly. Capture must never become
-        // the visible input surface or add readbacks to the menu render path.
-        g_captureOverlay.Tick(g_gamePid, visible && !g_surfaceInteractive);
+        // Input stays on the native window. GPU sharing transfers the complete
+        // rendered UI without a CPU readback or a second ImGui render.
+        g_captureOverlay.Tick(g_gamePid, visible);
+        if (g_surfaceInteractive)
+        {
+            if (g_alphaCompositing)
+                g_composition.SetCaptured(g_captureOverlay.Active());
+            else
+                SetLayeredWindowAttributes(g_hWnd, RGB(0, 0, 0), g_captureOverlay.Active() ? 1 : 255,
+                                           LWA_COLORKEY | LWA_ALPHA);
+        }
         bool introReady = visible && g_pShared && SnapshotAge() < .5;
         suite_ui::lifecycle.Consider(suite_ui::LifecycleNow(), introReady, suite_ui::preferences,
                                      ActiveSpeedrun() ||
@@ -1984,7 +1992,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 if (g_surfaceInteractive)
                     CreateRenderTarget();
             }
-            if (occluded && g_surfaceInteractive)
+            if (occluded && g_surfaceInteractive && !g_captureOverlay.enabled)
             {
                 HRESULT probe = g_pSwapChain->Present(0, DXGI_PRESENT_TEST);
                 if (probe == DXGI_STATUS_OCCLUDED)
@@ -2000,6 +2008,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 else
                     occluded = false;
             }
+            if (g_captureOverlay.enabled)
+                occluded = false;
             if (!occluded && g_mainRenderTargetView)
             {
                 ImGui_ImplDX11_NewFrame();
@@ -2141,6 +2151,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
                     g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear);
                     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+                    bool gpuCapture = g_captureOverlay.PublishGpu(g_pd3dDevice, g_pd3dDeviceContext,
+                                                                  g_mainRenderTargetView);
+                    if (!gpuCapture && g_surfaceInteractive)
+                        g_captureOverlay.PublishMenu(g_pd3dDevice, g_pd3dDeviceContext,
+                                                     g_mainRenderTargetView, *ImGui::GetDrawData());
                     HRESULT present =
                         g_surfaceInteractive
                             ? g_pSwapChain->Present(0, 0)
@@ -2152,10 +2167,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                                    g_validityBadgeBounds, g_captureOverlay.Active() ? 0 : 255)
                                    ? S_OK
                                    : E_FAIL);
+                    // A composition visual hidden behind its acknowledged game
+                    // copy must keep producing frames for OBS and local input.
+                    if (present == DXGI_STATUS_OCCLUDED && g_captureOverlay.enabled)
+                        present = S_OK;
                     suite_ui::CommitLifecycleFrame(present == S_OK, GetTickCount64() / 1000.0);
                     if (!g_surfaceInteractive && SUCCEEDED(present))
                     {
-                        g_captureOverlay.Publish(g_layeredHud);
+                        if (!gpuCapture)
+                            g_captureOverlay.Publish(g_layeredHud);
                         auto region = g_layeredHud.PresentedRegion();
                         if (region.Width() > 0 && region.Height() > 0)
                         {

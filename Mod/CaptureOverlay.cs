@@ -17,6 +17,8 @@ public sealed class CaptureOverlay : IDisposable
     private uint serial;
     private int count, width, height;
     private double received;
+    private CaptureGpu gpu;
+    private bool gpuVisible;
 
     public CaptureOverlay(int pid)
     {
@@ -30,6 +32,10 @@ public sealed class CaptureOverlay : IDisposable
             view.Write(4, 1u);
             view.Write(8, (uint)Capacity);
             view.Write(12, pid);
+            view.Write(44,
+                       SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Direct3D11
+                           ? 0u
+                           : 2u);
         }
         catch
         {
@@ -40,9 +46,15 @@ public sealed class CaptureOverlay : IDisposable
 
     public void Tick(bool connected)
     {
+        if (gpu != null && gpu.Failed)
+        {
+            CloseGpu();
+            view.Write(44, 2u);
+        }
         if (!connected)
         {
             count = 0;
+            gpuVisible = false;
             return;
         }
         bool locked = false;
@@ -63,12 +75,45 @@ public sealed class CaptureOverlay : IDisposable
             if (view.ReadUInt32(36) == 0)
             {
                 count = 0;
+                gpuVisible = false;
                 return;
             }
             uint next = view.ReadUInt32(16);
             if (next == serial)
                 return;
             int w = view.ReadInt32(24), h = view.ReadInt32(28), n = view.ReadInt32(32);
+            if (view.ReadUInt32(40) == 1)
+            {
+                long handle = view.ReadInt64(48);
+                if (w < 1 || h < 1 || w > 16384 || h > 16384 || handle == 0)
+                    throw new InvalidOperationException("Invalid GPU capture dimensions");
+                gate.ReleaseMutex();
+                locked = false;
+                try
+                {
+                    if (gpu == null || gpu.Handle != handle || gpu.Image.width != w || gpu.Image.height != h)
+                    {
+                        CloseGpu();
+                        gpu = new CaptureGpu(handle, w, h);
+                    }
+                    if (gpu.Failed)
+                        throw new InvalidOperationException("GPU capture copy failed");
+                    view.Write(44, 1u);
+                    width = w;
+                    height = h;
+                    count = 0;
+                    serial = next;
+                    received = Time.realtimeSinceStartupAsDouble;
+                    gpuVisible = true;
+                }
+                catch
+                {
+                    CloseGpu();
+                    view.Write(44, 2u);
+                }
+                return;
+            }
+            gpuVisible = false;
             if (w < 1 || h < 1 || w > 16384 || h > 16384 || n < 1 || n > 4)
                 throw new InvalidOperationException("Invalid capture overlay dimensions");
             for (int i = 0; i < n; i++)
@@ -126,8 +171,13 @@ public sealed class CaptureOverlay : IDisposable
 
     public void Draw()
     {
-        if (count == 0 || Event.current.type != EventType.Repaint ||
-            Time.realtimeSinceStartupAsDouble - received > .35)
+        if (Event.current.type != EventType.Repaint)
+            return;
+        // Also drain a hidden pending image so an Alt-Tab cannot leave the
+        // producer waiting on a shared texture that nobody will consume.
+        if (gpu != null)
+            gpu.Schedule(serial);
+        if ((!gpuVisible && count == 0) || Time.realtimeSinceStartupAsDouble - received > .35)
             return;
         var matrix = GUI.matrix;
         var color = GUI.color;
@@ -138,10 +188,20 @@ public sealed class CaptureOverlay : IDisposable
                 Matrix4x4.Scale(new Vector3((float)Screen.width / width, (float)Screen.height / height, 1));
             GUI.color = Color.white;
             GUI.depth = -10000;
-            for (int i = 0; i < count; i++)
-                // Raw DX11 rows are top-down; Unity texture UVs are bottom-up.
-                GUI.DrawTextureWithTexCoords(bounds[i], images[i], new Rect(0, 1, 1, -1), true);
-            view.Write(20, serial);
+            if (gpuVisible && gpu != null)
+            {
+                GUI.DrawTextureWithTexCoords(new Rect(0, 0, width, height), gpu.Image, new Rect(0, 1, 1, -1),
+                                             true);
+                if (gpu.Copied != 0)
+                    view.Write(20, gpu.Copied);
+            }
+            else
+            {
+                for (int i = 0; i < count; i++)
+                    // Raw DX11 rows are top-down; Unity texture UVs are bottom-up.
+                    GUI.DrawTextureWithTexCoords(bounds[i], images[i], new Rect(0, 1, 1, -1), true);
+                view.Write(20, serial);
+            }
         }
         finally
         {
@@ -153,6 +213,7 @@ public sealed class CaptureOverlay : IDisposable
 
     public void Dispose()
     {
+        CloseGpu();
         count = 0;
         for (int i = 0; i < images.Length; i++)
             if (images[i] != null)
@@ -166,5 +227,15 @@ public sealed class CaptureOverlay : IDisposable
         view = null;
         mapping = null;
         gate = null;
+    }
+
+    private void CloseGpu()
+    {
+        gpuVisible = false;
+        if (gpu == null)
+            return;
+        gpu.Dispose();
+        UnityEngine.Object.Destroy(gpu.Image);
+        gpu = null;
     }
 }

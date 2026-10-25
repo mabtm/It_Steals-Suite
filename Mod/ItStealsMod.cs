@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.14.1";
+    public const string Version = "7.14.2";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;

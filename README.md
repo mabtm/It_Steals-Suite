@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.14.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.14.1)**
+**[v7.14.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.14.2)**
 
-- Fixed a bug caused by Recorded game sending the world camera to a different texture from the hands and game UI. The view and video export now keep the game's camera chain intact.
-- Fixed a bug caused by resetting the audio clock during recorder setup. Each run now keeps one PCM timeline, so setup delays cannot create artificial audio gaps.
-- Improved movement recording from the start of a run. A stationary setup interval is recognised only when both body observations agree and no physics step occurred. Missing samples still appear in Recording check.
+- Improved OBS capture with a shared DX11 texture for the complete trainer UI, including menus, Clip Studio and run verification. Busy capture frames are skipped without waiting; the UI is rendered once.
+- Fixed a bug caused by scenes with an unassigned BodyCam reference. Replay recording now finds the actual hand camera in the player's camera rig.
+- Improved attempt statistics by ignoring empty resets under four seconds.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

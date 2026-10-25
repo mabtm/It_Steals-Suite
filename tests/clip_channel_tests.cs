@@ -99,6 +99,14 @@ public static class GUI
     }
 }
 
+public static class GL
+{
+    public static void IssuePluginEvent(IntPtr callback, int id)
+    {
+        throw new InvalidOperationException("No GPU texture in the portable fixture");
+    }
+}
+
 public enum FilterMode
 {
     Point
@@ -140,6 +148,8 @@ public enum RenderTextureFormat
 
 public static class SystemInfo
 {
+    public static UnityEngine.Rendering.GraphicsDeviceType graphicsDeviceType =
+        UnityEngine.Rendering.GraphicsDeviceType.Direct3D11;
     public static bool Bgra = true, supportsAsyncGPUReadback = true;
 
     public static bool SupportsTextureFormat(TextureFormat f)
@@ -187,6 +197,11 @@ public sealed class RenderTexture : Object
 
 public sealed class Texture2D : Object
 {
+    public IntPtr GetNativeTexturePtr()
+    {
+        return IntPtr.Zero;
+    }
+
     public static int FullReads;
     public static Action Uploaded;
     public static int Uploads;
@@ -270,6 +285,11 @@ public struct RawData
 
 namespace UnityEngine.Rendering
 {
+public enum GraphicsDeviceType
+{
+    Direct3D11
+}
+
 public sealed class Job
 {
     public UnityEngine.RenderTexture Target;
@@ -641,6 +661,18 @@ public static class ClipChannelTests
             overlay.Tick(false);
             overlay.Draw();
             Check(UnityEngine.GUI.Draws == 2, "disconnect clears the in-game presentation");
+            capture.Write(40, 1u);
+            capture.Write(48, 123L);
+            capture.Write(16, 5u);
+            overlay.Tick(true);
+            Check(capture.ReadUInt32(44) == 2, "unavailable GPU sharing requests the CPU fallback");
+            overlay.Draw();
+            Check(UnityEngine.GUI.Draws == 2, "failed GPU setup never draws an uninitialised image");
+            capture.Write(40, 0u);
+            capture.Write(16, 6u);
+            overlay.Tick(true);
+            overlay.Draw();
+            Check(UnityEngine.GUI.Draws == 3, "CPU capture resumes after failed GPU setup");
             const int largeBytes = 1920 * 1080 * 4;
             var large = new byte[largeBytes];
             large[largeBytes - 1] = 193;

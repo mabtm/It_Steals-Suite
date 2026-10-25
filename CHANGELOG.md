@@ -2,6 +2,12 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.14.2 Changelog
+
+- Improved OBS capture with a shared DX11 texture for the complete trainer UI, including menus, Clip Studio and run verification. Busy capture frames are skipped without waiting; the UI is rendered once.
+- Fixed a bug caused by scenes with an unassigned BodyCam reference. Replay recording now finds the actual hand camera in the player's camera rig.
+- Improved attempt statistics by ignoring empty resets under four seconds.
+
 ### v7.14.1 Changelog
 
 - Fixed a bug caused by Recorded game sending the world camera to a different texture from the hands and game UI. The view and video export now keep the game's camera chain intact.
