@@ -10,6 +10,7 @@ class GraphicsComposition
     IDCompositionDevice *device = nullptr;
     IDCompositionTarget *target = nullptr;
     IDCompositionVisual *visual = nullptr;
+    IDCompositionEffectGroup *opacityEffect = nullptr;
     float opacity = 1;
 
   public:
@@ -26,9 +27,15 @@ class GraphicsComposition
         opacity = 1;
         if (visual)
         {
+            visual->SetEffect(nullptr);
             visual->SetContent(nullptr);
             visual->Release();
             visual = nullptr;
+        }
+        if (opacityEffect)
+        {
+            opacityEffect->Release();
+            opacityEffect = nullptr;
         }
         if (target)
         {
@@ -52,7 +59,7 @@ class GraphicsComposition
     void SetCaptured(bool captured)
     {
         float next = captured ? 0.f : 1.f;
-        if (visual && device && opacity != next && SUCCEEDED(visual->SetOpacity(next)))
+        if (opacityEffect && device && opacity != next && SUCCEEDED(opacityEffect->SetOpacity(next)))
         {
             if (SUCCEEDED(device->Commit()))
                 opacity = next;
@@ -104,6 +111,10 @@ class GraphicsComposition
             hr = device->CreateTargetForHwnd(window, TRUE, &target);
         if (SUCCEEDED(hr))
             hr = device->CreateVisual(&visual);
+        if (SUCCEEDED(hr))
+            hr = device->CreateEffectGroup(&opacityEffect);
+        if (SUCCEEDED(hr))
+            hr = visual->SetEffect(opacityEffect);
         if (SUCCEEDED(hr))
             hr = visual->SetContent(chain);
         if (SUCCEEDED(hr))
