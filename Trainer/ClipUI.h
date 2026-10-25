@@ -1461,7 +1461,7 @@ inline void Render()
             if (ImGui::BeginTabItem("Run check"))
             {
                 Help(
-                    "Full run videos include a fresh replay check and a eight-second run verification with the original check animation. Clip exports keep your chosen range and camera edits.");
+                    "Full run videos end with the same animated verification shown after a run. The closing sequence lasts eight seconds. Clip exports keep your range and camera edits.");
                 auto result = practice::g_replayArchive.Get()->revalidation;
                 if (result && result->run == run.id)
                     content.revalidation = result;
