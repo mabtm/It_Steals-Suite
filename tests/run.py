@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "frame_policy_tests": ["FramePolicy.cs"],
     "capture_gpu_tests": ["CaptureGpu.cs"],
     "recording_channels_tests": [
         "ReplaySceneData.cs",

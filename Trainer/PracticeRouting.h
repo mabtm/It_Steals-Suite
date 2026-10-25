@@ -948,6 +948,10 @@ inline RouteResult SolveOrderFlat(const double *matrix, int size, RouteWorkspace
     if (n <= 15 && exactWhenPossible)
     {
         result.exact = true;
+        std::array<std::array<double, 15>, 15> incoming;
+        for (int end = 0; end < n; end++)
+            for (int from = 0; from < n; from++)
+                incoming[end][from] = distance(from + 1, end + 1);
         unsigned masks = 1u << n;
         size_t entries = static_cast<size_t>(masks) * n;
         work.dp.resize(entries);
@@ -970,10 +974,11 @@ inline RouteResult SolveOrderFlat(const double *matrix, int size, RouteWorkspace
                     continue;
                 double best = Unreachable;
                 int8_t parent = -1;
+                const double *costs = work.dp.data() + previous * n;
                 for (unsigned froms = previous; froms; froms &= froms - 1)
                 {
                     int from = std::countr_zero(froms);
-                    double candidate = work.dp[previous * n + from] + distance(from + 1, end + 1);
+                    double candidate = costs[from] + incoming[end][from];
                     if (candidate < best)
                     {
                         best = candidate;

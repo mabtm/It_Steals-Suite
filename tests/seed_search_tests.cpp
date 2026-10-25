@@ -416,6 +416,10 @@ int main(int argc, char **argv)
                 row.seed = order.SeedAt(static_cast<uint32_t>(i));
                 row.selection = variedChoices[i];
                 row.route = matrix.Score(row.selection, fast, [] { return false; }, workspace);
+                matrix.FillBoundMatrix(row.selection, workspace);
+                auto reused = matrix.Score(row.selection, fast, [] { return false; }, workspace, true);
+                assert(reused.length == row.route.length && reused.order == row.route.order &&
+                       reused.estimated == row.route.estimated);
                 practice::RankSeed(oracle, std::move(row), static_cast<practice::SearchObjective>(goal));
             }
             for (int workers : {1, std::min(4, SeedWorkerLimit())})

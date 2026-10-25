@@ -16,6 +16,7 @@
 #include <iostream>
 
 bool g_autoStartGame = true;
+bool g_skipGameIntro = true;
 bool g_captureOverlayEnabled = false;
 bool g_overlayVisible = true, g_allOverlayEnabled = true, g_quit = false, g_resetLayout = false;
 bool g_compactMode = false, g_showMinimapWindow = true, g_showPath = false, minimapLockAspect = true;

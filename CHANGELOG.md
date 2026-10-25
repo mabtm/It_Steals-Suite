@@ -2,6 +2,13 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.15.0 Changelog
+
+- Improved seed search by sharing distance tables and reusing worker buffers. Layout scans and exact route scoring do less repeated work; seed coverage, route quality and Top 10 ordering stay the same.
+- Improved replay recording by skipping repeated pose calculations for stationary objects. Capture rates and stored poses stay the same. Diagnostics now include the OBS transfer work on the game thread.
+- Improved startup with a saved Skip game intro option under Settings > System. The game still initializes its sound and first-launch settings before opening the main menu.
+- Fixed a bug caused by the Windows launch-test fixture exiting during cleanup, which could incorrectly mark a successful launcher test as failed.
+
 ### v7.14.2 Changelog
 
 - Improved OBS capture with a shared DX11 texture for the complete trainer UI, including menus, Clip Studio and run verification. Busy capture frames are skipped without waiting; the UI is rendered once.

@@ -53,6 +53,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "Replay3DControls.h"
 
 bool g_autoStartGame = true;
+bool g_skipGameIntro = true;
 bool g_captureOverlayEnabled = false;
 std::string g_gameLaunchStatus = "Not requested";
 bool g_overlayVisible = false;
@@ -813,6 +814,7 @@ TrainerPreferences CollectPreferences()
     p.map = g_mapOptions;
     p.reports = g_reportsEnabled;
     p.autoStartGame = g_autoStartGame;
+    p.skipGameIntro = g_skipGameIntro;
     p.captureOverlay = g_captureOverlayEnabled;
     p.planner = g_plannerOptions;
     p.compact = g_compactMode;
@@ -855,6 +857,7 @@ void ApplyPreferences(TrainerPreferences p)
     g_mapOptions = p.map;
     g_reportsEnabled = p.reports;
     g_autoStartGame = p.autoStartGame;
+    g_skipGameIntro = p.skipGameIntro;
     g_captureOverlayEnabled = p.captureOverlay;
     g_plannerOptions = p.planner;
     g_compactMode = p.compact;
@@ -955,6 +958,7 @@ std::string BuildDiagnostics()
     out << "[Connection and build]\nAuthor: " << suite_brand::Author << "\nTrainer: " << suite_brand::Version
         << " / protocol " << kProtocolVersion << "\nMod: " << (g_pShared ? g_pShared->version : "--")
         << "\nAuto-start game: " << (g_autoStartGame ? "enabled" : "disabled")
+        << "\nSkip game intro: " << (g_skipGameIntro ? "enabled" : "disabled")
         << "\nLast game launch: " << g_gameLaunchStatus << "\nStatus: " << g_connectionStatus
         << "\nGame PID: " << g_gamePid;
     if (g_pShared)
@@ -1178,6 +1182,8 @@ void SyncCommands(bool visible)
     g_commands.runHudVisible =
         visible && g_validityBadgeDrawn && GetTickCount64() - g_badgePresentedTick < 250 ? 1u : 0u;
     g_commands.telemetryOptions = kTelemetryConfigured;
+    if (g_skipGameIntro)
+        g_commands.telemetryOptions |= kTelemetrySkipIntro;
     if (inspectorWanted)
         g_commands.telemetryOptions |= kTelemetryInspector;
     if (visible && suite_input::preferences.enabled && !suite_hud::active && !ClipInputRequested())

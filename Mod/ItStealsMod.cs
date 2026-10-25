@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.14.2";
+    public const string Version = "7.15.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -258,7 +258,8 @@ public sealed class ItStealsMod : MelonMod
             else if (request && commands.RunReviewRequest == 3 && !speedrun.Running)
                 speedrun.ResetStatistics();
             speedrun.AuditBeforeSuppression(commands);
-            framePolicy.Tick(commands, trainerConnected);
+            if (framePolicy.Tick(commands, trainerConnected))
+                return;
             bool hitboxes = allowed && commands.HitboxEnabled == 1;
             if (HitboxDrawer.Enabled && !hitboxes)
                 HitboxDrawer.Clear();
@@ -429,9 +430,9 @@ public sealed class ItStealsMod : MelonMod
 
     public override void OnLateUpdate()
     {
+        long workStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         if (captureOverlay != null)
             captureOverlay.Tick(trainerConnected);
-        long workStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         if (connection == null)
             return;
         try

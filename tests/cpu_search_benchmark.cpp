@@ -3,8 +3,9 @@
 #include <fstream>
 #include <iostream>
 
-int main()
+int main(int argc, char **argv)
 {
+    const uint64_t count = argc > 1 ? std::stoull(argv[1]) : 1000000;
     auto fixture = SeedFixture();
     fixture.vertices.clear();
     fixture.indices.clear();
@@ -42,34 +43,41 @@ int main()
     assert(source->data);
     std::cout
         << "Synthetic 9-spawn/34-point/18-crystal fixture; includes CPU generation, route distances, scoring, ranking and drawing. No live Unity or game FPS measurement.\n";
-    for (int workers : {1, 2, 6})
-        for (int repeat = 0; repeat < 3; repeat++)
-        {
-            practice::SeedSearch search;
-            auto request = StreamingRequest(*source, 1000000, workers, true);
-            auto start = std::chrono::steady_clock::now();
-            search.Begin(request);
-            search.Update(source);
-            auto result = AwaitStreaming(search);
-            assert(result->phase == practice::SearchPhase::Completed && result->evaluated == 1000000 &&
-                   result->generated == 1000000 && result->top.size() == 10);
-            double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-            std::cout << "route," << workers << ',' << repeat << ',' << seconds << ',' << 1000000 / seconds
-                      << ',' << result->top.front().seed << ',' << result->top.front().route.length << ','
-                      << result->scored << ',' << result->pruned << '\n';
-        }
-    practice::SeedSearch million;
-    auto request = StreamingRequest(*source, 10000000, 6, true);
-    request.layoutOnly = true;
-    auto start = std::chrono::steady_clock::now();
-    million.Begin(request);
-    million.Update(source);
-    auto result = AwaitStreaming(million);
-    assert(result->phase == practice::SearchPhase::Completed && result->evaluated == 10000000 &&
-           result->generated == 10000000 && result->top.size() == 10 && result->filtered == 0);
-    double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-    std::cout << "layout,6,0," << seconds << ',' << 10000000 / seconds << ',' << result->top.front().seed
-              << ",0\n";
+    if (argc < 3 || std::string_view(argv[2]) != "layout")
+        for (int workers : {1, 2, 6})
+            for (int repeat = 0; repeat < 3; repeat++)
+            {
+                if (argc > 3 && workers != std::stoi(argv[3]))
+                    continue;
+                practice::SeedSearch search;
+                auto request = StreamingRequest(*source, count, workers, true);
+                auto start = std::chrono::steady_clock::now();
+                search.Begin(request);
+                search.Update(source);
+                auto result = AwaitStreaming(search);
+                assert(result->phase == practice::SearchPhase::Completed && result->evaluated == count &&
+                       result->generated == count && result->top.size() == 10);
+                double seconds =
+                    std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+                std::cout << "route," << workers << ',' << repeat << ',' << seconds << ',' << count / seconds
+                          << ',' << result->top.front().seed << ',' << result->top.front().route.length << ','
+                          << result->scored << ',' << result->pruned << '\n';
+            }
+    for (int repeat = 0; repeat < 3; repeat++)
+    {
+        practice::SeedSearch million;
+        auto request = StreamingRequest(*source, count * 10, 6, true);
+        request.layoutOnly = true;
+        auto start = std::chrono::steady_clock::now();
+        million.Begin(request);
+        million.Update(source);
+        auto result = AwaitStreaming(million);
+        assert(result->phase == practice::SearchPhase::Completed && result->evaluated == count * 10 &&
+               result->generated == count * 10 && result->top.size() == 10 && result->filtered == 0);
+        double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        std::cout << "layout,6," << repeat << "," << seconds << ',' << count * 10 / seconds << ','
+                  << result->top.front().seed << ",0\n";
+    }
     std::ifstream memory("/proc/self/status");
     std::string line;
     while (std::getline(memory, line))

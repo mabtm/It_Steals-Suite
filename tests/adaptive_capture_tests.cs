@@ -126,6 +126,13 @@ class AdaptiveCaptureTests
         }
         Check(stillTrack.Frames.Count == 2,
               "quaternion normalization noise does not inflate stationary tracks");
+        stillSampler.Push(Pose(100.01, 20), false, true);
+        Check(stillSampler.Interval(100.01) == AdaptivePoseSampler.FastInterval &&
+                  stillSampler.Interval(101) == AdaptivePoseSampler.NormalInterval,
+              "stationary detail requests keep their sampling schedule");
+        stillSampler.Push(Pose(100.02, 20), true);
+        Check(stillTrack.Frames[stillTrack.Frames.Count - 1].Seconds == 100.02,
+              "stationary boundaries are never skipped");
         var longCapture = new ReplayVisualData { Recorded = true };
         var longTrack = longCapture.Track(longCapture.Owner(1, 0, 0, ""), 1, "");
         for (int n = 0; n < 400000; n++)

@@ -27,6 +27,7 @@ struct TrainerPreferences
     ReplayPreferences replay;
     bool reports = false;
     bool autoStartGame = true;
+    bool skipGameIntro = true;
     bool captureOverlay = false;
     bool rawSpawn = false;
     bool compact = false, minimap = true, path = false, lockAspect = true;
@@ -71,14 +72,14 @@ struct TrainerPreferences
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out.precision(9);
-        out << "version=18\nframeLimitMode=" << frameLimitMode << "\ngameFrameLimit=" << gameFrameLimit
+        out << "version=19\nframeLimitMode=" << frameLimitMode << "\ngameFrameLimit=" << gameFrameLimit
             << "\nvSyncMode=" << vSyncMode << "\nreports=" << reports << "\nrawSpawn=" << rawSpawn
             << "\ncompact=" << compact << "\nminimap=" << minimap << "\npath=" << path
             << "\nlockAspect=" << lockAspect << "\nplayer=" << player << "\ncrystals=" << crystals
             << "\nmonster=" << monster << "\nvisuals=" << visuals << "\nwidth=" << width
             << "\nheight=" << height << "\nfps=" << fps << "\nlevel=" << level << "\nseed=" << seed
             << "\nautoStartGame=" << autoStartGame << "\ncaptureOverlay=" << captureOverlay
-            << "\nopacity=" << opacity << '\n';
+            << "\nskipGameIntro=" << skipGameIntro << "\nopacity=" << opacity << '\n';
         const float *colors[] = {background, text, header, accent};
         const char *names[] = {"background", "text", "header", "accent"};
         for (int c = 0; c < 4; c++)
@@ -160,6 +161,8 @@ struct TrainerPreferences
                 result.autoStartGame = flag;
             else if (key == "captureOverlay" && (value == 0 || value == 1))
                 result.captureOverlay = flag;
+            else if (key == "skipGameIntro" && (value == 0 || value == 1))
+                result.skipGameIntro = flag;
             else if (key == "compact")
                 result.compact = flag;
             else if (key == "frameLimitMode")

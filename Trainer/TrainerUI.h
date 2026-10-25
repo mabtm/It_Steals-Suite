@@ -486,6 +486,9 @@ inline void RenderSystemSettings()
     suite_ui::Checkbox("Start It Steals with PracticeSuite", &g_autoStartGame);
     Help(
         "Start the installed game once when the trainer opens. An existing game is reused. The trainer closes when that game exits. Use --no-launch to skip automatic startup once.");
+    suite_ui::Checkbox("Skip game intro", &g_skipGameIntro);
+    Help(
+        "Go straight to the main menu after the game's startup initialization. Applies while the trainer is connected; game preferences and run scenes are unchanged.");
     ImGui::Separator();
     ImGui::TextColored(g_headerCol, "Interface");
     suite_ui::Checkbox("UI sounds", &suite_ui::preferences.sounds);
@@ -577,6 +580,7 @@ inline void RenderSettingsPage()
         defaults.seed = g_practiceSeed;
         defaults.reports = g_reportsEnabled;
         defaults.autoStartGame = g_autoStartGame;
+        defaults.skipGameIntro = g_skipGameIntro;
         ApplyPreferences(defaults);
     }
     if (suite_ui::Button("Save settings now"))

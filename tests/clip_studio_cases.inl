@@ -162,9 +162,8 @@ void Workshop751Cases(const std::string &output)
     previous.input.states = false;
     previous.input.events = true;
     auto legacySettings = previous.Encode();
-    auto versionAt = legacySettings.find("version=18");
-    assert(versionAt != std::string::npos);
-    legacySettings.replace(versionAt, 10, "version=17");
+    assert(legacySettings.starts_with("version="));
+    legacySettings.replace(0, legacySettings.find('\n'), "version=17");
     assert(TrainerPreferences::Decode(legacySettings).input.states);
     playPreview = false;
     for (int n = 0; n < 3; n++)

@@ -88,6 +88,14 @@ public sealed class AdaptivePoseSampler
                Cosine(a.Rotation, b.Rotation) > .9999999;
     }
 
+    private static bool Identical(ReplayVisualFrame a, ReplayVisualFrame b)
+    {
+        return a.Position.x == b.Position.x && a.Position.y == b.Position.y && a.Position.z == b.Position.z &&
+               a.Scale.x == b.Scale.x && a.Scale.y == b.Scale.y && a.Scale.z == b.Scale.z &&
+               a.Rotation.x == b.Rotation.x && a.Rotation.y == b.Rotation.y && a.Rotation.z == b.Rotation.z &&
+               a.Rotation.w == b.Rotation.w;
+    }
+
     private static bool Finite(float n)
     {
         return !float.IsNaN(n) && !float.IsInfinity(n) && Math.Abs(n) <= 100000;
@@ -178,6 +186,15 @@ public sealed class AdaptivePoseSampler
             return;
         }
         double dt = f.Seconds - previous.Seconds;
+        // Most scene transforms are stationary. Keep validation, transition
+        // boundaries and detail scheduling, without computing angular speed.
+        if (!boundary && dt <= .25 && count == 0 && Identical(anchor, f) && Identical(previous, f))
+        {
+            if (detail)
+                fastUntil = f.Seconds + .2;
+            previous = f;
+            return;
+        }
         double distance = Math.Sqrt(Distance2(previous.Position, f.Position));
         double turn = 2 * Math.Acos(Cosine(previous.Rotation, f.Rotation)) * 180 / Math.PI;
         bool cut = boundary || dt > .25 || distance > Math.Max(4, dt * 40);

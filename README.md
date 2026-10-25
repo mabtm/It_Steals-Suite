@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.14.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.14.2)**
+**[v7.15.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.15.0)**
 
-- Improved OBS capture with a shared DX11 texture for the complete trainer UI, including menus, Clip Studio and run verification. Busy capture frames are skipped without waiting; the UI is rendered once.
-- Fixed a bug caused by scenes with an unassigned BodyCam reference. Replay recording now finds the actual hand camera in the player's camera rig.
-- Improved attempt statistics by ignoring empty resets under four seconds.
+- Improved seed search by sharing distance tables and reusing worker buffers. Layout scans and exact route scoring do less repeated work; seed coverage, route quality and Top 10 ordering stay the same.
+- Improved replay recording by skipping repeated pose calculations for stationary objects. Capture rates and stored poses stay the same. Diagnostics now include the OBS transfer work on the game thread.
+- Improved startup with a saved Skip game intro option under Settings > System. The game still initializes its sound and first-launch settings before opening the main menu.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

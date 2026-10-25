@@ -24,9 +24,6 @@ class SearchDistances
 {
     const MapData &data;
     const NavGraph &graph;
-    std::vector<NavProjection> projections;
-    std::vector<std::vector<double>> lengths;
-    std::vector<std::vector<uint8_t>> estimates;
     int estimatedPairs = 0;
     std::unique_ptr<PickupRouting> pickups;
     std::shared_ptr<const PreparedRoutes> table;
@@ -34,16 +31,11 @@ class SearchDistances
   public:
     SearchDistances(const MapData &catalog, const NavGraph &nav, const Cancel &canceled,
                     const std::function<void(int, int)> &progress)
-        : data(catalog), graph(nav),
-          lengths(data.spawns.size() + data.points.size(),
-                  std::vector<double>(data.spawns.size() + data.points.size(), Unreachable)),
-          estimates(lengths.size(), std::vector<uint8_t>(lengths.size()))
+        : data(catalog), graph(nav)
     {
         table = graph.Routes(canceled, progress);
         int count = table->count;
-        projections = table->projected;
-        lengths = table->lengths;
-        estimates = table->estimates;
+        const auto &estimates = table->estimates;
         estimatedPairs = 0;
         for (int a = 0; a < count; a++)
             for (int b = std::max(a + 1, int(data.spawns.size())); b < count; b++)
@@ -59,12 +51,14 @@ class SearchDistances
 
     int ProjectedSpawns() const
     {
+        const auto &projections = table->projected;
         return static_cast<int>(std::count_if(projections.begin(), projections.begin() + data.spawns.size(),
                                               [](auto p) { return p.triangle >= 0; }));
     }
 
     int ProjectedPoints() const
     {
+        const auto &projections = table->projected;
         return static_cast<int>(std::count_if(projections.begin() + data.spawns.size(), projections.end(),
                                               [](auto p) { return p.triangle >= 0; }));
     }
@@ -101,16 +95,21 @@ class SearchDistances
     int FillMatrix(const Selection &selection, RouteWorkspace &work) const
     {
         int count = static_cast<int>(selection.crystals.size()) + 1;
+        std::array<int, 65> nodes;
+        for (int i = 0; i < count; i++)
+            nodes[i] = Node(selection, i);
         work.estimated = false;
         for (int from = 0; from < count; from++)
         {
+            const auto &lengths = table->lengths.at(nodes[from]);
+            const auto &estimates = table->estimates.at(nodes[from]);
             work.matrix[from * count + from] = 0;
             for (int to = from + 1; to < count; to++)
             {
-                int a = Node(selection, from), b = Node(selection, to);
-                work.matrix[from * count + to] = work.matrix[to * count + from] = lengths.at(a).at(b);
+                int b = nodes[to];
+                work.matrix[from * count + to] = work.matrix[to * count + from] = lengths.at(b);
                 if (estimatedPairs)
-                    work.estimated |= estimates.at(a).at(b) != 0;
+                    work.estimated |= estimates.at(b) != 0;
             }
         }
         return count;
@@ -127,10 +126,13 @@ class SearchDistances
         return count;
     }
 
-    RouteResult Score(const Selection &selection, bool fast, const Cancel &canceled,
-                      RouteWorkspace &work) const
+    RouteResult Score(const Selection &selection, bool fast, const Cancel &canceled, RouteWorkspace &work,
+                      bool boundPrepared = false) const
     {
-        int count = FillMatrix(selection, work);
+        // Contact lower bounds differ from center distances; only the latter
+        // can serve both pruning and scoring without filling the matrix twice.
+        int count = boundPrepared && !pickups->Active() ? static_cast<int>(selection.crystals.size()) + 1
+                                                        : FillMatrix(selection, work);
         auto result = SolveOrderFlat(work.matrix.data(), count, work, canceled, !fast);
         if (pickups->Active())
         {
@@ -149,7 +151,7 @@ class SearchDistances
             for (int index : result.order)
             {
                 int next = Node(selection, index + 1);
-                estimated |= estimates[previous][next] != 0;
+                estimated |= table->estimates[previous][next] != 0;
                 previous = next;
             }
         }
@@ -190,7 +192,7 @@ class SearchDistances
             if (canceled())
                 throw std::runtime_error("Canceled");
             int next = Node(selection, index + 1);
-            bool estimated = estimates.at(previous).at(next) != 0;
+            bool estimated = table->estimates.at(previous).at(next) != 0;
             for (auto point : table->Between(previous, next).points)
                 AppendRoutePoint(result, point, estimated);
             previous = next;
@@ -459,6 +461,8 @@ class SeedSearch
         {
             std::vector<CachedRoute> cache(distances ? 4096 : 0);
             RouteWorkspace workspace;
+            std::vector<SeedResult> top;
+            top.reserve(11);
             std::unique_ptr<PortableSelectionGenerator> generator;
             std::shared_ptr<SeedBatch> localBuffer;
             RandomSeedOrder order(job->state.request.key);
@@ -473,7 +477,7 @@ class SeedSearch
                 double cutoff = Unreachable;
                 if (generator)
                 {
-                    constexpr uint64_t chunk = 64;
+                    const uint64_t chunk = distances ? 64 : 256;
                     uint64_t begin = job->nextIndex.fetch_add(chunk);
                     if (begin >= job->state.request.count)
                         return;
@@ -514,7 +518,7 @@ class SeedSearch
                     if (job->state.top.size() == 10 && !job->state.top.back().route.estimated)
                         cutoff = job->state.top.back().route.length;
                 }
-                std::vector<SeedResult> top;
+                top.clear();
                 uint64_t done = 0, estimated = 0, filtered = 0, scored = 0, pruned = 0, matched = 0, hits = 0;
                 auto flush = [&] {
                     std::lock_guard<std::mutex> lock(job->gate);
@@ -546,12 +550,16 @@ class SeedSearch
                     else if (!distances)
                     {
                         matched++;
-                        SeedResult row;
-                        row.seed = layout.seed;
-                        row.index = batch->offset + i;
-                        row.selection = selection;
-                        row.route.message = "Verified spawn layout; route length unavailable.";
-                        RankSeed(top, std::move(row));
+                        uint64_t index = batch->offset + i;
+                        if (WouldRank(top, selection, 0, index, criteria.objective))
+                        {
+                            SeedResult row;
+                            row.seed = layout.seed;
+                            row.index = index;
+                            row.selection = selection;
+                            row.route.message = "Verified spawn layout; route length unavailable.";
+                            RankSeed(top, std::move(row), criteria.objective);
+                        }
                     }
                     else
                     {
@@ -597,8 +605,8 @@ class SeedSearch
                                 }
                             }
                             if (keep)
-                                entry.score =
-                                    distances->Score(selection, job->state.request.fast, canceled, workspace);
+                                entry.score = distances->Score(selection, job->state.request.fast, canceled,
+                                                               workspace, true);
                             if (keep || std::isfinite(lower))
                             {
                                 entry.spawn = selection.spawn;

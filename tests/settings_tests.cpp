@@ -96,9 +96,11 @@ int main(int argc, char **argv)
     for (auto &entry : std::filesystem::directory_iterator(path.parent_path()))
         if (entry.is_regular_file())
             std::filesystem::remove(entry);
+    assert(TrainerPreferences::Decode("version=18\nseed=11\n").skipGameIntro);
     TrainerPreferences p;
     p.seed = 123;
     p.captureOverlay = true;
+    p.skipGameIntro = false;
     p.experience.volume = .34f;
     p.experience.motion = false;
     p.experience.sounds = false;
@@ -118,8 +120,9 @@ int main(int argc, char **argv)
     {
         TrainerSettings settings;
         auto loaded = settings.Load();
-        assert(loaded.seed == 124 && loaded.captureOverlay && !loaded.experience.motion &&
-               !loaded.experience.sounds && std::abs(loaded.experience.volume - .34f) < 1e-6);
+        assert(loaded.seed == 124 && loaded.captureOverlay && !loaded.skipGameIntro &&
+               !loaded.experience.motion && !loaded.experience.sounds &&
+               std::abs(loaded.experience.volume - .34f) < 1e-6);
         assert(std::filesystem::exists(path.string() + ".bak"));
     }
     Write(path, std::string(270000, 'X'));

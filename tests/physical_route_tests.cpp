@@ -72,6 +72,10 @@ int main(int argc, char **argv)
         RouteWorkspace work;
         int count = distances.FillBoundMatrix(selection, work);
         assert(MstRouteLowerBound(work.matrix.data(), count, [] { return false; }) <= score.length + 1e-6);
+        auto reused = distances.Score(selection, false, [] { return false; }, work, true);
+        assert(reused.length == score.length && reused.order == score.order &&
+               reused.contacts == score.contacts && reused.pickupOptimized == score.pickupOptimized &&
+               reused.estimated == score.estimated);
         // A complete AI floor containing a real wall is insufficient. All modes
         // must detour using the player's radius, even Outside's smaller AI bake.
         d = World(scene);

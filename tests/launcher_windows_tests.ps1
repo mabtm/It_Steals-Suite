@@ -136,10 +136,13 @@ public class ControlledGame {
     if ($fixtureExecutable) {
         foreach ($candidate in @(Get-Process -Name 'It Steals' -ErrorAction SilentlyContinue)) {
             try {
-                if ($candidate.MainModule.FileName -eq $fixtureExecutable) {
+                $module = $candidate.MainModule
+                if ($module -and $module.FileName -eq $fixtureExecutable) {
                     $candidate.Kill()
                     $null=$candidate.WaitForExit(5000)
                 }
+            } catch [System.InvalidOperationException] {
+                # The fixture may have exited between enumeration and inspection.
             } finally { $candidate.Dispose() }
         }
     }

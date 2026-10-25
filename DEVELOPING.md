@@ -55,7 +55,7 @@ Game, Unity, MelonLoader, and Harmony assemblies are local build inputs. Keep th
 
 ## Check a change
 
-Python 3 and a C++20 compiler run the native tests. `--ui` adds real ImGui interaction tests; `--managed` adds six C# contract programs and requires Mono's `mcs` and `mono`.
+Python 3 and a C++20 compiler run the native tests. `--ui` adds real ImGui interaction tests; `--managed` adds C# contract programs and requires Mono's `mcs` and `mono`.
 
 ```sh
 python3 generate-layout.py --check
@@ -71,6 +71,33 @@ python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests 
 
 Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests; compile it separately against the matching game SDK and loader.
 
+### Performance comparison: 7.14.2 to 7.15.0
+
+Local Linux benchmarks used the same compiler, deterministic fixtures and interleaved before/after runs. Values below are medians. These measure isolated CPU paths, not game FPS or every map's search speed.
+
+| Workload | 7.14.2 | 7.15.0 | Scope |
+| --- | --- | --- | --- |
+| Layout-only CPU scan, 6 workers | 4.47M/s | 13.18M/s | 5M layouts per run, 9 runs per build |
+| Exact scoring, 14 crystals | 1,071/s | 1,387/s | 48 unique layouts, 3 runs per build |
+| Heuristic scoring, 14 crystals | 58,054/s | 64,069/s | 3,000 unique layouts, 3 runs per build |
+| Stationary pose sampling | 185 ms | 108 ms | 480,200 observations, 3 runs per build |
+| Additional live allocation for prepared search distances | 1,411,264 bytes | 47,248 bytes | 384-node catalog, excludes the shared table and process RSS |
+
+Full 18-crystal heuristic searches stayed around 60,000 seeds/s with two workers; this fixture showed no material overall gain. The 22/40-crystal heuristic scoring benchmarks also stayed effectively unchanged. Route lengths and order hashes matched. All four pose profiles retained byte-identical serialized output and the same adaptive sampling schedules. Heavy route searches retain their existing 64-seed work packets and cancellation checks.
+
+Build each benchmark against the desired revision's headers; use the same current benchmark source on both revisions. Run timings sequentially without compiling or testing in parallel:
+
+```sh
+g++ -std=c++20 -O2 -pthread -ITrainer tests/cpu_search_benchmark.cpp -o build/cpu-benchmark
+build/cpu-benchmark 500000 layout
+g++ -std=c++20 -O2 -pthread -DSEARCHLAB_WORKSPACE -ITrainer tests/route_order_benchmark.cpp -o build/route-benchmark
+build/route-benchmark
+g++ -std=c++20 -O2 -pthread -ITrainer tests/distance_table_benchmark.cpp -o build/distance-benchmark
+build/distance-benchmark
+mcs -langversion:7.2 -optimize+ -main:PoseSamplingBenchmark -out:build/pose-benchmark.exe tests/pose_sampling_benchmark.cs tests/adaptive_capture_tests.cs Mod/ReplayVisualData.cs Mod/AdaptivePoseSampler.cs Mod/ReplayCoverage.cs
+mono build/pose-benchmark.exe 200
+```
+
 The Windows release job also encodes 1080p clips at 60 FPS (653 frames) and 120 FPS (587 and 3,601 frames) with the supplied encoder, checks the AVI stream clocks, and decodes the recorded PCM for an exact comparison. Moving RGB bars exercise frame order and spatial detail. To repeat it, run `python tests/verify_audio_exports.py build/verification/replay_experience_tests/work bin/PracticeSuiteEncoder.exe --avi-only`. If independent FFmpeg and ffprobe are installed, it also checks every video timestamp and decoded RGB frame. These checks verify encoded files; they do not measure playback speed in a user's media player.
 
 ## Check in game
@@ -78,6 +105,7 @@ The Windows release job also encodes 1080p clips at 60 FPS (653 frames) and 120 
 Use the release downloads and note the Suite version. Mark each check **Passed**, **Failed**, or **Not tested**. Keep results and diagnostic reports with the test discussion or bug report.
 
 - **Install and start:** Check that Setup finds the correct game folder. Launch the desktop shortcut, open the menu with **F3**, and confirm the game is connected. Alt-Tab away and back; check overlay visibility, cursor control, and windowed/borderless mode.
+- **Intro preference:** With Skip game intro enabled, restart through the Suite and check that the main menu opens with working cursor, sound and saved quality settings. Disable it and restart; the normal intro returns. A disconnected trainer and later run/death scenes must not trigger the skip.
 - **Map and seed:** Compare walls, player spawn, crystals, and movement with the minimap. In Practice, use **Apply Seed & Reload** twice with the same seed and seed type; compare the player and crystal spawns. Seed numbers need the matching **Practice base seed** or **Captured spawn seed** setting. For Timer, test a subsequent start; its first start forces spawn #5.
 - **Run and replay:** Set the **Recording rule** low enough to retain the test attempts before starting. Complete one run and abort another with **ESC**. Check their outcomes, then open each replay and compare movement, pickups, enemy observations, and light flashes with what happened. Pause, seek, and test 3D playback; after leaving it, check game input, camera, and audio.
 - **Archive and camera editor:** Name a retained replay, export its package, and reopen the replay after restarting the Suite. Import the package and check that the existing run stays intact. In Clip Studio, add and adjust a camera keypoint, preview the move, and export a short clip. Check the saved file's picture, duration, and sound if recorded.
@@ -168,7 +196,7 @@ For a local Windows package build, install **NSIS 3**, then run:
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
-Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.14.2**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
+Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.15.0**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
 Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
 
