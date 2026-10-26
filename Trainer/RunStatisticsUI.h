@@ -9,9 +9,15 @@ inline int setupSeed = 0;
 inline std::array<std::string, 8> pbLabels;
 inline std::array<double, 8> pbFlash{};
 
+inline bool CanStart()
+{
+    return g_pShared && !HasPendingRequest() &&
+           (!setupPractice || !setupFixed || g_pShared->rngPatchComplete);
+}
+
 inline bool StartSelected()
 {
-    if (!g_pShared || HasPendingRequest())
+    if (!CanStart())
         return false;
     g_selectedSpeedrunLevel = dashboard.selected;
     g_practiceMode = setupPractice;
@@ -149,7 +155,7 @@ inline void Details()
     if (suite_ui::Button("Close"))
         ImGui::CloseCurrentPopup();
     SameLineIfFits("Start this mode");
-    ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
+    ImGui::BeginDisabled(!CanStart());
     if (suite_ui::Button("Start this mode") && StartSelected())
         ImGui::CloseCurrentPopup();
     ImGui::EndDisabled();
@@ -173,6 +179,8 @@ inline void Settings()
                 }
                 suite_ui::Checkbox("Use captured spawn seed", &setupSpawn);
                 Help("Captured Seed Map seeds use the spawn seed option. These runs are SET PRACTICE.");
+                if (g_pShared && !g_pShared->rngPatchComplete)
+                    ImGui::TextWrapped("Fixed seeds require all RNG hooks to be ready before starting.");
             }
         }
         ImGui::TextWrapped(
@@ -326,9 +334,11 @@ inline void Render()
     if (!compactFooter)
         ImGui::Text("Selected: %s  /  %s", kMapLevelNames[dashboard.selected],
                     setupPractice ? "Practice" : "Clean Speedrun");
-    ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
+    ImGui::BeginDisabled(!CanStart());
     if (suite_ui::Button(shortLabels ? "Start mode" : "Start selected mode"))
         StartSelected();
+    ImGui::EndDisabled();
+    ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
     if (g_speedrunMode)
     {
         const char *disable = shortLabels ? "Disable" : "Disable Speedrun";

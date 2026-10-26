@@ -108,6 +108,12 @@ void RunStatisticsCases(const std::string &output)
             if (!output.empty())
                 Dump(output + "/mode-details-" + std::to_string(int(viewport.x)) + "-" +
                      std::to_string(int(dpi * 100)) + ".draw");
+            if (run_stats::setupFixed)
+            {
+                data.rngPatchComplete = 0;
+                assert(!run_stats::StartSelected() && !g_commands.speedrunLoadLevelCmd && !g_speedrunMode);
+                data.rngPatchComplete = 1;
+            }
             io.AddMousePosEvent(start.GetCenter().x, start.GetCenter().y);
             io.AddMouseButtonEvent(0, true);
             controls();
