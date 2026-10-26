@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "SeedSearch.h"
 #include "seed_map_fixture.h"
 #include <cassert>
