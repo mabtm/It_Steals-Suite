@@ -15,6 +15,7 @@ public sealed class RunStore : IDisposable
     private readonly SortedDictionary<int, int[]> days = new SortedDictionary<int, int[]>();
     public readonly List<RunRecord> History = new List<RunRecord>();
     public RunRecord Active;
+    public readonly ModeStatistics Modes = new ModeStatistics();
     public int Runs, Finished, Deaths, Resets, TimedResets;
     public double TotalFinishedTime, TotalResetTime;
     public float FurthestProgress;
@@ -109,6 +110,10 @@ public sealed class RunStore : IDisposable
         if (old > 0 && time >= old)
             return false;
         best[scene] = time;
+        int mode = Array.IndexOf(ModeStatistics.Scenes, scene);
+        if (mode >= 0)
+            Modes.BestUtc[mode] = DateTime.UtcNow.Ticks;
+        Modes.Revision++;
         return true;
     }
 
@@ -183,6 +188,7 @@ public sealed class RunStore : IDisposable
         FurthestProgress = 0;
         days.Clear();
         History.Clear();
+        Modes.Clear();
         QueueSave();
         return true;
     }
@@ -364,6 +370,8 @@ public sealed class RunStore : IDisposable
 
     private void ClearLoaded()
     {
+        Modes.Clear();
+        Array.Clear(Modes.BestUtc, 0, Modes.BestUtc.Length);
         Runs = Finished = Deaths = Resets = TimedResets = 0;
         TotalFinishedTime = TotalResetTime = 0;
         FurthestProgress = 0;
@@ -391,7 +399,7 @@ public sealed class RunStore : IDisposable
         foreach (string line in lines)
             if (line.StartsWith("version=", StringComparison.Ordinal))
                 int.TryParse(line.Substring(8).Trim(), out version);
-        if (version > 7)
+        if (version > 8)
             throw new NotSupportedException(
                 "Run data belongs to a newer suite; writes are disabled to preserve it.");
         if (version < 3)
@@ -427,6 +435,8 @@ public sealed class RunStore : IDisposable
             if (split <= 0)
                 continue;
             string key = line.Substring(0, split), value = line.Substring(split + 1);
+            if (version >= 8 && Modes.Read(key, value))
+                continue;
             if (key == "history" || key == "active")
             {
                 RunRecord r = Unpack(value);
@@ -510,7 +520,7 @@ public sealed class RunStore : IDisposable
     private string Encode()
     {
         var text = new StringBuilder(4096);
-        text.Append("version=7\nruns=")
+        text.Append("version=8\nruns=")
             .Append(Runs)
             .Append("\nfinished=")
             .Append(Finished)
@@ -527,6 +537,7 @@ public sealed class RunStore : IDisposable
             .Append("\nfurthest=")
             .Append(FurthestProgress.ToString("R", culture))
             .Append('\n');
+        Modes.Write(text);
         var keys = new List<int>(best.Keys);
         keys.Sort();
         foreach (int key in keys)

@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.16.2";
+    public const string Version = "7.19.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -335,8 +335,7 @@ public sealed class ItStealsMod : MelonMod
                     planner.Fail(error);
                     Report(error);
                 }
-            if (!Replay3D.Reserved)
-                speedrun.Tick();
+            speedrun.Tick();
             if (!Replay3D.Reserved &&
                 (speedrun.NeedsDeathReload ||
                  (MenuCursor.GameHotkeysAllowed && commands.Speedrun && Input.GetKeyDown(KeyCode.T) &&

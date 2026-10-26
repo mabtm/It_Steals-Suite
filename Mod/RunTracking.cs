@@ -7,16 +7,6 @@ public enum SeedKind : byte
     Set
 }
 
-public enum RunOutcome : byte
-{
-    Running,
-    Completed,
-    Reset,
-    Death,
-    Interrupted,
-    Abandoned
-}
-
 [Flags]
 public enum RunAids : uint
 {
@@ -155,6 +145,7 @@ public sealed class RunTracker
                                        Environment = environment == null ? null : environment.Copy(),
                                        ExportReport = exportReport };
         lastFeatures = aids;
+        store.Modes.Begin(scene, (aids & (RunAids.Practice | RunAids.FixedSeed)) != 0);
         Event("RunStart", aids.ToString());
         if (!observedFromStart)
             Warn(RunWarnings.StateUnavailable);
@@ -264,6 +255,8 @@ public sealed class RunTracker
         record.Outcome = outcome;
         bool quickReset = (outcome == RunOutcome.Reset || outcome == RunOutcome.Interrupted) &&
                           record.Seconds < 4 && record.Progress <= 0;
+        store.Modes.End(record.Scene, (record.InitialAids & (RunAids.Practice | RunAids.FixedSeed)) != 0,
+                        outcome, record.Seconds, quickReset);
         if (quickReset)
         {
             store.UncountAttempt(record.StartedUtc);

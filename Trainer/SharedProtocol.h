@@ -3,10 +3,11 @@
 #include <cstddef>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 using byte = std::uint8_t;
-inline constexpr char kMapName[] = "ItStealsSharedMem.v29";
-inline constexpr char kMutexName[] = "ItStealsSharedMem.v29.Lock";
-inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 29;
+inline constexpr char kMapName[] = "ItStealsSharedMem.v30";
+inline constexpr char kMutexName[] = "ItStealsSharedMem.v30.Lock";
+inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 30;
 inline constexpr size_t kMappingSize = 32768, kCommandOffset = 64, kPayloadOffset = 256;
 inline constexpr uint32_t kTelemetryConfigured = 0x80000000u, kTelemetryMap = 1, kTelemetryPath = 2, kTelemetryDetails = 4, kTelemetryLive = 8;
 inline constexpr uint32_t kTelemetryWalls=16,kTelemetryCrystals=32,kTelemetryMonster=64,kTelemetryPlanner=128,kTelemetryGeometry=256,kTelemetryInputs=1024,kTelemetryInspector=2048;
@@ -251,6 +252,16 @@ struct GameData {
     int inputEventCount;
     byte inputEvents[192];
     float inputGameAxes[6];
+    long long modeStatsSinceUtc;
+    int modeStatsRevision;
+    int modeAttempts[24];
+    int modeFinished[24];
+    int modeResets[24];
+    int modeDeaths[24];
+    double modeFinishSeconds[24];
+    double modePlaySeconds[24];
+    double modePersonalBest[8];
+    long long modePbUtc[8];
 };
 struct TrainerCommands {
     uint32_t serial = 0, heartbeat = 0;
@@ -282,7 +293,7 @@ struct SharedHeader {
     byte reserved[20];
 };
 #pragma pack(pop)
-static_assert(sizeof(GameData) == 16952);
+static_assert(sizeof(GameData) == 17860);
 static_assert(sizeof(TrainerCommands) == 192);
 static_assert(sizeof(SharedHeader) == 64);
 static_assert(offsetof(SharedHeader, commandAck) == 40);
@@ -538,6 +549,16 @@ static_assert(offsetof(GameData, inputFlash) == 16728);
 static_assert(offsetof(GameData, inputEventCount) == 16732);
 static_assert(offsetof(GameData, inputEvents) == 16736);
 static_assert(offsetof(GameData, inputGameAxes) == 16928);
+static_assert(offsetof(GameData, modeStatsSinceUtc) == 16952);
+static_assert(offsetof(GameData, modeStatsRevision) == 16960);
+static_assert(offsetof(GameData, modeAttempts) == 16964);
+static_assert(offsetof(GameData, modeFinished) == 17060);
+static_assert(offsetof(GameData, modeResets) == 17156);
+static_assert(offsetof(GameData, modeDeaths) == 17252);
+static_assert(offsetof(GameData, modeFinishSeconds) == 17348);
+static_assert(offsetof(GameData, modePlaySeconds) == 17540);
+static_assert(offsetof(GameData, modePersonalBest) == 17732);
+static_assert(offsetof(GameData, modePbUtc) == 17796);
 
 inline bool ValidCoordinate(float value) {
     return std::isfinite(value) && std::fabs(value) <= 1000000.0f;
@@ -595,6 +616,23 @@ inline void SanitizeSnapshot(GameData& data) {
     if (!std::isfinite(data.sessionTimeSeconds) || data.sessionTimeSeconds < 0) data.sessionTimeSeconds = 0;
     if (!std::isfinite(data.averageResetSeconds) || data.averageResetSeconds < 0) data.averageResetSeconds = 0;
     data.statsError[95] = '\0';
+    data.modeStatsSinceUtc = data.modeStatsSinceUtc > 0 && data.modeStatsSinceUtc <= 3155378975999999999LL ? data.modeStatsSinceUtc : 0;
+    for (int i = 0; i < 24; i++) {
+        data.modeAttempts[i] = std::max(0, int(data.modeAttempts[i]));
+        data.modeFinished[i] = std::clamp(int(data.modeFinished[i]), 0, int(data.modeAttempts[i]));
+        data.modeResets[i] = std::clamp(int(data.modeResets[i]), 0, int(data.modeAttempts[i]));
+        data.modeDeaths[i] = std::clamp(int(data.modeDeaths[i]), 0, int(data.modeResets[i]));
+        for (double* seconds : {&data.modeFinishSeconds[i], &data.modePlaySeconds[i]}) {
+            double value; std::memcpy(&value, seconds, sizeof(value));
+            value = std::isfinite(value) && value >= 0 ? std::min(value, 3153600000.) : 0;
+            std::memcpy(seconds, &value, sizeof(value));
+        }
+    }
+    for (int i = 0; i < 8; i++) {
+        double pb = data.modePersonalBest[i];
+        data.modePersonalBest[i] = std::isfinite(pb) && pb > 0 && pb <= 315360000 ? pb : 0;
+        data.modePbUtc[i] = data.modePbUtc[i] > 0 && data.modePbUtc[i] <= 3155378975999999999LL ? data.modePbUtc[i] : 0;
+    }
     data.totalObjectives = std::clamp(data.totalObjectives, 0, 100000);
     data.objectives = std::clamp(data.objectives, 0, data.totalObjectives);
     data.playerRotY = std::isfinite(data.playerRotY) ? std::fmod(data.playerRotY, 360.f) : 0;

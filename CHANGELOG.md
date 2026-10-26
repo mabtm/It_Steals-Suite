@@ -2,6 +2,13 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.19.0 Changelog
+
+- Improved the Speedrun page with a responsive eight-mode dashboard, clean personal bests, attempts, finishes and time played. Mode details show completion rates, resets, deaths, average finishes and recent attempts; All, Clean and Practice filters keep the overview focused.
+- Improved statistics persistence with bounded per-mode counters and active playtime, recorded from this update onward. Earlier personal bests and lifetime counters remain intact; menus, loading, pauses, replay playback and unfocused intervals do not add playtime. Resetting statistics preserves personal bests and saved replays.
+- Improved mode selection with safe browsing, draft practice/seed settings and an explicit Start action. Short entry, hover and personal-best animations respect reduced motion, formatted statistics are cached, and the Inspector now has its own magnifying-glass icon.
+- Improved verification with real mod-binary migration/save/recovery tests, dashboard interaction and DPI checks, Windows statistics checks, and documented comparisons of twelve seed-algorithm variants. None offered a reliable improvement for wide-contact Outside searches, so the verified 7.18.1 search remains in use.
+
 ### v7.18.1 Changelog
 
 - Improved large-layout seed scoring by preparing the crystal-neighbor order once per map and filtering it for each seed. Equal-distance ties, all starting routes, optimization passes and ranking stay the same. This also reduces work when pickup-contact bounds cannot reject seeds.

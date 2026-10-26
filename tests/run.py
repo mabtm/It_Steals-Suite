@@ -2,16 +2,23 @@
 """Build and run portable production-logic tests without the game SDK."""
 
 import argparse
+import hashlib
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
 import time
+import re
+import urllib.request
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "mode_statistics_tests": ["ModeStatistics.cs"],
+    "statistics_store_tests": [],
     "frame_policy_tests": ["FramePolicy.cs"],
     "capture_gpu_tests": ["CaptureGpu.cs"],
     "recording_channels_tests": [
@@ -69,6 +76,7 @@ def run_logged(command, log, cwd, env=None, timeout=600):
 
 def arguments(name, work, fixtures):
     pairs = {
+        "statistics_store_tests": [work],
         "planner_tests": [work, fixtures / "map-wire.bin"],
         "seed_search_tests": [
             fixtures / "seed-batch-wire.bin",
@@ -149,6 +157,9 @@ def execute(name, managed, args, root, output, fixtures):
                 "-out:" + str(executable),
                 *sources,
             ]
+            if name == "statistics_store_tests":
+                command.append("-r:" + str(root / "bin/ItStealsHelper.dll"))
+                shutil.copy2(root / "bin/ItStealsHelper.dll", folder / "ItStealsHelper.dll")
             if name == "clip_channel_tests":
                 runs = [
                     ["mono", executable, mode]
@@ -161,7 +172,9 @@ def execute(name, managed, args, root, output, fixtures):
                     )
                 ]
             else:
-                runs = [["mono", executable]]
+                runs = [["mono", executable, *arguments(name, work, fixtures)]]
+            if name == "statistics_store_tests":
+                runs[0].append(root / "Trainer/SuiteBranding.h")
         else:
             flags = ["-std=c++20", "-pthread", "-O0" if name == "ui_tests" else "-O2"]
             if args.sanitize:
@@ -205,6 +218,8 @@ def execute(name, managed, args, root, output, fixtures):
         if result["buildExitCode"]:
             raise RuntimeError("Compilation failed; see " + str(folder / "build.log"))
         environment = os.environ.copy()
+        if name == "statistics_store_tests":
+            environment["MONO_PATH"] = str(output / "loader")
         if name == "capture_gpu_tests":
             environment["LD_LIBRARY_PATH"] = (
                 str(work) + os.pathsep + environment.get("LD_LIBRARY_PATH", "")
@@ -278,6 +293,20 @@ def main():
         if not shutil.which(tool):
             parser.error("Required executable not found: " + tool)
     output.mkdir(parents=True, exist_ok=True)
+    if ("statistics_store_tests", True) in selected:
+        # Use the same pinned official loader as Setup; no proprietary game SDK.
+        installer = (root / "Installer/Install.ps1").read_text()
+        url = re.search(r"\$script:LoaderUrl = '([^']+)'", installer)[1]
+        digest = re.search(r"\$script:LoaderHash = '([^']+)'", installer)[1]
+        with urllib.request.urlopen(url, timeout=30) as response:
+            archive = response.read()
+        if hashlib.sha256(archive).hexdigest() != digest:
+            raise RuntimeError("Official loader checksum mismatch")
+        loader = output / "loader"
+        loader.mkdir(exist_ok=True)
+        with zipfile.ZipFile(io.BytesIO(archive)) as package:
+            for name in ("MelonLoader.dll", "0Harmony.dll"):
+                (loader / name).write_bytes(package.read("MelonLoader/net472/" + name))
     subprocess.run(
         [sys.executable, root / "generate-layout.py", "--check"], cwd=root, check=True
     )

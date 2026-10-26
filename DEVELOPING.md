@@ -69,7 +69,41 @@ Use `--only TEST_NAME`, `--output DIRECTORY`, or `--compiler COMPILER` for a foc
 python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests routing_reliability_tests --output build/sanitized
 ```
 
-Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests; compile it separately against the matching game SDK and loader.
+Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests; compile it separately against the matching game SDK and loader. The managed statistics storage test executes the supplied DLL and verifies its version, migration and persistence. It downloads and checksums the same official loader pinned by Setup; no proprietary game assemblies are required for that test.
+
+### Mode dashboard and statistics: 7.19.0
+
+**Mod/ModeStatistics.cs** owns 24 fixed rows: eight modes times Normal, Clean and Practice. The existing run tracker owns attempt boundaries and the exclusion of empty resets under four seconds. Initial practice/seed aids determine the attempt category. Normal play contributes time without inventing speedrun attempts. The clock credits consecutive observations in the same playable mode/category, separated by at most 0.5 seconds, with focus, living player and remaining objectives; menu ownership, time-scale pause, replay and loading intervals are excluded. A long stall is excluded conservatively. No per-frame allocation is needed. Time is queued through the existing coalesced atomic writer at most once per five seconds; run events retain their existing save behavior.
+
+Run data format 8 keeps the existing checksums, backup recovery and forward-version read-only protection. Old global totals and PBs survive migration; full per-mode counters start at the displayed tracking date, since the bounded old history cannot reconstruct lifetime totals. PB dates missing from older files remain unknown. Resetting counters clears playtime and tracking origin while preserving PBs, their known dates and replays. Protocol 30 appends 908 bytes without changing preceding payload offsets. Both trainer and mod must be updated together.
+
+**Trainer/RunStatistics.h** caches eight formatted rows once per second or on run revision, process, tracking-origin or filter changes. The last snapshot remains browsable after disconnecting. **RunStatisticsUI.h** renders responsive one/two/three-column cards, a bounded detail modal and an explicit Start footer. Browsing and draft setup never load a level. The existing HUD timer remains unchanged. Entry/hover/PB animations use the existing motion preference; Inspector has a separate vector magnifier. Tests cover all modes/categories, unchanged-frame cache reuse, pause/focus/gap accounting, real DLL save/reload/reset/recovery, actual mouse actions, fixed-seed practice starts, reduced motion and 480/800/1280 viewports at 100/150% DPI. The native statistics model also runs under MSVC.
+
+### Seed algorithm research: 7.19.0
+
+Twelve variants were compared with the frozen 7.18.1 pipeline. None is enabled in production. Sequential CPU-affinity runs used asset-derived Outside geometry, a synthetic deterministic RNG descriptor, 52 crystals and synthetic pickup radii. These are algorithm benchmarks, not live Unity FPS measurements or predictions for another PC. Scoring and complete search are separate workloads; compare only the matching reference within each batch. All timed samples and result fingerprints are in [tests/seed_algorithm_experiments.csv](tests/seed_algorithm_experiments.csv).
+
+| Variant | Matching workload | Reference / candidate, median per second | Result |
+| --- | --- | --- | --- |
+| Compiler specialization for 53 vertices | 10,000 complete scores, radius 1.35, four pairs | 2,157 / 2,117 | Same fingerprint; no gain |
+| Contact-aware 2-opt plus contact DP | 6,000 complete-search seeds, radius 1.35, three pairs | 1,781 / 1,696 | Top 10 unchanged; extra work reduces throughput |
+| Exact longest-edge candidate restriction | 6,000 complete scores, radius 1.35, three pairs | 2,254 / 1,701 | Same fingerprint; indexing/mask overhead wins |
+| Exact cache of negative edge exchanges | Same scoring workload | 2,254 / 1,059 | Same fingerprint; cache overhead wins |
+| Reused catalog-indexed bound penalties | 6,000 search seeds, radius 0 / 1.35, three pairs | 12,813 / 16,135; 2,010 / 1,947 | Center-only gain; contact case loses throughput |
+| Center-gated penalty reuse, lazy storage | 6,000 search seeds, radius 0 / 0.5 / 1.35, three pairs | 12,044 / 15,407; 2,832 / 2,733; 1,880 / 1,636 | Same Top 10; no reliable Outside contact gain |
+| Six LKH candidate/trial/move configurations | 64 layouts per configuration, radius 1.35 | External CLI 50–61 layouts/s, including process/files | Each worsens 12–53 individual contact routes |
+
+The contact refinement separately rescored 10,000 layouts: 828 routes improved, none worsened, but the aggregate improvement was only 1,995.6 of 4,606,340.9 units (0.043%). The warmed bounds reduced complete center scores from 294 to 255 of 6,000 seeds, retaining identical final Top-10 seed indices, lengths and order hashes; the wide-contact case still scored every seed. Even a branch gated away from contact scoring changed measured throughput, so it is not shipped on the strength of a center-only result.
+
+The LKH research used c4v4/LKH3 commit `5bd63680970445d4a595ca2c966ac593b0b32ad1` (archive SHA-256 `5ff7aff0ea362646d0072e0b83be40002c20d38b8614f5c1f6a61285e058857a`). Its academic/noncommercial solver is an external research input, not bundled code or a dependency. The driver encodes a fixed-start open path as ATSP with a free return to spawn, validates each returned permutation and rescores with original double distances plus verified continuous contact DP. Integer solver objectives alone are not comparable to the game's pickup routes. The best mean configuration improved the mean by 5.33 units, but worsened 12/64 routes by up to 8.67 units. [Per-layout quality data](tests/lkh_algorithm_quality.csv) includes all six configurations; subprocess/file overhead is included in CLI timing, so that timing does not isolate the solver's intrinsic cost.
+
+```sh
+g++ -std=c++20 -O2 -pthread -ITrainer tests/algorithm_lab.cpp -o build/algorithm-lab
+python3 tests/algorithm_lab.py --driver build/algorithm-lab --solver /path/to/LKH --count 64
+# Existing production benchmark; optional final "details" prints each score/order hash.
+g++ -std=c++20 -O2 -pthread -ITrainer tests/seed_route_benchmark.cpp -o build/seed-route-benchmark
+build/seed-route-benchmark tests/fixtures/hide-seek-outside-boxes.routefixture 10000 52 1 score 1.35 details
+```
 
 ### GUI changes: 7.17.0 to 7.18.0
 

@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.18.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.18.1)**
+**[v7.19.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.19.0)**
 
-- Improved large-layout seed scoring by preparing the crystal-neighbor order once per map and filtering it for each seed. Equal-distance ties, all starting routes, optimization passes and ranking stay the same. This also reduces work when pickup-contact bounds cannot reject seeds.
-- Improved pickup-contact evaluation by reusing each leg's distance and verification tables inside the solver. Continuous contacts and verification priorities are preserved.
-- Improved seed-search reports: Copy results (TSV) now includes the active generator, worker count, generated/scored/cache counters and average throughput with preparation time for useful performance comparisons.
+- Improved the Speedrun page with a responsive eight-mode dashboard, clean personal bests, attempts, finishes and time played. Mode details show completion rates, resets, deaths, average finishes and recent attempts; All, Clean and Practice filters keep the overview focused.
+- Improved statistics persistence with bounded per-mode counters and active playtime, recorded from this update onward. Earlier personal bests and lifetime counters remain intact; menus, loading, pauses, replay playback and unfocused intervals do not add playtime. Resetting statistics preserves personal bests and saved replays.
+- Improved mode selection with safe browsing, draft practice/seed settings and an explicit Start action. Short entry, hover and personal-best animations respect reduced motion, formatted statistics are cached, and the Inspector now has its own magnifying-glass icon.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -105,6 +105,8 @@ While the repository is private, open **Updates → Connect private releases** a
 - **Minimap:** Show walls, crystals, player trails, monster movement, and optional route guidance.
 
 **Runs & HUDs**
+
+- **Mode dashboard:** All eight modes with clean PBs, attempts, finishes and time played; filter Clean/Practice statistics, inspect details and start a mode explicitly.
 
 - **Run timer:** Track time, splits, personal bests, seed, and observed run validity.
 - **Statistics:** Keep attempts, resets, completions, deaths, and daily or session progress.

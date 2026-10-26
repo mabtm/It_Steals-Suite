@@ -20,12 +20,13 @@ enum class Icon
     Crystal,
     Trophy,
     Lock,
-    Update
+    Update,
+    Magnifier
 };
 inline constexpr std::array<const char *, PageCount> PageNames = {
     "Cheats", "Seed Map", "Speedrun", "Settings", "Replay", "Diagnostics", "Inspector", "Updates"};
 inline constexpr std::array<const char *, PageCount> PageDetails = {
-    "Live training tools",    "Explore layouts and routes",  "Clean runs and practice",
+    "Live training tools",    "Explore layouts and routes",  "Your progress across every mode",
     "Make the suite yours",   "Review every turn",           "Connection and system health",
     "Inspect the live scene", "Releases and version history"};
 
@@ -37,6 +38,10 @@ inline void DrawIcon(ImDrawList *d, Icon icon, ImVec2 p, float size, ImU32 color
     auto circle = [&](float x, float y, float r) { d->AddCircle(q(x, y), r * size, color, 20, line); };
     switch (icon)
     {
+    case Icon::Magnifier:
+        circle(.41f, .41f, .27f);
+        leg(.61f, .61f, .88f, .88f);
+        break;
     case Icon::Update:
         circle(.5f, .5f, .37f);
         leg(.5f, .2f, .5f, .62f);
@@ -204,7 +209,7 @@ inline void PageHeading(Page page)
     Motif(d, a, {a.x + w, a.y + h});
     DrawIcon(d,
              page == Page::Updates     ? Icon::Update
-             : page == Page::Inspector ? Icon::Scan
+             : page == Page::Inspector ? Icon::Magnifier
                                        : Icon(int(page)),
              {a.x, a.y + 3 * u}, 25 * u, ImGui::GetColorU32(heading));
     ImVec4 clip(a.x + 37 * u, a.y, a.x + w, a.y + h);
@@ -252,7 +257,7 @@ inline void Sidebar(float height)
                        ImGui::GetColorU32(Alpha(Color(AppearancePreferences::Animation), active)), 3 * u);
         DrawIcon(d,
                  i == int(Page::Updates)     ? Icon::Update
-                 : i == int(Page::Inspector) ? Icon::Scan
+                 : i == int(Page::Inspector) ? Icon::Magnifier
                                              : Icon(i),
                  {a.x + 13 * u, a.y + 13 * u}, 24 * u,
                  ImGui::GetColorU32(Blend(Blend(ink, background, .36f), heading, active)));

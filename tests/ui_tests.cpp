@@ -1695,6 +1695,7 @@ void Workshop740Cases(const std::string &output)
 #include "replay_health_ui_cases.inl"
 #include "physical_map_ui_cases.inl"
 #include "inspector_ui_cases.inl"
+#include "run_statistics_ui_cases.inl"
 
 void SeedRouteUICases(const std::string &output)
 {
@@ -1960,6 +1961,12 @@ int main(int argc, char **argv)
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.DeltaTime = 1.f / 60;
+    if (argc > 2 && std::string(argv[2]) == "--mode-statistics-only")
+    {
+        RunStatisticsCases(argv[1]);
+        ImGui::DestroyContext();
+        return 0;
+    }
     if (argc > 2 && std::string(argv[2]) == "--seed-route-only")
     {
         SeedRouteUICases(argv[1]);
@@ -3201,6 +3208,7 @@ int main(int argc, char **argv)
         InspectorUICases(argv[1]);
         SeedRouteReliabilityUICases(argv[1]);
     }
+    RunStatisticsCases(argc > 1 ? argv[1] : "");
     if (argc > 1)
     {
         std::ofstream done(std::string(argv[1]) + "/ui-complete.txt");

@@ -1,8 +1,8 @@
 {
-  "version": 29,
+  "version": 30,
   "mappingSize": 32768,
   "payloadOffset": 256,
-  "payloadSize": 16952,
+  "payloadSize": 17860,
   "fields": [
     {
       "name": "playerX",
@@ -1419,6 +1419,66 @@
       "type": "float",
       "count": 6,
       "offset": 16928
+    },
+    {
+      "name": "modeStatsSinceUtc",
+      "offset": 16952,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "modeStatsRevision",
+      "offset": 16960,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "modeAttempts",
+      "offset": 16964,
+      "type": "int",
+      "count": 24
+    },
+    {
+      "name": "modeFinished",
+      "offset": 17060,
+      "type": "int",
+      "count": 24
+    },
+    {
+      "name": "modeResets",
+      "offset": 17156,
+      "type": "int",
+      "count": 24
+    },
+    {
+      "name": "modeDeaths",
+      "offset": 17252,
+      "type": "int",
+      "count": 24
+    },
+    {
+      "name": "modeFinishSeconds",
+      "offset": 17348,
+      "type": "double",
+      "count": 24
+    },
+    {
+      "name": "modePlaySeconds",
+      "offset": 17540,
+      "type": "double",
+      "count": 24
+    },
+    {
+      "name": "modePersonalBest",
+      "offset": 17732,
+      "type": "double",
+      "count": 8
+    },
+    {
+      "name": "modePbUtc",
+      "offset": 17796,
+      "type": "long long",
+      "count": 8
     }
   ],
   "commandSize": 192

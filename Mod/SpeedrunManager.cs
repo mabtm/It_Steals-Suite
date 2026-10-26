@@ -10,7 +10,7 @@ public sealed class SpeedrunManager
         return scene == 5 || scene == 13;
     }
 
-    public static readonly int[] LevelIndices = { 3, 4, 5, 7, 8, 14, 12, 13 };
+    public static readonly int[] LevelIndices = ModeStatistics.Scenes;
     public static SpeedrunManager Instance { get; private set; }
     public static bool IsSpeedrunActive
     {
@@ -64,6 +64,7 @@ public sealed class SpeedrunManager
     private double nextPatchAudit;
     private bool patchesTrusted;
     private double lastHudSeen = double.NegativeInfinity;
+    private double nextPlaySave;
 
     public bool MovementLearningAllowed(MouseLook mouse)
     {
@@ -306,6 +307,20 @@ public sealed class SpeedrunManager
 
     public void Tick()
     {
+        double playNow = Time.realtimeSinceStartupAsDouble;
+        bool playing = IsPlayableScene && player != null && MouseLook.Health > 0 &&
+                       player.TotalObjectives > 0 && player.Objectives > 0 && Time.timeScale > 0 &&
+                       Application.isFocused && !MenuCursor.OwnsInput && !Replay3D.Reserved &&
+                       !ReplayGamePause.Frozen;
+        if (store.Modes.Observe(SceneManager.GetActiveScene().buildIndex, active ? (practice ? 2 : 1) : 0,
+                                playing, playNow) &&
+            playNow >= nextPlaySave)
+        {
+            nextPlaySave = playNow + 5;
+            store.QueueSave();
+        }
+        if (Replay3D.Reserved)
+            return;
         MovementCapture.Tick();
         if (!active || !IsPlayableScene)
             return;
@@ -417,6 +432,23 @@ public sealed class SpeedrunManager
 
     public void WriteSnapshot(SnapshotBuffer data, TrainerCommands commands)
     {
+        data.Write(SharedLayout.ModeStatsSinceUtc, store.Modes.SinceUtc);
+        data.Write(SharedLayout.ModeStatsRevision, store.Modes.Revision);
+        for (int i = 0; i < store.Modes.Rows.Length; i++)
+        {
+            var row = store.Modes.Rows[i];
+            data.Write(SharedLayout.ModeAttempts + i * 4, row.Attempts);
+            data.Write(SharedLayout.ModeFinished + i * 4, row.Finished);
+            data.Write(SharedLayout.ModeResets + i * 4, row.Resets);
+            data.Write(SharedLayout.ModeDeaths + i * 4, row.Deaths);
+            data.Write(SharedLayout.ModeFinishSeconds + i * 8, row.FinishSeconds);
+            data.Write(SharedLayout.ModePlaySeconds + i * 8, row.PlaySeconds);
+        }
+        for (int i = 0; i < LevelIndices.Length; i++)
+        {
+            data.Write(SharedLayout.ModePersonalBest + i * 8, store.Best(LevelIndices[i]));
+            data.Write(SharedLayout.ModePbUtc + i * 8, store.Modes.BestUtc[i]);
+        }
         RunRecord record = timerState == 0 ? tracker.Active : Record;
         if (record != null && record.Environment != null && record.Environment.GameHash == "UNKNOWN" &&
             build != null && build.Supported)
