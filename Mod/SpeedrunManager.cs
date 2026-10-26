@@ -256,6 +256,8 @@ public sealed class SpeedrunManager
 
     public void SceneLoaded(int index)
     {
+        // A quick reload can return to the same mode; never credit its loading interval.
+        store.Modes.Observe(index, 0, false, Time.realtimeSinceStartupAsDouble);
         if (timerState == 1)
             End(RunOutcome.Interrupted);
         RunReviewRecorder.DiscardTransient();

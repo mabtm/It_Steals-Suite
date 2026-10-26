@@ -49,6 +49,12 @@ public static class ModeStatisticsTests
         Check(stats.Rows[0].PlaySeconds == .5 && stats.Rows[1].PlaySeconds == .25 &&
                   stats.Rows[22].PlaySeconds == .25,
               "exact credited intervals");
+        var reload = new ModeStatistics();
+        reload.Observe(3, 1, true, 0);
+        reload.Observe(3, 1, true, .125);
+        reload.Observe(3, 0, false, .25); // Scene-loaded callback, including the same mode.
+        reload.Observe(3, 1, true, .375);
+        Check(reload.Rows[1].PlaySeconds == .125, "fast same-mode reload excludes loading");
         stats.BestUtc[7] = DateTime.UtcNow.Ticks;
         CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
         var encoded = new StringBuilder();
