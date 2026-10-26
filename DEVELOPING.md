@@ -71,6 +71,38 @@ python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests 
 
 Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests; compile it separately against the matching game SDK and loader.
 
+### Performance comparison: 7.16.2 to 7.17.0
+
+Sequential Linux/GCC 13.3 comparisons used the same benchmark source, static game-asset geometry/catalogs and synthetic deterministic RNG descriptor on both revisions. Each workload has three alternating before/after pairs of 6,000 seeds; values are median seeds per second. CPU affinity allows the workers plus one coordinator core. A preceding 128-seed search prepares the shared geometry, so timings include generation, bounds, scoring, ranking and drawing, but exclude cold preparation. Raw measurements and Top-10 fingerprints are in [tests/seed_search_performance.csv](tests/seed_search_performance.csv).
+
+| Workload | Workers | Synthetic pickup radius | 7.16.2 | 7.17.0 | Throughput |
+| --- | --- | --- | --- | --- | --- |
+| Outside, 52 crystals | 1 | 0, center distances | 1,814/s | 10,807/s | 5.96x |
+| Outside, 52 crystals | 2 | 0, center distances | 3,089/s | 19,817/s | 6.42x |
+| Outside, 52 crystals | 6 | 0, center distances | 8,515/s | 46,636/s | 5.48x |
+| Outside, 40 crystals | 1 | 0, center distances | 5,810/s | 27,809/s | 4.79x |
+| Inside, 22 crystals | 1 | 0, center distances | 48,611/s | 123,166/s | 2.53x |
+| Outside, 52 crystals | 1 | 0.5 | 1,639/s | 2,457/s | 1.50x |
+| Outside, 52 crystals | 1 | 1.35 | 1,655/s | 1,706/s | No material gain |
+
+Pickup contacts matter: wider regions weaken the pairwise lower bounds and can leave every seed requiring a complete route score. These synthetic radii are sensitivity checks, not measured live collector radii. These results do not establish a speedup on a user's live capture or any game-FPS improvement. In the center-distance Outside/52/one-worker case, complete scores fall from 5,521 to 294; all 6,000 seeds are still generated and checked. Seed indices, route lengths and visit-order hashes for the final Top 10 match exactly across all 42 timed runs within each workload, including worker counts where applicable.
+
+The new refinement gives crystal vertices penalties `p`. Every open route consists of a crystal spanning tree and one spawn edge, with one crystal endpoint of degree one and all other crystal degrees two. Therefore `MST(c[i,j]+p[i]+p[j]) + min(c[spawn,i]+p[i]) - 2*sum(p) + min(p)` is a lower bound for any penalties. This requires symmetry, not the triangle inequality, and also applies to pickup-contact pair minima. Eight dense Prim/subgradient rounds use fixed stack arrays. Floating-point error is conservatively subtracted; nonfinite refinement falls back to the previous bound.
+
+Refinement runs only for shortest-route searches above 15 crystals, after a finite Top-10 cutoff exists, when the original bound reaches 75% of that cutoff. After 16 consecutive refinements fail to reject a seed, a worker skips refinement for 256 candidates before retrying. This limits overhead on loose contact bounds. RNG, worker count, the complete route solver, heuristic starts/passes, ranking and cancellation remain intact. Longest-route and layout-only searches retain their existing paths.
+
+The bound regression compares 432 results with exact-DP optima, plus known optimal star routes at 16–64 crystals and scales from `1e-9` to `1e100`. Frozen order/length fingerprints cover 336 matrices, including 52-crystal and directed input. The Windows launcher job also compiles and runs both routing checks with MSVC. The existing physical-contact test compares one/six-worker searches with exhaustive scoring of all 4,096 seeds.
+
+Use the current benchmark source against each revision's headers, replacing `-ITrainer` with that revision's Trainer directory. Run timings sequentially without other builds or tests:
+
+```sh
+g++ -std=c++20 -O2 -pthread -ITrainer tests/seed_route_benchmark.cpp -o build/seed-route-benchmark
+build/seed-route-benchmark tests/fixtures/hide-seek-outside-boxes.routefixture 6000 52 1 search 0
+build/seed-route-benchmark tests/fixtures/hide-seek-outside-boxes.routefixture 6000 52 1 search 0.5
+build/seed-route-benchmark tests/fixtures/hide-seek-outside-boxes.routefixture 6000 52 1 search 1.35
+python3 tests/run.py --sanitize --only route_bound_tests physical_seed_tests --jobs 2 --output build/seed-sanitizers
+```
+
 ### Performance comparison: 7.15.0 to 7.16.0
 
 Sequential Linux/GCC 13/Mono comparisons used the same benchmark sources and deterministic data on both revisions, without other builds or tests running. Values are medians. Scoring used five alternating before/after pairs; complete CPU searches used three repeats per worker count. These are synthetic CPU measurements, not live game FPS or a measured Hide & Seek Outside speedup.
@@ -234,7 +266,7 @@ For a local Windows package build, install **NSIS 3**, then run:
 .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
 ```
 
-Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.16.0**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
+Packages go into **build/release/**. This builds the native trainer and bundles the supplied compatible mod **7.16.2**. A complete mod rebuild needs the local game SDKs and **build.ps1**.
 
 Game discovery checks saved Suite paths, Steam installation entries, running game/Steam processes, standard Steam folders, and configured libraries. Candidates must contain the supported executable and managed assembly. Discovery skips unreadable metadata and does not scan whole drives. Windows tests also launch the actual discovery command and read its Unicode result through the same INI API used by Setup.
 

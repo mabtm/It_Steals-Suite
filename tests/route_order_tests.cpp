@@ -2,7 +2,7 @@
 #include <cassert>
 #include <iostream>
 
-// Golden fingerprints from unmodified 7.15.0: tied, non-metric and grid
+// Frozen pre-7.17 fingerprints: tied, non-metric and grid
 // distances. Power-of-two fractions keep every comparison platform-independent.
 static uint64_t Fingerprint(int n, int profile)
 {
@@ -24,9 +24,12 @@ static uint64_t Fingerprint(int n, int profile)
             {
                 double cost = profile == 0   ? (1 + next() % 8192) / 8.
                               : profile == 1 ? double(next() % 5)
-                                             : double(std::abs(points[a][0] - points[b][0]) +
-                                                      std::abs(points[a][1] - points[b][1]));
+                              : profile == 2 ? double(std::abs(points[a][0] - points[b][0]) +
+                                                      std::abs(points[a][1] - points[b][1]))
+                                             : (1 + next() % 8192) / 8.;
                 work.matrix[a * size + b] = work.matrix[b * size + a] = cost;
+                if (profile == 3)
+                    work.matrix[b * size + a] = (1 + next() % 8192) / 8.;
             }
         }
         for (int exact = 0; exact <= int(n <= 15); exact++)
@@ -62,15 +65,18 @@ int main()
         {571619580999766981ULL, 14721048749964028103ULL, 3934606641263893541ULL},
         {15214400589602694419ULL, 1776531299721853609ULL, 8685236504025859735ULL},
         {11498932256997930337ULL, 17813931701174841751ULL, 10418111275456613175ULL},
+        {7978581916984128793ULL, 16263134512004231675ULL, 16429632061446302729ULL},
         {7919396285002477737ULL, 8280354242353619261ULL, 9181873428648029671ULL},
     };
     size_t row = 0;
-    for (int n : {1, 8, 14, 15, 16, 22, 40, 64})
+    for (int n : {1, 8, 14, 15, 16, 22, 40, 52, 64})
     {
         for (int profile = 0; profile < 3; profile++)
             assert(Fingerprint(n, profile) == expected[row][profile]);
         row++;
     }
+    // Directed input retains the general solver, without symmetric shortcuts.
+    assert(Fingerprint(22, 3) == 6127160003320515981ULL);
     std::cout
-        << "7.15.0 route-order/length parity, 1-64 crystals, exact/heuristic, ties and non-metric distances: PASS\n";
+        << "Frozen route-order/length parity, 1-64 crystals, exact/heuristic, tied, non-metric and directed distances: PASS\n";
 }

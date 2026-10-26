@@ -25,10 +25,10 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.16.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.16.2)**
+**[v7.17.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.17.0)**
 
-- Fixed a bug caused by trying to stop Unity's logos from a mod that loads after their playback. The trainer now prepares the verified game's splash settings before launching the game process, then restores the original file after the mod connects or the trainer exits.
-- Improved startup recovery with an original-file backup, complete file checks and visible diagnostics for unsupported builds or write failures. Interrupted launches are repaired on the next Suite launch; externally changed files are preserved.
+- Improved large-route seed searches with a stronger, bounded spanning-tree lower bound. Seeds that are provably outside the Top 10 avoid full route optimization; every seed remains generated and checked, and the route solver and ranking rules stay the same. Repeatedly ineffective refinement automatically pauses to limit its overhead.
+- Improved performance verification with a repeatable Outside-geometry benchmark, pickup-radius comparisons, exact-optimum bound checks and Windows checks against frozen route orders and lengths, including 52-crystal layouts and directed input.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

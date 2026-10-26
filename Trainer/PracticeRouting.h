@@ -925,6 +925,94 @@ inline double MstRouteLowerBound(const double *matrix, int size, const Cancel &c
     return bound;
 }
 
+// Strengthen a symmetric tree bound with vertex penalties. Every open tour is a tree
+// with spawn degree 1, one crystal degree 1 and all other degrees 2. For any
+// penalties p, a crystal MST plus its cheapest spawn edge therefore gives:
+// MST(c[i,j]+p[i]+p[j]) + min(c[0,i]+p[i]) - 2*sum(p) + min(p).
+// No triangle inequality or heuristic-route assumption is needed.
+inline double TightenRouteLowerBound(const double *matrix, int size, double lower, double cutoff,
+                                     const Cancel &canceled)
+{
+    int n = size - 1;
+    if (n < 2 || n > 64 || !std::isfinite(cutoff))
+        return lower;
+    std::array<double, 64> penalty{}, costs;
+    std::array<int, 64> parent, degree;
+    double scale = 0;
+    for (int i = 0; i < size * size; i++)
+        scale = std::max(scale, std::abs(matrix[i]));
+    if (!scale)
+        return lower;
+    for (int iteration = 0; iteration < 8; iteration++)
+    {
+        costs.fill(Unreachable);
+        parent.fill(-1);
+        degree.fill(0);
+        costs[0] = 0;
+        uint64_t used = 0;
+        double tree = 0;
+        for (int step = 0; step < n; step++)
+        {
+            if ((step & 7) == 0 && canceled())
+                throw std::runtime_error("Canceled");
+            int next = -1;
+            for (int i = 0; i < n; i++)
+                if (!(used & (uint64_t{1} << i)) && (next < 0 || costs[i] < costs[next]))
+                    next = i;
+            if (next < 0 || !std::isfinite(costs[next]))
+                return lower;
+            used |= uint64_t{1} << next;
+            tree += costs[next];
+            if (parent[next] >= 0)
+            {
+                degree[next]++;
+                degree[parent[next]]++;
+            }
+            const double *row = matrix + (next + 1) * size + 1;
+            for (int i = 0; i < n; i++)
+                if (!(used & (uint64_t{1} << i)))
+                {
+                    double cost = row[i] + penalty[next] + penalty[i];
+                    if (cost < costs[i])
+                    {
+                        costs[i] = cost;
+                        parent[i] = next;
+                    }
+                }
+        }
+        int spawn = 0, end = 0;
+        double sum = 0, magnitude = 0;
+        for (int i = 0; i < n; i++)
+        {
+            if (matrix[i + 1] + penalty[i] < matrix[spawn + 1] + penalty[spawn])
+                spawn = i;
+            if (penalty[i] < penalty[end])
+                end = i;
+            sum += penalty[i];
+            magnitude = std::max(magnitude, std::abs(penalty[i]));
+        }
+        degree[spawn]++;
+        double bound = tree + matrix[spawn + 1] + penalty[spawn] - 2 * sum + penalty[end];
+        // Deflate for accumulated floating-point error, including choosing the
+        // MST with rounded adjusted edges. Large/overflowing scales fall back.
+        double error = 64. * n * n * std::numeric_limits<double>::epsilon() * (scale + 2 * magnitude);
+        if (!std::isfinite(bound) || !std::isfinite(error))
+            return lower;
+        lower = std::max(lower, bound - error);
+        if (lower > cutoff + 1e-6)
+            return lower;
+        int norm = 0;
+        for (int i = 0; i < n; i++)
+            norm += (degree[i] - 2 + (i == end)) * (degree[i] - 2 + (i == end));
+        if (!norm)
+            return lower;
+        double step = 1.5 * (cutoff - bound + 1) / norm;
+        for (int i = 0; i < n; i++)
+            penalty[i] += step * (degree[i] - 2 + (i == end));
+    }
+    return lower;
+}
+
 inline RouteResult SolveOrderFlat(const double *matrix, int size, RouteWorkspace &work,
                                   const Cancel &canceled, bool exactWhenPossible)
 {

@@ -1,7 +1,7 @@
 #pragma once
 
-#define SUITE_VERSION "7.16.2"
-#define SUITE_VERSION_COMPONENTS 7, 16, 2, 0
+#define SUITE_VERSION "7.17.0"
+#define SUITE_VERSION_COMPONENTS 7, 17, 0, 0
 #define SUITE_MOD_VERSION "7.16.2"
 #define SUITE_AUTHOR "mab"
 

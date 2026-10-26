@@ -2,6 +2,11 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.17.0 Changelog
+
+- Improved large-route seed searches with a stronger, bounded spanning-tree lower bound. Seeds that are provably outside the Top 10 avoid full route optimization; every seed remains generated and checked, and the route solver and ranking rules stay the same. Repeatedly ineffective refinement automatically pauses to limit its overhead.
+- Improved performance verification with a repeatable Outside-geometry benchmark, pickup-radius comparisons, exact-optimum bound checks and Windows checks against frozen route orders and lengths, including 52-crystal layouts and directed input.
+
 ### v7.16.2 Changelog
 
 - Fixed a bug caused by trying to stop Unity's logos from a mod that loads after their playback. The trainer now prepares the verified game's splash settings before launching the game process, then restores the original file after the mod connects or the trainer exits.

@@ -457,6 +457,7 @@ class SeedSearch
         {
             std::vector<CachedRoute> cache(distances ? 4096 : 0);
             RouteWorkspace workspace;
+            int refinementMisses = 0, refinementCooldown = 0;
             std::vector<SeedResult> top;
             top.reserve(11);
             std::unique_ptr<PortableSelectionGenerator> generator;
@@ -559,6 +560,8 @@ class SeedSearch
                     }
                     else
                     {
+                        if (refinementCooldown)
+                            refinementCooldown--;
                         uint64_t hash = 14695981039346656037ULL ^ static_cast<uint64_t>(selection.spawn);
                         for (int id : selection.crystals)
                         {
@@ -594,7 +597,22 @@ class SeedSearch
                                                : MstRouteLowerBound(workspace.matrix.data(), count, canceled);
                                 if (!std::isfinite(lower))
                                     throw std::runtime_error("Invalid prepared route distances");
-                                else if (lower > boundCutoff + 1e-6)
+                                // Spend the bounded refinement budget only on
+                                // large tours already close to the cutoff.
+                                if (!refinementCooldown && count > 16 && lower <= boundCutoff + 1e-6 &&
+                                    lower >= .75 * boundCutoff)
+                                {
+                                    lower = TightenRouteLowerBound(workspace.matrix.data(), count, lower,
+                                                                   boundCutoff, canceled);
+                                    if (lower > boundCutoff + 1e-6)
+                                        refinementMisses = 0;
+                                    else if (++refinementMisses == 16)
+                                    {
+                                        refinementMisses = 0;
+                                        refinementCooldown = 256;
+                                    }
+                                }
+                                if (lower > boundCutoff + 1e-6)
                                 {
                                     pruned++;
                                     keep = false;
