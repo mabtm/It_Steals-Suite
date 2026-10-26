@@ -1578,7 +1578,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 tray.LaunchWarning();
         }
         suite_ui::lifecycleTime = GetTickCount64() / 1000.0;
-        if (suite_keys::recording >= 0 || io.WantTextInput || suite_hud::active || suite_clip::open)
+        if (suite_keys::recording >= 0 || io.WantTextInput || ImGui::IsAnyItemActive() || suite_hud::active ||
+            suite_clip::open)
             ReleaseHotkeys();
         MSG message{};
         int messages = 0;
@@ -1644,7 +1645,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         bool allowed = !suite_ui::lifecycle.Exiting() &&
                        (binding.state.gameForeground || binding.state.overlayForeground);
         bool workspaceActive = suite_hud::active || suite_clip::open;
-        bool shortcutsAllowed = allowed && !workspaceActive && !io.WantTextInput && suite_keys::recording < 0;
+        bool shortcutsAllowed = allowed && !workspaceActive && !io.WantTextInput &&
+                                !ImGui::IsAnyItemActive() && suite_keys::recording < 0;
         bool bindingsChanged = appliedHotkeys != suite_keys::preferences;
         if (bindingsChanged)
         {
