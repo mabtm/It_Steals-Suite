@@ -471,6 +471,15 @@ void CreateRenderTarget()
     }
 }
 
+void ReleaseHotkeys()
+{
+    for (int i = 0; i < suite_keys::Count; i++)
+        if (g_hotkeysRegistered & (1u << i))
+            UnregisterHotKey(g_hWnd, i + 1);
+    g_hotkeysRegistered = g_hotkeysAttempted = g_hotkeyEvents = 0;
+    suite_keys::unavailable = 0;
+}
+
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (msg == WM_LBUTTONDOWN && inspector::picking && IsWindow(g_gameWnd) && !inspector::clickPointer &&
@@ -491,9 +500,20 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return MA_NOACTIVATE;
         return DefWindowProcW(hWnd, msg, wParam, lParam);
     }
-    if (msg == WM_HOTKEY && wParam >= 1 && wParam <= 8)
+    if (suite_keys::recording >= 0 && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN))
     {
-        g_hotkeyEvents |= 1u << (wParam - 1);
+        if (!(lParam & (1ll << 30)))
+            suite_keys::Offer(int(wParam), (GetKeyState(VK_CONTROL) < 0 ? suite_keys::Control : 0) |
+                                               (GetKeyState(VK_MENU) < 0 ? suite_keys::Alt : 0) |
+                                               (GetKeyState(VK_SHIFT) < 0 ? suite_keys::Shift : 0));
+        return 0;
+    }
+    if (msg == WM_HOTKEY && wParam >= 1 && wParam <= suite_keys::Count)
+    {
+        if (suite_keys::recording >= 0)
+            suite_keys::Offer(HIWORD(lParam), LOWORD(lParam) & 7);
+        else
+            g_hotkeyEvents |= 1u << (wParam - 1);
         return 0;
     }
     if (msg == WM_SIZE && wParam != SIZE_MINIMIZED && g_surfaceInteractive)
@@ -813,6 +833,7 @@ TrainerPreferences CollectPreferences()
     p.inspector = inspector_fx::preferences;
     p.input = suite_input::preferences;
     p.replay = suite_ui::replayPreferences;
+    p.hotkeys = suite_keys::preferences;
     p.experience = suite_ui::preferences;
     p.appearance = suite_ui::appearance;
     p.hud = g_hudLayout;
@@ -855,6 +876,7 @@ void ApplyPreferences(TrainerPreferences p)
     inspector_fx::preferences = p.inspector;
     suite_input::preferences = p.input;
     suite_ui::replayPreferences = p.replay;
+    suite_keys::preferences = p.hotkeys;
     suite_ui::preferences = p.experience;
     suite_ui::fontsDirty = true;
     suite_ui::appearance = p.appearance;
@@ -1324,10 +1346,7 @@ DiagnosticInputs CaptureDiagnosticInputs()
 void ReleaseSurface()
 {
     suite_clip::ResetGraphics();
-    for (int i = 0; i < 8; i++)
-        if (g_hotkeysRegistered & (1u << i))
-            UnregisterHotKey(g_hWnd, i + 1);
-    g_hotkeysRegistered = g_hotkeysAttempted = g_hotkeyEvents = 0;
+    ReleaseHotkeys();
     if (ImGui::GetIO().BackendRendererUserData)
         ImGui_ImplDX11_Shutdown();
     if (ImGui::GetIO().BackendPlatformUserData)
@@ -1490,6 +1509,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         out = *p;
         return true;
     };
+    suite_keys::nativeKeyName = [](int key) -> std::string {
+        wchar_t name[80]{};
+        int count = GetKeyNameTextW(LONG(MapVirtualKeyW(key, MAPVK_VK_TO_VSC) << 16), name, 80);
+        int bytes = WideCharToMultiByte(CP_UTF8, 0, name, count, nullptr, 0, nullptr, nullptr);
+        std::string result(std::max(0, bytes), '\0');
+        if (bytes > 0)
+            WideCharToMultiByte(CP_UTF8, 0, name, count, result.data(), bytes, nullptr, nullptr);
+        return result;
+    };
     ApplyPreferences(g_settings.Load());
     inspector::reportFolder = g_settings.Directory() / L"Diagnostics" / L"Inspector";
     g_mapWorker.SetDirectory(g_settings.Directory());
@@ -1517,6 +1545,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     KeyEdge f2, f3, f4, f5, f6, shiftT, f8, pickerKey, replayTab, replayEscape, replaySpace, replayLeft,
         replayRight, replayHome, replayEnd, replayFast, replaySlow, replayMark;
     bool occluded = false;
+    auto appliedHotkeys = suite_keys::preferences;
     game_launch::StartupOnce startup;
     bool launchRequested =
         startup.Plan(g_autoStartGame || game_launch::RestartAfterUpdateFlag(),
@@ -1549,6 +1578,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 tray.LaunchWarning();
         }
         suite_ui::lifecycleTime = GetTickCount64() / 1000.0;
+        if (suite_keys::recording >= 0 || io.WantTextInput || suite_hud::active || suite_clip::open)
+            ReleaseHotkeys();
         MSG message{};
         int messages = 0;
         while (messages++ < 256 && PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
@@ -1558,7 +1589,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 g_quit = true;
                 break;
             }
-            TranslateMessage(&message);
+            if (suite_keys::recording < 0 ||
+                (message.message != WM_KEYDOWN && message.message != WM_SYSKEYDOWN))
+                TranslateMessage(&message);
             DispatchMessageW(&message);
         }
         if (g_quit && DeferExit())
@@ -1610,10 +1643,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         g_gameWnd = binding.Game();
         bool allowed = !suite_ui::lifecycle.Exiting() &&
                        (binding.state.gameForeground || binding.state.overlayForeground);
-        for (int i = 0; i < 8; i++)
+        bool workspaceActive = suite_hud::active || suite_clip::open;
+        bool shortcutsAllowed = allowed && !workspaceActive && !io.WantTextInput && suite_keys::recording < 0;
+        bool bindingsChanged = appliedHotkeys != suite_keys::preferences;
+        if (bindingsChanged)
+        {
+            ReleaseHotkeys();
+            appliedHotkeys = suite_keys::preferences;
+        }
+        int modifiers = (GetAsyncKeyState(VK_CONTROL) < 0 ? suite_keys::Control : 0) |
+                        (GetAsyncKeyState(VK_MENU) < 0 ? suite_keys::Alt : 0) |
+                        (GetAsyncKeyState(VK_SHIFT) < 0 ? suite_keys::Shift : 0);
+        for (int i = 0; i < suite_keys::Count; i++)
         {
             unsigned bit = 1u << i;
-            if (!allowed)
+            const auto &shortcut = appliedHotkeys.bindings[i];
+            if (!shortcutsAllowed || !shortcut.key)
             {
                 if (g_hotkeysRegistered & bit)
                     UnregisterHotKey(g_hWnd, i + 1);
@@ -1623,25 +1668,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             else if (IsWindow(g_hWnd) && !(g_hotkeysAttempted & bit))
             {
                 g_hotkeysAttempted |= bit;
-                if (RegisterHotKey(g_hWnd, i + 1, MOD_NOREPEAT | (i == 5 ? MOD_SHIFT : 0),
-                                   i == 5   ? 'T'
-                                   : i == 7 ? VK_F7
-                                            : VK_F2 + i))
+                if (RegisterHotKey(g_hWnd, i + 1, MOD_NOREPEAT | shortcut.modifiers, shortcut.key))
                     g_hotkeysRegistered |= bit;
             }
         }
+        suite_keys::unavailable = g_hotkeysAttempted & appliedHotkeys.Enabled() & ~g_hotkeysRegistered;
         auto keyPressed = [&](KeyEdge &key, int index) {
-            bool down = (GetAsyncKeyState(index == 5   ? 'T'
-                                          : index == 7 ? VK_F7
-                                                       : VK_F2 + index) &
-                         0x8000) != 0;
-            if (index == 5)
-                down = down && (GetAsyncKeyState(VK_SHIFT) & 0x8000);
-            bool fallback = key.Update(down, allowed);
+            const auto &shortcut = appliedHotkeys.bindings[index];
+            bool down =
+                shortcut.key && (GetAsyncKeyState(shortcut.key) & 0x8000) && modifiers == shortcut.modifiers;
+            bool enabled = shortcutsAllowed && !bindingsChanged &&
+                           (index == suite_keys::Menu || !UpdateInputRequested());
+            bool fallback = key.Update(down, enabled);
             unsigned bit = 1u << index;
-            return allowed && ((g_hotkeysRegistered & bit) ? (g_hotkeyEvents & bit) != 0 : fallback);
+            return enabled && shortcut.key &&
+                   ((g_hotkeysRegistered & bit) ? (g_hotkeyEvents & bit) != 0 : fallback);
         };
-        bool workspaceActive = suite_hud::active || suite_clip::open;
         if (keyPressed(f2, 0) && !workspaceActive)
         {
             if (inspector::picking)
@@ -1722,8 +1764,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             SetOverlayInteractive(g_overlayVisible && !g_compactMode);
         }
         auto replayKey = [&](KeyEdge &edge, int code, bool enabled) {
+            bool assigned =
+                shortcutsAllowed &&
+                std::any_of(appliedHotkeys.bindings.begin(), appliedHotkeys.bindings.end(),
+                            [&](const auto &key) { return key.key == code && key.modifiers == modifiers; });
             return edge.Update((GetAsyncKeyState(code) & 0x8000) != 0,
-                               allowed && replayActive && !workspaceActive && enabled);
+                               allowed && replayActive && !workspaceActive && enabled && !assigned &&
+                                   suite_keys::recording < 0);
         };
         bool textInput = ImGui::GetCurrentContext() && ImGui::GetIO().WantTextInput;
         if (replayKey(replayTab, VK_TAB, !textInput && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)))
@@ -2233,7 +2280,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 .Observe(std::chrono::duration<double, std::milli>(Clock::now() - frameStarted).count());
         }
         auto deadline =
-            Clock::now() + std::chrono::milliseconds(allowed && g_hotkeysRegistered != 127 ? 20 : 100);
+            Clock::now() + std::chrono::milliseconds(
+                               suite_keys::NeedsPolling(shortcutsAllowed, g_hotkeysRegistered) ? 20 : 100);
         if (visible && g_pd3dDevice)
             deadline = std::min(deadline, nextFrame);
         auto duration = deadline - Clock::now();

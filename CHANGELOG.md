@@ -2,6 +2,12 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.18.0 Changelog
+
+- Improved the replay library with favorites, mode/status filters, searchable notes, recording dates and sortable columns. Favorites are local library preferences; recordings, notes and verification data are preserved.
+- Improved GUI efficiency by caching replay search/display text and filtered order until the archive or controls change. Recording dates are formatted only for visible rows, and fully registered shortcuts no longer trigger unnecessary fallback polling.
+- Improved trainer shortcuts: assign keys with Ctrl, Alt or Shift, remove assignments or restore defaults in Settings > Shortcuts. Conflicts and reserved combinations are explained, displayed hints follow the saved assignments, and text entry suspends shortcuts. Freecam, restart and replay playback keys keep their existing game controls.
+
 ### v7.17.0 Changelog
 
 - Improved large-route seed searches with a stronger, bounded spanning-tree lower bound. Seeds that are provably outside the Top 10 avoid full route optimization; every seed remains generated and checked, and the route solver and ranking rules stay the same. Repeatedly ineffective refinement automatically pauses to limit its overhead.

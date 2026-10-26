@@ -13,6 +13,7 @@
 #include <fstream>
 #include <map>
 #include <mutex>
+#include <set>
 #include <thread>
 
 namespace practice
@@ -22,7 +23,7 @@ struct ReplayInfo
     int64_t id = 0;
     int scene = 0, seed = 0, outcome = 0;
     double seconds = 0;
-    bool valid = false, saved = false;
+    bool valid = false, saved = false, favorite = false;
     std::string name, category, notes, reason;
     std::filesystem::path file;
 };
@@ -37,25 +38,32 @@ inline const char *ReplayStatusName(int outcome, bool valid)
     return ReplayAborted(outcome) ? "ABORTED" : valid ? "VALID" : "UNVALID";
 }
 
-inline std::string ReplayName(const MapData &data)
+inline std::string ReplayRecordedAt(int64_t id)
 {
-    if (!data.review)
-        return "Run";
-    int64_t id = data.review->id;
     constexpr int64_t epoch = 621355968000000000ll;
     if (id < epoch || id > 3155378975999999999ll)
-        return "Run " + std::to_string(id);
+        return {};
     std::time_t time = std::time_t((id - epoch) / 10000000);
     std::tm local{};
 #ifdef _WIN32
     if (localtime_s(&local, &time) != 0)
-        return "Run " + std::to_string(id);
+        return {};
 #else
     if (!localtime_r(&time, &local))
-        return "Run " + std::to_string(id);
+        return {};
 #endif
     char stamp[32]{};
     std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M", &local);
+    return stamp;
+}
+
+inline std::string ReplayName(const MapData &data)
+{
+    if (!data.review)
+        return "Run";
+    auto stamp = ReplayRecordedAt(data.review->id);
+    if (stamp.empty())
+        return "Run " + std::to_string(data.review->id);
     int level = MapLevelIndex(data.scene);
     return std::string(level >= 0 ? kMapLevelNames[level] : "Run") + " | " + stamp;
 }
@@ -77,6 +85,7 @@ struct ReplayArchiveState
 // sleeping IO worker. The UI receives immutable snapshots, never file handles.
 class ReplayArchive
 {
+    static constexpr const char *FavoriteWarning = "Replay favorites could not be loaded (favorites.json).";
     enum class JobKind
     {
         Initialize,
@@ -92,6 +101,7 @@ class ReplayArchive
         SaveAnnotations,
         Revalidate,
         SaveVerification,
+        Favorite,
     };
 
     struct Job
@@ -102,6 +112,7 @@ class ReplayArchive
         std::filesystem::path path;
         std::shared_ptr<const MapData> data;
         std::string name, category, notes;
+        bool favorite = false;
         std::shared_ptr<const ReplayAnnotations> annotations;
         std::shared_ptr<const suite_run::Verification> verification;
     };
@@ -115,6 +126,7 @@ class ReplayArchive
 
     std::filesystem::path root, source;
     std::map<std::filesystem::path, Cached> cache;
+    std::set<int64_t> favorites;
     std::shared_ptr<const ReplayArchiveState> state = std::make_shared<ReplayArchiveState>();
     std::shared_ptr<const MapData> loaded;
     std::shared_ptr<const ReplayMotion> motion;
@@ -256,6 +268,7 @@ class ReplayArchive
         for (auto it = rows.rbegin(); it != rows.rend(); ++it)
         {
             auto row = it->second;
+            row.favorite = favorites.contains(row.id);
             auto metadata = File(row.id, ".meta");
             std::error_code metaError;
             if (std::filesystem::exists(metadata, metaError))
@@ -701,7 +714,64 @@ class ReplayArchive
             auto b = Read(config, 32768);
             source = std::filesystem::path(std::u8string(b.begin(), b.end()));
         }
+        favorites.clear();
+        auto favoriteFile = root / "favorites.json";
+        if (std::filesystem::exists(favoriteFile))
+            try
+            {
+                auto bytes = Read(favoriteFile, 1024 * 1024);
+                auto json = suite_update::JsonReader(
+                                std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()))
+                                .Read();
+                if (json.kind != suite_update::Json::Kind::Array)
+                    throw std::runtime_error("Replay favorites are unreadable");
+                for (const auto &value : json.items)
+                {
+                    auto id = value.UInt();
+                    if (!id || id > uint64_t(INT64_MAX))
+                        throw std::runtime_error("Replay favorite identity is invalid");
+                    favorites.insert(int64_t(id));
+                }
+            }
+            catch (const std::exception &)
+            {
+                favorites.clear();
+                problem = FavoriteWarning;
+            }
         Scan();
+    }
+
+    void SetFavorite(const Job &job)
+    {
+        auto snapshot = Get();
+        if (std::none_of(snapshot->runs.begin(), snapshot->runs.end(),
+                         [&](const auto &row) { return row.id == job.id; }))
+            throw std::runtime_error("Replay no longer available");
+        auto next = favorites;
+        if (job.favorite)
+            next.insert(job.id);
+        else
+            next.erase(job.id);
+        std::string json = "[";
+        for (auto id : next)
+        {
+            if (json.size() > 1)
+                json += ',';
+            json += std::to_string(id);
+        }
+        json += "]\n";
+        if (json.size() > 1024 * 1024)
+            throw std::runtime_error("Replay favorites exceed the library limit");
+        Atomic(root / "favorites.json", ReplayText(json), true);
+        favorites.swap(next);
+        // A preference change does not need to reread every replay's metadata.
+        auto updated = std::make_shared<ReplayArchiveState>(*snapshot);
+        for (auto &row : updated->runs)
+            if (row.id == job.id)
+                row.favorite = job.favorite;
+        if (updated->error == FavoriteWarning)
+            updated->error.clear();
+        std::atomic_store(&state, std::shared_ptr<const ReplayArchiveState>(updated));
     }
 
     void ChangeSourceDirectory(const Job &job)
@@ -1007,6 +1077,9 @@ class ReplayArchive
         case JobKind::SaveRecording:
             SaveRecording(job);
             break;
+        case JobKind::Favorite:
+            SetFavorite(job);
+            break;
         case JobKind::ExportPackage:
             ExportRecording(job);
             break;
@@ -1123,6 +1196,11 @@ class ReplayArchive
     void Refresh()
     {
         Queue({.kind = JobKind::Refresh});
+    }
+
+    void Favorite(int64_t id, bool value)
+    {
+        Queue({.kind = JobKind::Favorite, .id = id, .favorite = value});
     }
 
     void Load(int64_t id)

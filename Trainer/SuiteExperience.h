@@ -3,6 +3,7 @@
 #include "imgui_internal.h"
 #include "ExperienceModel.h"
 #include "SuiteAppearance.h"
+#include "TrainerHotkeys.h"
 #include <cstring>
 #include <string>
 
@@ -510,12 +511,12 @@ inline void RenderLifecycle(bool visible, bool running, bool ready = true)
         draw->AddCircle({p.x + 39 * u, p.y + 133 * u}, (10 + 4 * pulse) * u,
                         ImGui::ColorConvertFloat4ToU32(Alpha(color, .12f * fade)), 24, u);
     }
-    auto text = [&](float x, float y, ImFont *font, ImVec4 c, const char *value) {
+    auto text = [&](float x, float y, ImFont *font, ImVec4 c, const char *value, float wrap = 0) {
         if (!font)
             font = ImGui::GetFont();
         float factor = u / Unit();
         draw->AddText(font, font->FontSize * factor, {std::floor(p.x + x * u), std::floor(p.y + y * u)},
-                      ImGui::ColorConvertFloat4ToU32(Alpha(c, fade)), value);
+                      ImGui::ColorConvertFloat4ToU32(Alpha(c, fade)), value, nullptr, wrap);
     };
     text(164, 30, introBodyFont, color, "IT STEALS / PRACTICE TOOLS");
     text(162, 72, introTitleFont, ink, suite_brand::Title);
@@ -523,7 +524,11 @@ inline void RenderLifecycle(bool visible, bool running, bool ready = true)
          closing ? "Until the next attempt." : "A clear route. A better run.");
     text(164, 177, introBodyFont, heading, suite_brand::Credit);
     text(164, 216, ImGui::GetFont(), Blend(ink, background, .25f),
-         closing ? "SEE YOU NEXT RUN" : "F3  MENU    /    F4  COMPACT HUD");
+         closing ? "SEE YOU NEXT RUN"
+                 : (suite_keys::Hint(suite_keys::Menu) + "  MENU    /    " +
+                    suite_keys::Hint(suite_keys::Hud) + "  COMPACT HUD")
+                       .c_str(),
+         w - 188 * u);
     float bar = (w - 48 * u) * progress;
     draw->AddLine({p.x + 24 * u, p.y + h - 16 * u}, {p.x + 24 * u + bar, p.y + h - 16 * u},
                   ImGui::ColorConvertFloat4ToU32(Alpha(color, .6f * fade)), 2 * u);

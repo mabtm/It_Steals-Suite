@@ -358,8 +358,11 @@ inline void Picker()
                      inspector::pickAction == 3 ? "Wheel: change target   |   Tab: target list"
                                                 : "Click: choose surface",
                      g_textCol, 14 * u, clip);
-    suite_ui::TextAt(draw, {a.x + 14 * u, a.y + 94 * u}, "Click / Enter: select   |   Esc / RMB / F7: cancel",
-                     g_textCol, 14 * u, clip);
+    suite_ui::TextAt(
+        draw, {a.x + 14 * u, a.y + 94 * u},
+        ("Click / Enter: select   |   Esc / RMB / " + suite_keys::Hint(suite_keys::Picker) + ": cancel")
+            .c_str(),
+        g_textCol, 14 * u, clip);
     if (!inspector::transportError.empty())
         draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), {a.x + 10 * u, b.y + 8 * u},
                       IM_COL32(255, 163, 105, 255), inspector::transportError.c_str(), nullptr,
@@ -901,7 +904,7 @@ inline void FocusButton(const inspector::State &state)
     }
     ImGui::EndDisabled();
     Help(
-        "Frame the selected object using the existing spectator camera. The player body stays in place. After acknowledgement, return to the game: RMB look, WASD/QE move, F3 menu. Closing the Inspector restores a Freecam it created.");
+        "Frame the selected object using the existing spectator camera. The player body stays in place. After acknowledgement, return to the game: RMB look, WASD/QE move, menu shortcut to return. Closing the Inspector restores a Freecam it created.");
 }
 
 inline void SaveButton(const inspector::State &state)
@@ -1056,11 +1059,11 @@ inline void RenderTab()
     }
     float u = suite_ui::Unit();
     ImGui::BeginDisabled(inspector::pending.has_value());
-    if (Action("Picker  [F7]", suite_ui::Icon::Scan, true))
+    if (Action(suite_keys::Label("Picker ", suite_keys::Picker).c_str(), suite_ui::Icon::Scan, true))
         StartPick(3);
     ImGui::EndDisabled();
     Help(
-        "Hide the menu and select in the game. Hover highlights the hit; click confirms that same object. Esc / RMB / F7 cancel.");
+        "Hide the menu and select in the game. Hover highlights the hit; click confirms that same object. Escape, right mouse or the picker shortcut cancel.");
     SameLineIfFits("Fullbright");
     FullbrightButton();
     InlineAction(browse ? "Hide object list" : "Object list");
@@ -1098,9 +1101,11 @@ inline void RenderTab()
     }
     if (!state->detail || !state->detail->selected)
     {
-        suite_ui::EmptyState(
-            "Inspector selection", suite_ui::Icon::Scan, "Point. Pick. Inspect.",
-            "Press F7 to select directly in the game. A compact object card keeps the view clear.", 178);
+        suite_ui::EmptyState("Inspector selection", suite_ui::Icon::Scan, "Point. Pick. Inspect.",
+                             ("Press " + suite_keys::Hint(suite_keys::Picker) +
+                              " to select directly in the game. A compact object card keeps the view clear.")
+                                 .c_str(),
+                             178);
         PickingMode();
         return;
     }
@@ -1243,9 +1248,11 @@ inline void Card()
             SameLineIfFits("Pin card");
             if (suite_ui::Checkbox("Pin card", &inspector::pinned))
                 Sound(inspector::pinned ? suite_ui::Tone::InspectorPin : suite_ui::Tone::InspectorClose);
-            Help("Keep this card visible while playing. F3 opens the menu; F7 selects another object.");
+            Help(("Keep this card visible while playing. " + suite_keys::Hint(suite_keys::Menu) +
+                  " opens the menu; " + suite_keys::Hint(suite_keys::Picker) + " selects another object.")
+                     .c_str());
             ImGui::BeginDisabled(inspector::pending.has_value());
-            if (Action("Picker  [F7]", suite_ui::Icon::Scan, true))
+            if (Action(suite_keys::Label("Picker ", suite_keys::Picker).c_str(), suite_ui::Icon::Scan, true))
                 StartPick(3);
             ImGui::EndDisabled();
             InlineAction("Copy ID");
@@ -1260,7 +1267,7 @@ inline void Card()
                 resetDetails = true;
                 tabRequest = 0;
             }
-            if (Action("Return to game  [F3]", suite_ui::Icon::Path))
+            if (Action(suite_keys::Label("Return to game ", suite_keys::Menu).c_str(), suite_ui::Icon::Path))
             {
                 ReturnToGame();
             }
@@ -1274,7 +1281,7 @@ inline void Card()
             cardPopupWasOpen = popup;
         }
         else
-            ImGui::TextDisabled("PINNED  |  F7 picker");
+            ImGui::TextDisabled("PINNED  |  %s picker", suite_keys::Hint(suite_keys::Picker).c_str());
         ImGui::Spacing();
         ImGui::TextDisabled("%s", suite_brand::Credit);
     }

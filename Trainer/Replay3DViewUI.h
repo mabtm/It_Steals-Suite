@@ -394,7 +394,7 @@ inline void RenderReplay3DDock()
     else
     {
         ImGui::TextDisabled("%s", data.replay3dState == 1 ? "Loading recorded level..."
-                                                          : "F3 opens replay controls");
+                                                          : "Use the menu shortcut to open replay controls");
     }
     ImGui::End();
     ImGui::PopStyleColor();

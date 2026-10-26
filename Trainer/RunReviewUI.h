@@ -5,11 +5,14 @@
 #include "ReplayTimelineUI.h"
 #include "RunReviewState.h"
 #include "ReplayArchive.h"
+#include "ReplayLibraryModel.h"
 #include "ReplayInputUI.h"
 #include "ClipUI.h"
 #include "RunExperienceModel.h"
 inline bool g_reviewFromArchive = false;
 inline int64_t g_reviewLoadedId = 0;
+inline practice::ReplayLibraryView g_replayLibraryView;
+inline practice::ReplayLibraryFilter g_replayLibraryFilter;
 
 inline ImVec4 ReplayStatusColor(int outcome, bool valid)
 {
@@ -184,11 +187,66 @@ inline void OpenReplayLibrary()
 inline void ReplayList()
 {
     static char search[160]{};
-    ImGui::SetNextItemWidth(std::min(340.f * g_dpiScale, ImGui::GetContentRegionAvail().x));
-    ImGui::InputTextWithHint("##Replay filter", "Name, category or seed", search, sizeof(search));
+    auto &filter = g_replayLibraryFilter;
+    float width = ImGui::GetContentRegionAvail().x;
+    bool compact = width < 650 * g_dpiScale;
+    float buttons =
+        ImGui::CalcTextSize(compact ? "RefreshFilters *" : "Refresh").x +
+        (ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemSpacing.x) * (compact ? 2 : 1);
+    ImGui::SetNextItemWidth(std::min(340.f * g_dpiScale, std::max(80.f * g_dpiScale, width - buttons)));
+    if (ImGui::InputTextWithHint("##Replay filter", "Name, category, notes or seed", search, sizeof(search)))
+        filter.query = search;
     SameLineIfFits("Refresh");
     if (suite_ui::Button("Refresh"))
         practice::g_replayArchive.Refresh();
+    auto drawFilters = [&] {
+        float filterWidth = ImGui::GetContentRegionAvail().x;
+        ImGui::SetNextItemWidth(
+            std::min(210.f * g_dpiScale, (filterWidth - ImGui::GetStyle().ItemSpacing.x) * .53f));
+        if (ImGui::BeginCombo("##Replay mode", filter.level < 0 ? "All modes" : kMapLevelNames[filter.level]))
+        {
+            for (int level = -1; level < kMapLevelCount; level++)
+                if (ImGui::Selectable(level < 0 ? "All modes" : kMapLevelNames[level], filter.level == level))
+                    filter.level = level;
+            ImGui::EndCombo();
+        }
+        Help("Filter recordings by game mode.");
+        ImGui::SameLine();
+        const char *statuses[] = {"All statuses", "Finished", "Finished / valid", "Finished / unvalid",
+                                  "Aborted"};
+        ImGui::SetNextItemWidth(std::min(180.f * g_dpiScale, ImGui::GetContentRegionAvail().x));
+        ImGui::Combo("##Replay status", &filter.status, statuses, 5);
+        Help("Filter by run outcome and observed local validity.");
+        SameLineIfFits("Favorites");
+        suite_ui::Checkbox("Favorites", &filter.favorites);
+        Help("Show only recordings marked as favorites.");
+        SameLineIfFits("Clear filters");
+        if (suite_ui::Button("Clear filters"))
+        {
+            search[0] = 0;
+            filter.query.clear();
+            filter.level = -1;
+            filter.status = 0;
+            filter.favorites = false;
+        }
+    };
+    if (compact)
+    {
+        SameLineIfFits("Filters *");
+        bool active = filter.level >= 0 || filter.status || filter.favorites;
+        if (suite_ui::Button(active ? "Filters *###ReplayFilters" : "Filters###ReplayFilters"))
+            ImGui::OpenPopup("Replay library filters");
+        Help("Mode, status and favorites filters. The asterisk indicates active filters.");
+        ImGui::SetNextWindowSize({std::min(400.f * g_dpiScale, ImGui::GetIO().DisplaySize.x - 32), 0},
+                                 ImGuiCond_Appearing);
+        if (ImGui::BeginPopup("Replay library filters"))
+        {
+            drawFilters();
+            ImGui::EndPopup();
+        }
+    }
+    else
+        drawFilters();
     auto state = practice::g_replayArchive.Get();
     if (!state->error.empty())
     {
@@ -208,52 +266,67 @@ inline void ReplayList()
             204);
         return;
     }
-    std::string query = search;
-    std::transform(query.begin(), query.end(), query.begin(),
-                   [](unsigned char c) { return char(std::tolower(c)); });
-    std::vector<size_t> shown;
-    for (size_t i = 0; i < state->runs.size(); i++)
-    {
-        const auto &row = state->runs[i];
-        std::string text = row.name + " " + row.category + " " + std::to_string(row.seed) + " " +
-                           kMapLevelNames[MapLevelIndex(row.scene)];
-        std::transform(text.begin(), text.end(), text.begin(),
-                       [](unsigned char c) { return char(std::tolower(c)); });
-        if (text.find(query) != std::string::npos)
-            shown.push_back(i);
-    }
+    auto &view = g_replayLibraryView;
+    view.Update(state, filter);
+    const auto &shown = view.shown;
+    ImGui::TextDisabled("%zu / %zu recordings", shown.size(), state->runs.size());
+    Help("Click a column heading to sort; click it again to reverse the order.");
     if (shown.empty())
     {
         suite_ui::EmptyState("Replay filtered", suite_ui::Icon::Replay, "No matching recordings",
-                             "Try a different name, category or seed.");
+                             "Change the search, mode or status, or clear the filters.");
         return;
     }
-    float height = std::max(140.f * g_dpiScale, ImGui::GetContentRegionAvail().y - 10 * g_dpiScale);
-    if (ImGui::BeginTable("Replay archive", 5,
+    float height = std::max(1.f, ImGui::GetContentRegionAvail().y - 4 * g_dpiScale);
+    if (ImGui::BeginTable("Replay archive", 7,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX |
-                              ImGuiTableFlags_SizingFixedFit,
-                          ImVec2(0, height)))
+                              ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Sortable,
+                          ImVec2(0, height), std::max(1000.f * g_dpiScale, ImGui::GetContentRegionAvail().x)))
     {
-        ImGui::TableSetupColumn("Name / category", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Mode", ImGuiTableColumnFlags_WidthFixed, 155 * g_dpiScale);
-        ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed, 95 * g_dpiScale);
-        ImGui::TableSetupColumn("Seed", ImGuiTableColumnFlags_WidthFixed, 100 * g_dpiScale);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 85 * g_dpiScale);
+        ImGui::TableSetupColumn("Fav", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort,
+                                36 * g_dpiScale);
+        ImGui::TableSetupColumn("Name / category", ImGuiTableColumnFlags_WidthStretch, 0, 2);
+        ImGui::TableSetupColumn("Mode", ImGuiTableColumnFlags_WidthFixed, 155 * g_dpiScale, 3);
+        ImGui::TableSetupColumn("Time",
+                                ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending,
+                                95 * g_dpiScale, 4);
+        ImGui::TableSetupColumn("Recorded",
+                                ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort |
+                                    ImGuiTableColumnFlags_PreferSortDescending,
+                                155 * g_dpiScale, 1);
+        ImGui::TableSetupColumn("Seed", ImGuiTableColumnFlags_WidthFixed, 100 * g_dpiScale, 5);
+        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 85 * g_dpiScale, 6);
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableHeadersRow();
+        if (auto sort = ImGui::TableGetSortSpecs(); sort && sort->SpecsDirty && sort->SpecsCount)
+        {
+            filter.sort = practice::ReplaySort(sort->Specs[0].ColumnUserID - 1);
+            filter.ascending = sort->Specs[0].SortDirection == ImGuiSortDirection_Ascending;
+            view.Update(state, filter);
+            sort->SpecsDirty = false;
+        }
         ImGuiListClipper clipper;
         clipper.Begin(int(shown.size()));
         while (clipper.Step())
             for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
             {
-                const auto &row = state->runs[shown[i]];
-                ImGui::PushID(std::to_string(row.id).c_str());
+                size_t index = shown[i];
+                const auto &row = state->runs[index];
+                auto &text = view.text[index];
+                if (text.date.empty())
+                    text.date = practice::ReplayRecordedAt(row.id);
+                ImGui::PushID(text.id.c_str());
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                std::string name = row.name + (row.category.empty() ? "" : " / " + row.category);
+                bool favoriteClicked = suite_ui::SmallButton(row.favorite ? "*" : "+");
+                if (favoriteClicked)
+                    practice::g_replayArchive.Favorite(row.id, !row.favorite);
+                Help(row.favorite ? "Remove from favorites" : "Add to favorites");
+                ImGui::TableNextColumn();
                 ImGui::BeginDisabled(HasPendingRequest());
-                if (ImGui::Selectable(name.c_str(), g_runReviewOpen && g_reviewTarget == row.id,
-                                      ImGuiSelectableFlags_SpanAllColumns))
+                if (ImGui::Selectable(text.label.c_str(), g_runReviewOpen && g_reviewTarget == row.id,
+                                      ImGuiSelectableFlags_SpanAllColumns) &&
+                    !favoriteClicked)
                 {
                     OpenSavedReplay(row);
                     ImGui::CloseCurrentPopup();
@@ -264,9 +337,12 @@ inline void ReplayList()
                       (row.notes.empty() ? "" : "\n" + row.notes))
                          .c_str());
                 ImGui::TableNextColumn();
-                ImGui::TextUnformatted(kMapLevelNames[MapLevelIndex(row.scene)]);
+                int level = MapLevelIndex(row.scene);
+                ImGui::TextUnformatted(level >= 0 ? kMapLevelNames[level] : "Unknown");
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(FormatRunTime(row.seconds).c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(text.date.empty() ? "Unknown" : text.date.c_str());
                 ImGui::TableNextColumn();
                 ImGui::Text("%d", row.seed);
                 ImGui::TableNextColumn();
@@ -287,27 +363,22 @@ inline void ReplayEditor(std::shared_ptr<const practice::MapData> data)
     if (!data || !data->review)
         return;
     int64_t id = data->review->id;
+    auto state = practice::g_replayArchive.Get();
+    auto row = std::lower_bound(state->runs.begin(), state->runs.end(), id,
+                                [](const auto &item, int64_t target) { return item.id > target; });
+    bool retained = row != state->runs.end() && row->id == id;
     if (bound != id)
     {
         bound = id;
         pending = false;
-        std::string title = practice::ReplayName(*data), cat, detail;
-        for (const auto &row : practice::g_replayArchive.Get()->runs)
-            if (row.id == id)
-            {
-                title = row.name;
-                cat = row.category;
-                detail = row.notes;
-                break;
-            }
+        std::string title = retained ? row->name : practice::ReplayName(*data);
+        std::string cat = retained ? row->category : "", detail = retained ? row->notes : "";
         snprintf(name, sizeof(name), "%s", title.c_str());
         snprintf(category, sizeof(category), "%s", cat.c_str());
         snprintf(notes, sizeof(notes), "%s", detail.c_str());
     }
-    bool mayEdit =
-        g_reviewFromArchive || (g_pShared && g_pShared->reviewRunId == id && g_pShared->reviewRetained);
-    for (const auto &row : practice::g_replayArchive.Get()->runs)
-        mayEdit |= row.id == id;
+    bool mayEdit = retained || g_reviewFromArchive ||
+                   (g_pShared && g_pShared->reviewRunId == id && g_pShared->reviewRetained);
     if (!mayEdit)
     {
         ImGui::TextDisabled("Temporary attempt / discarded on restart");
@@ -340,12 +411,8 @@ inline void ReplayEditor(std::shared_ptr<const practice::MapData> data)
     }
     if (pending)
     {
-        bool found = false;
-        auto state = practice::g_replayArchive.Get();
-        for (const auto &row : state->runs)
-            if (row.id == id && row.saved && row.name == name && row.category == category &&
-                row.notes == notes)
-                found = true;
+        bool found =
+            retained && row->saved && row->name == name && row->category == category && row->notes == notes;
         if (found)
         {
             ImGui::TextDisabled("Replay saved");

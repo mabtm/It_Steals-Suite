@@ -464,14 +464,17 @@ inline void RenderRunExperience(suite_run::Presentation &p, double now, bool exp
                      ? suite_ui::Ease(float(age / .18)) * suite_ui::Ease(float(left / .3))
                      : 1;
     card("##RunNotification", *r, fade, false, [&] {
-        ImGui::TextColored(suite_ui::heading, "%s", analyze ? "Analyse Run? [F8]" : p.toast.c_str());
+        ImGui::TextColored(suite_ui::heading, "%s",
+                           analyze ? suite_keys::Label("Analyse Run?", suite_keys::Analyze).c_str()
+                                   : p.toast.c_str());
         if (analyze)
         {
             ImGui::Text("Replay / %.0f s", std::ceil(left));
             ImGui::ProgressBar(float(left / 15), {-1, 4 * u}, "");
         }
         else
-            ImGui::TextUnformatted(p.toastOn ? "Shift+T to disable" : "Shift+T to enable");
+            ImGui::Text("%s to %s", suite_keys::Hint(suite_keys::Speedrun).c_str(),
+                        p.toastOn ? "disable" : "enable");
     });
 }
 

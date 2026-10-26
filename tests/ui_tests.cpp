@@ -494,13 +494,13 @@ void AppearanceCases(const std::string &output)
                     window->LastFrameActive == ImGui::GetFrameCount())
                     child = window;
             assert(child);
-            auto *tabs = findTabs("Appearance", 4);
+            auto *tabs = findTabs("Appearance", 5);
             assert(tabs);
             auto settingsID = tabs->ID;
-            std::array<ImGuiID, 4> pageIDs{};
-            for (int i = 0; i < 4; i++)
+            std::array<ImGuiID, 5> pageIDs{};
+            for (int i = 0; i < 5; i++)
                 pageIDs[i] = tabs->Tabs[i].ID;
-            for (int page = 0; page < 4; page++)
+            for (int page = 0; page < 5; page++)
             {
                 GImGui->TabBars.GetByKey(settingsID)->NextSelectedTabId = pageIDs[page];
                 for (int frame = 0; frame < 14; frame++)
@@ -599,7 +599,7 @@ void AppearanceCases(const std::string &output)
         suite_ui::navigation.Select(suite_ui::Page::Settings, ImGui::GetTime());
         Frame();
         Frame();
-        auto *settings = findTabs("Appearance", 4);
+        auto *settings = findTabs("Appearance", 5);
         assert(settings);
         settings->NextSelectedTabId = settings->Tabs[0].ID;
         Frame();
@@ -1887,6 +1887,71 @@ void SeedRouteReliabilityUICases(const std::string &output)
         << "7.11.4 real ImGui: route survives same-layout working/completed refresh, new seed/session resets, partial route retains checked pieces without crossing unknown gaps or showing a pulse in them at 480/1280 and 100/150 DPI: PASS\n";
 }
 
+void ShortcutUICases(const std::string &output)
+{
+    auto &io = ImGui::GetIO();
+    auto saved = suite_keys::preferences;
+    suite_keys::preferences = {};
+    for (ImVec2 viewport : {ImVec2(480, 360), ImVec2(1280, 720)})
+        for (float dpi : {1.f, 1.5f})
+        {
+            io.DisplaySize = viewport;
+            ApplyTheme(dpi);
+            io.Fonts->Build();
+            io.Fonts->SetTexID(1);
+            auto frame = [&] {
+                ImGui::NewFrame();
+                ImGui::SetNextWindowPos({20, 20}, ImGuiCond_Always);
+                ImGui::SetNextWindowSize({std::min(640.f, viewport.x - 40), viewport.y - 40},
+                                         ImGuiCond_Always);
+                ImGui::Begin("Shortcut settings QA");
+                RenderShortcutSettings();
+                ImGui::End();
+                ImGui::Render();
+            };
+            frame();
+            frame();
+            auto *window = ImGui::FindWindowByName("Shortcut settings QA");
+            int action = suite_keys::Menu;
+            auto row = ImHashData(&action, sizeof(action), window->GetID("Trainer shortcuts"));
+            auto assign = ImHashStr(suite_keys::Hint(suite_keys::Menu).c_str(), 0, row);
+            ImGui::ActivateItemByID(assign);
+            frame();
+            frame();
+            assert(suite_keys::recording == suite_keys::Menu &&
+                   ImGui::FindWindowByName("Assign trainer shortcut"));
+            suite_keys::Offer(0x73, 0);
+            frame();
+            assert(!suite_keys::error.empty() && suite_keys::recording == suite_keys::Menu);
+            if (!output.empty() && viewport.x == 1280 && dpi == 1)
+                Dump(output + "/shortcut-conflict.draw");
+            suite_keys::Offer('J', suite_keys::Control | suite_keys::Shift);
+            frame();
+            frame();
+            assert(suite_keys::Hint(suite_keys::Menu) == "Ctrl+Shift+J");
+            suite_keys::Capture(suite_keys::Menu);
+            frame();
+            frame();
+            auto *popup = ImGui::FindWindowByName("Assign trainer shortcut");
+            assert(popup->Pos.x >= 0 && popup->Pos.x + popup->Size.x <= viewport.x + 1 && popup->Pos.y >= 0 &&
+                   popup->Pos.y + popup->Size.y <= viewport.y + 1);
+            assert(popup->ScrollMax.y == 0);
+            ImGui::ActivateItemByID(popup->GetID("Cancel"));
+            frame();
+            frame();
+            assert(suite_keys::recording == -1 && suite_keys::Hint(suite_keys::Menu) == "Ctrl+Shift+J");
+            if (!output.empty() && viewport.x == 1280 && dpi == 1)
+                Dump(output + "/shortcuts-settings.draw");
+            ImGui::ActivateItemByID(window->GetID("Restore default shortcuts"));
+            frame();
+            frame();
+            assert(suite_keys::preferences.bindings == suite_keys::Defaults);
+        }
+    suite_keys::preferences = saved;
+    std::cout
+        << "Actual shortcut buttons, assignment/conflict modal, cancel/default restoration and small-screen popup bounds: PASS\n";
+}
+
 int main(int argc, char **argv)
 {
     std::cout.setf(std::ios::unitbuf);
@@ -2841,15 +2906,19 @@ int main(int argc, char **argv)
         while (std::chrono::steady_clock::now() < deadline && practice::g_replayArchive.Get()->runs.empty())
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         assert(practice::g_replayArchive.Get()->runs.size() == 1);
-        for (int frame = 0; frame < 3; frame++)
-        {
+        auto libraryFrame = [&] {
             ImGui::NewFrame();
-            ImGui::SetNextWindowSize(ImVec2(1100, 640), ImGuiCond_Always);
+            ImGui::SetNextWindowPos({20, 20}, ImGuiCond_Always);
+            ImGui::SetNextWindowSize(
+                {std::min(1100.f, io.DisplaySize.x - 40), std::min(640.f, io.DisplaySize.y - 40)},
+                ImGuiCond_Always);
             ImGui::Begin("Replay library QA");
             ReplayList();
             ImGui::End();
             ImGui::Render();
-        }
+        };
+        for (int frame = 0; frame < 3; frame++)
+            libraryFrame();
         Dump(std::string(argv[1]) + "/replay-library.draw");
         bool orange = false, green = false;
         auto abortColor = ImGui::ColorConvertFloat4ToU32(ReplayStatusColor(3, true)),
@@ -2861,6 +2930,51 @@ int main(int argc, char **argv)
                 green |= v.col == validColor;
             }
         assert(orange && !green);
+        auto *library = ImGui::FindWindowByName("Replay library QA");
+        auto tableID = library->GetID("Replay archive");
+        auto rowID = practice::g_replayArchive.Get()->runs[0].id;
+        auto favoriteID = ImHashStr("+", 0, ImHashStr(std::to_string(rowID).c_str(), 0, tableID));
+        auto beforeTarget = g_reviewTarget;
+        ImGui::ActivateItemByID(favoriteID);
+        libraryFrame();
+        deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (!practice::g_replayArchive.Get()->runs[0].favorite &&
+               std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        assert(practice::g_replayArchive.Get()->runs[0].favorite && g_reviewTarget == beforeTarget);
+        libraryFrame();
+        ImGui::ActivateItemByID(library->GetID("Favorites"));
+        libraryFrame();
+        assert(g_replayLibraryFilter.favorites && g_replayLibraryView.shown.size() == 1);
+        auto *table = GImGui->Tables.GetByKey(tableID);
+        auto &column = table->Columns[3];
+        io.AddMousePosEvent((column.MinX + column.MaxX) * .5f, table->OuterRect.Min.y + 10);
+        libraryFrame();
+        io.AddMouseButtonEvent(0, true);
+        libraryFrame();
+        io.AddMouseButtonEvent(0, false);
+        libraryFrame();
+        libraryFrame();
+        assert(g_replayLibraryFilter.sort == practice::ReplaySort::Time);
+        g_replayLibraryFilter.status = 2;
+        libraryFrame();
+        assert(g_replayLibraryView.shown.empty());
+        ImGui::ActivateItemByID(library->GetID("Clear filters"));
+        libraryFrame();
+        assert(g_replayLibraryView.shown.size() == 1 && !g_replayLibraryFilter.favorites);
+        for (ImVec2 viewport : {ImVec2(480, 360), ImVec2(1280, 720)})
+            for (float dpi : {1.f, 1.5f})
+            {
+                io.DisplaySize = viewport;
+                ApplyTheme(dpi);
+                io.Fonts->Build();
+                io.Fonts->SetTexID(1);
+                libraryFrame();
+                libraryFrame();
+                assert(library->Pos.x >= 0 && library->Pos.x + library->Size.x <= viewport.x + 1);
+                if (viewport.x == 480 && dpi == 1)
+                    Dump(std::string(argv[1]) + "/replay-library-small.draw");
+            }
         for (int outcome : {2, 3, 4, 5})
             for (bool valid : {false, true})
                 assert(ImGui::ColorConvertFloat4ToU32(ReplayStatusColor(outcome, valid)) == abortColor);
@@ -3061,6 +3175,7 @@ int main(int argc, char **argv)
     UpdateUICases(argc > 1 ? argv[1] : "");
     ExperienceCases(argc > 1 ? argv[1] : "");
     AppearanceCases(argc > 1 ? argv[1] : "");
+    ShortcutUICases(argc > 1 ? argv[1] : "");
     FeedbackRevisionCases(argc > 1 ? argv[1] : "");
     MilestoneCases(argc > 1 ? argv[1] : "");
     PersistentFeedbackCases(argc > 1 ? argv[1] : "");

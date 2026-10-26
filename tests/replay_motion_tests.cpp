@@ -329,6 +329,11 @@ int main(int argc, char **argv)
         assert(recheck(transport)->filesOk);
         archive.Save(transport, "Input run", "Moderation", "Original notes\nSecond line");
         Until([&] { return archive.Get()->savedRevision == 1 && !archive.Get()->busy; });
+        auto originalMeta = Read(saved / (prefix + ".meta"));
+        archive.Favorite(map->review->id, true);
+        Until([&] { return archive.Get()->runs[0].favorite || !archive.Get()->error.empty(); });
+        assert(archive.Get()->error.empty() && Read(saved / (prefix + ".meta")) == originalMeta &&
+               Read(source / (prefix + ".isrun")) == map->bytes);
         assert(Read(saved / (prefix + ".isinput")) == bytes &&
                Read(saved / (prefix + ".validation.json")) == Read(source / (prefix + ".validation.json")));
         archive.LoadAnnotations(transport);
@@ -351,6 +356,31 @@ int main(int argc, char **argv)
         archive.Shutdown();
     }
     auto package = DecodeReplayZip(Read(exported));
+    {
+        ReplayArchive reopened;
+        reopened.SetDirectory(saved);
+        Until([&] { return !reopened.Get()->runs.empty() || !reopened.Get()->error.empty(); });
+        assert(reopened.Get()->error.empty() && reopened.Get()->runs[0].favorite);
+        reopened.Favorite(map->review->id, false);
+        Until([&] { return !reopened.Get()->runs[0].favorite; });
+        reopened.Favorite(map->review->id, true);
+        Until([&] { return reopened.Get()->runs[0].favorite; });
+        reopened.Refresh();
+        reopened.Shutdown();
+        assert(reopened.Get()->runs[0].favorite);
+    }
+    {
+        Write(saved / "favorites.json", ReplayText("[broken]"));
+        ReplayArchive recovered;
+        recovered.SetDirectory(saved);
+        Until([&] { return recovered.Get()->runs.size() == 1 && !recovered.Get()->busy; });
+        assert(!recovered.Get()->error.empty() && !recovered.Get()->runs[0].favorite);
+        recovered.Favorite(map->review->id, true);
+        Until([&] { return recovered.Get()->runs[0].favorite; });
+        recovered.Shutdown();
+        assert(recovered.Get()->error.empty() &&
+               Read(saved / "favorites.json.bak") == ReplayText("[broken]"));
+    }
     assert(package.size() == 8 && package[prefix + ".isrun"] == map->bytes &&
            package[prefix + ".isinput"] == bytes && package[prefix + ".ismarks"] == markBytes &&
            package["manifest.json"] ==
@@ -413,7 +443,7 @@ int main(int argc, char **argv)
          {"7.3.0",  "7.3.1",  "7.3.2",  "7.3.3",  "7.3.4",  "7.3.5",  "7.4.0",  "7.5.0",  "7.5.1",  "7.5.2",
           "7.6.0",  "7.7.0",  "7.8.0",  "7.8.1",  "7.9.0",  "7.10.0", "7.10.1", "7.11.0", "7.11.1", "7.11.2",
           "7.11.3", "7.11.4", "7.11.5", "7.12.0", "7.12.1", "7.12.2", "7.12.3", "7.12.4", "7.12.5", "7.12.6",
-          "7.13.0", "7.13.1", "7.14.0", "7.14.1", "7.14.2", "7.15.0", "7.16.0", "7.16.1", "7.16.2"})
+          "7.13.0", "7.13.1", "7.14.0", "7.14.1", "7.14.2", "7.15.0", "7.16.0", "7.16.1", "7.16.2", "7.17.0"})
     {
         auto previousPackage = package;
         previousPackage["manifest.json"] = ReplayText(ReplayManifest(*map, true, true, version, true));

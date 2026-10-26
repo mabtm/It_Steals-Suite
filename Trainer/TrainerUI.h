@@ -274,7 +274,8 @@ inline void RenderSpeedrunPage()
     ImGui::TextDisabled("Clean runs, focused practice, and your progress.");
     suite_ui::Section("Run setup", ImGuiTreeNodeFlags_DefaultOpen, [&]() {
         ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
-        if (suite_ui::Checkbox("Speedrun Mode [Shift+T]", &g_speedrunMode))
+        if (suite_ui::Checkbox(suite_keys::Label("Speedrun Mode", suite_keys::Speedrun).c_str(),
+                               &g_speedrunMode))
             SetSpeedrunMode(g_speedrunMode);
         ImGui::BeginDisabled(!g_speedrunMode);
         {
@@ -535,17 +536,81 @@ inline void RenderSystemSettings()
         ImGui::Text("Game target: %d | VSync: %d | display: %.0f Hz", g_pShared->gameTargetFps,
                     g_pShared->gameVSync, g_pShared->gameRefreshHz);
     ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
-    if (suite_ui::Button("Use borderless fullscreen [F6]"))
+    if (suite_ui::Button(suite_keys::Label("Use borderless fullscreen", suite_keys::Borderless).c_str()))
         g_commands.windowModeCmd = 1;
     Help(
         "Switch the game through Unity's window-mode setting. Useful when exclusive fullscreen hides external overlays.");
     ImGui::EndDisabled();
 }
 
+inline void RenderShortcutSettings()
+{
+    ImGui::TextWrapped(
+        "Click a shortcut, then press the new key combination. Ctrl, Alt and Shift are supported.");
+    if (ImGui::BeginTable("Trainer shortcuts", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg))
+    {
+        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch, .56f);
+        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthStretch, .44f);
+        ImGui::TableHeadersRow();
+        for (int i = 0; i < suite_keys::Count; i++)
+        {
+            ImGui::PushID(i);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextWrapped("%s", suite_keys::Actions[i]);
+            ImGui::TableNextColumn();
+            if (suite_ui::Button(suite_keys::Hint(suite_keys::Action(i)).c_str(), {-1, 0}))
+                suite_keys::Capture(i);
+            Help(suite_keys::Hint(suite_keys::Action(i)).c_str());
+            if (suite_keys::unavailable & (1u << i))
+            {
+                ImGui::TextDisabled("Focused input fallback");
+                Help(
+                    "Windows could not reserve this combination. It is checked while the game has focus; choose another combination if another application also uses it.");
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+    if (suite_ui::Button("Restore default shortcuts"))
+        suite_keys::preferences = {};
+    ImGui::TextWrapped(
+        "Shortcuts apply while the game or trainer has focus and pause during text entry. Custom trainer shortcuts take priority over replay keys. F1 (Freecam), T (restart) and replay playback controls remain game controls.");
+    ImGui::TextDisabled("The tray menu can always reopen the trainer.");
+    if (suite_keys::openRequested)
+    {
+        ImGui::OpenPopup("Assign trainer shortcut");
+        suite_keys::openRequested = false;
+    }
+    ImGui::SetNextWindowSize({std::min(460.f * g_dpiScale, ImGui::GetIO().DisplaySize.x - 24), 0},
+                             ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal("Assign trainer shortcut", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        if (suite_keys::recording < 0)
+            ImGui::CloseCurrentPopup();
+        else
+        {
+            ImGui::TextWrapped("%s", suite_keys::Actions[suite_keys::recording]);
+            ImGui::TextWrapped("Press shortcut now.\nEsc: cancel / Backspace: clear");
+            ImGui::BeginChild("Shortcut feedback", {0, 2.5f * ImGui::GetTextLineHeight()});
+            if (!suite_keys::error.empty())
+                ImGui::TextWrapped("%s", suite_keys::error.c_str());
+            ImGui::EndChild();
+            if (suite_ui::Button("Unassign"))
+                suite_keys::Offer(8, 0);
+            SameLineIfFits("Cancel");
+            if (suite_ui::Button("Cancel"))
+                suite_keys::recording = -1;
+        }
+        ImGui::EndPopup();
+    }
+}
+
 inline void RenderSettingsPage()
 {
     ImGui::BeginChild("SettingsScroll", ImVec2(0, 0));
-    if (ImGui::BeginTabBar("SettingsPages"))
+    if (ImGui::BeginTabBar("SettingsPages", ImGuiTabBarFlags_FittingPolicyScroll))
     {
         if (suite_ui::BeginTabItem("Appearance"))
         {
@@ -567,6 +632,11 @@ inline void RenderSettingsPage()
             RenderSystemSettings();
             suite_ui::EndTabItem();
         }
+        if (suite_ui::BeginTabItem("Shortcuts"))
+        {
+            RenderShortcutSettings();
+            suite_ui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
     ImGui::Spacing();
@@ -581,6 +651,7 @@ inline void RenderSettingsPage()
         defaults.reports = g_reportsEnabled;
         defaults.autoStartGame = g_autoStartGame;
         defaults.skipGameIntro = g_skipGameIntro;
+        defaults.hotkeys = suite_keys::preferences;
         ApplyPreferences(defaults);
     }
     if (suite_ui::Button("Save settings now"))
@@ -605,10 +676,12 @@ inline void RenderDiagnosticsPage()
     Help("Read-only scene inspection, geometry decisions, observed property changes and local snapshots.");
     RenderDiagnosticScan();
     ImGui::Separator();
-    ImGui::TextDisabled("Overlay visibility (F6)");
+    ImGui::TextDisabled("Overlay visibility (%s)", suite_keys::Hint(suite_keys::Borderless).c_str());
     Help(
-        "Windowed and borderless use the game client area. Press F6 in the game to request borderless fullscreen if exclusive fullscreen hides the overlay.");
-    ImGui::TextDisabled("F2: toggle optional panels. F3: open/close menu.");
+        "Windowed and borderless use the game client area. Use the borderless shortcut to request borderless fullscreen if exclusive fullscreen hides the overlay.");
+    ImGui::TextDisabled("%s: toggle overlay. %s: open/close menu.",
+                        suite_keys::Hint(suite_keys::Panels).c_str(),
+                        suite_keys::Hint(suite_keys::Menu).c_str());
     if (suite_ui::Button("Close trainer"))
         g_quit = true;
     ImGui::EndChild();
@@ -674,15 +747,16 @@ void RenderMainWindow(const std::string &mode, int seed)
     if (!replayHeader && g_pShared && g_pShared->seedActive)
         ImGui::TextColored(g_accentCol, "SET SEED | Practice seed: %d", seed);
     bool narrow = ImGui::GetContentRegionAvail().x < 650 * suite_ui::Unit();
-    if (suite_ui::Button(narrow ? "Back [F3]" : "Return to game [F3]"))
+    if (suite_ui::Button(suite_keys::Label(narrow ? "Back" : "Return to game", suite_keys::Menu).c_str()))
     {
         g_overlayVisible = false;
         SetOverlayInteractive(false);
     }
     Help("Close the menu and pass mouse/keyboard input back to the game. The map and timer remain visible.");
-    SameLineIfFits(narrow ? "HUD [F4]" : "Compact HUD [F4]");
+    auto hudLabel = suite_keys::Label(narrow ? "HUD" : "Compact HUD", suite_keys::Hud);
+    SameLineIfFits(hudLabel.c_str());
     ImGui::BeginDisabled(!CompactHudAllowed(g_speedrunMode, g_practiceMode));
-    if (suite_ui::Button(narrow ? "HUD [F4]" : "Compact HUD [F4]"))
+    if (suite_ui::Button(hudLabel.c_str()))
     {
         g_compactMode = true;
         SetOverlayInteractive(false);

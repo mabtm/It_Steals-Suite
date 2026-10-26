@@ -20,7 +20,7 @@ The game mod talks to the trainer through bounded shared-memory channels. Unity 
 
 Follow the owning component rather than adding a new layer for every change. Keep separate models, file formats, algorithms, and platform code where that separation makes them easier to understand or test.
 
-**ReplayArchive.h** queues named disk operations on one worker; **ReplayPackage.h** owns package formats and exporter compatibility. **TrainerUI.h** groups menu pages and settings, while **ClipUI.h** groups camera, layer, keypoint, and export controls. These sections share the existing state and UI identifiers.
+**ReplayArchive.h** queues named disk operations on one worker; **ReplayPackage.h** owns package formats and exporter compatibility. **ReplayLibraryModel.h** caches the immutable archive's searchable labels and sorted/filter indices without reordering the archive itself. **TrainerHotkeys.h** owns the eight native shortcut bindings and capture/conflict rules. **TrainerUI.h** groups menu pages and settings, while **ClipUI.h** groups camera, layer, keypoint, and export controls. These sections share the existing state and UI identifiers.
 
 **PerformanceTiming.h** contains frame-cost and search-progress measurements. **MovementTiming.h** contains recorded movement analysis and travel-time estimates. Input colors live with their drawing helpers in **InputModules.h**.
 
@@ -70,6 +70,31 @@ python3 tests/run.py --sanitize --only physical_edge_tests physical_route_tests 
 ```
 
 Tests use fixed captures and synthetic fixtures. Some fixtures contain non-English Unicode text to check file handling. Portable checks cover logic and contracts; live Unity behavior, interactive UAC, device input, and actual performance still need testing in game. The supplied mod is not rebuilt by contract tests; compile it separately against the matching game SDK and loader.
+
+### GUI changes: 7.17.0 to 7.18.0
+
+The replay library rebuilds display/search text when its immutable archive snapshot changes, and filtered order when data, the query, filters or sorting change. Visible rows still use ImGui's existing clipper. Dates are formatted only when a row becomes visible; notes are searched on demand without keeping a second copy of their full text. Name/date/time/mode/seed/status sorting uses run identity as the stable tie-breaker. Archive order remains newest-first for identity lookups. The replay detail editor reuses one snapshot and a binary identity lookup instead of scanning the full library each frame.
+
+Favorites are local library preferences in `Replays/favorites.json`, written atomically by the existing archive worker. Marking one does not rewrite the recording, notes, validity or verification companions, and does not rescan their metadata. Favorites survive refresh/restart; they are not part of shared replay packages.
+
+Settings format 20 adds the eight native trainer shortcuts and reads previous settings with the original defaults. `TrainerPreferences::FormatVersion` also defines the settings reader's future-version limit. Capture accepts modifier combinations, explains conflicts/reserved keys, supports cancel/unassign, and restores defaults independently of display settings. Native registration follows focus and binding changes; text entry and the HUD/clip workspaces suspend it. Reassignment consumes the current press instead of invoking the newly assigned action. Custom trainer bindings take priority over the existing fixed replay keys; F1 Freecam, T restart and replay playback controls remain in the game mod. Button labels and help use the saved bindings. The tray can reopen the menu if its shortcut is unassigned.
+
+The fallback timer now compares all enabled bindings with the registered mask, including the eighth action. Fully registered shortcuts use Windows messages instead of unnecessary 20 ms fallback wakes. Missing registrations retain the focused polling fallback. Render/capture frame limits and the mod remain unchanged.
+
+Five alternating before/after pairs on Linux/GCC 13.3, pinned to one CPU, compared 120 unchanged-list passes per run. The frozen 7.17 filter and current cache return identical indices/checksums for the deterministic fixture. [Raw measurements](tests/replay_library_performance.csv) measure only list preparation, excluding ImGui drawing, disk IO, the game and OBS; they are not a live FPS measurement.
+
+| Library size | 7.17 filter per frame, median | Unchanged 7.18 view per frame, median | One initial 7.18 index pass |
+| --- | --- | --- | --- |
+| 1,000 recordings | 0.214 ms | <0.001 ms | 1.263 ms |
+| 10,000 recordings | 2.672 ms | <0.001 ms | 12.192 ms |
+
+```sh
+g++ -std=c++20 -O2 -pthread -ITrainer tests/replay_library_benchmark.cpp -o build/replay-library-benchmark
+build/replay-library-benchmark
+python3 tests/run.py --ui --only hotkey_tests replay_library_tests settings_tests replay_motion_tests ui_tests --jobs 2
+```
+
+The regressions cover search/notes, combined filters, deterministic sorting, snapshot invalidation, favorite persistence without recording edits, settings migration and shortcut conflicts/capture/focus edges. Actual ImGui controls exercise sorting, favorite/filter buttons and shortcut assignment/cancel/default restoration at small/normal viewports and 100/150% DPI. The Windows launcher job also runs the portable shortcut/library models with MSVC. Actual keyboard reservation/focus behavior still needs the live check below.
 
 ### Performance comparison: 7.16.2 to 7.17.0
 
@@ -181,6 +206,7 @@ Use the release downloads and note the Suite version. Mark each check **Passed**
 - **Archive and camera editor:** Name a retained replay, export its package, and reopen the replay after restarting the Suite. Import the package and check that the existing run stays intact. In Clip Studio, add and adjust a camera keypoint, preview the move, and export a short clip. Check the saved file's picture, duration, and sound if recorded.
 - **Seed search:** Let each route method fill the Top 10 with the spawn filter set to **Any player spawn**. Check the ranked results and selected preview. **Use best seed** copies the mode, seed, and seed type; load it with **Apply Seed & Reload** and compare the layout. Stop and restart the search, then repeat with a specific spawn filter.
 - **Settings and update:** Save one visible HUD setting and restart the Suite. Confirm it and the retained replays remain. When a newer release is available, test **Later**, installation, and the restart; check the version and retained data afterward. Until then, mark update installation **Not tested**.
+- **Shortcuts and library:** Reassign the menu/picker to a modifier combination, type into replay search/notes, Alt-Tab away/back and hold/release the shortcut. Check one action per press and no action while typing or in another application. Try duplicate and reserved keys, cancel capture, unassign and recover through the tray, then restore defaults. In Replay, combine mode/status/favorite filters, sort columns both ways, clear filters and reopen an older recording. Favorites must survive restart without changing its name, notes, original files or run verdict.
 
 Repeat the map, seed, and run checks in **Classic**, **Camera**, **Hide & Seek**, **Timer**, **Ghost**, **Classic Bonus**, **Camera Bright**, and **Hide & Seek Outside**. In Timer, check enemy positions during a run. In both Hide & Seek modes, compare walls and replay paths closely. Test flashes only where the relevant light action exists.
 

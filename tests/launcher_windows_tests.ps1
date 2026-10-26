@@ -65,7 +65,7 @@ try {
     $msbuild=& $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
     if (-not $msbuild) { throw 'MSBuild is required for the native checks.' }
     $nativeIncludes=[Security.SecurityElement]::Escape((Join-Path $repo 'Trainer'))
-    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests')) {
+    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','hotkey_tests','replay_library_tests')) {
         $nativeSource=[Security.SecurityElement]::Escape((Join-Path $repo ('tests/'+$nativeTest+'.cpp')))
         $nativeOutput=[Security.SecurityElement]::Escape((Join-Path $work 'native'))
         $nativeProject=Join-Path $work 'startup-tests.vcxproj'

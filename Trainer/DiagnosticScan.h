@@ -56,7 +56,7 @@ inline std::vector<DiagnosticFinding> Diagnose(const DiagnosticInputs &in)
     if (in.menuRequested && (d.menuInputOwned != 1 || d.cursorLock == 1))
         add(2, "INP-001", "Menu cursor ownership is incomplete",
             "Owned: " + std::to_string(d.menuInputOwned) + " / lock: " + std::to_string(d.cursorLock),
-            "Return to the game with F3, then reopen the menu. Reconnect if the problem persists.");
+            "Return to the game with the menu shortcut, then reopen the menu. Reconnect if the problem persists.");
     else
         add(0, "INP-001", "Input ownership is consistent");
     add(in.software ? 2 : 0, "REN-001",

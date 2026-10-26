@@ -9,6 +9,7 @@
 #include "OverlayPolicy.h"
 #include "SeedSearchOptions.h"
 #include "ReplayPreferences.h"
+#include "TrainerHotkeys.h"
 #include <algorithm>
 #include <cmath>
 #include <locale>
@@ -17,6 +18,7 @@
 
 struct TrainerPreferences
 {
+    static constexpr int FormatVersion = 20;
     OverlayLayout hud{false}, speedrun{true};
     suite_input::Preferences input;
     MinimapOptions map;
@@ -25,6 +27,7 @@ struct TrainerPreferences
     inspector_fx::Preferences inspector;
     AppearancePreferences appearance;
     ReplayPreferences replay;
+    suite_keys::Preferences hotkeys;
     bool reports = false;
     bool autoStartGame = true;
     bool skipGameIntro = true;
@@ -47,6 +50,7 @@ struct TrainerPreferences
         inspector.Validate();
         appearance.Validate();
         replay.Validate();
+        hotkeys.Validate();
         hud.Validate();
         speedrun.Validate();
         map.Validate();
@@ -72,14 +76,15 @@ struct TrainerPreferences
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out.precision(9);
-        out << "version=19\nframeLimitMode=" << frameLimitMode << "\ngameFrameLimit=" << gameFrameLimit
-            << "\nvSyncMode=" << vSyncMode << "\nreports=" << reports << "\nrawSpawn=" << rawSpawn
-            << "\ncompact=" << compact << "\nminimap=" << minimap << "\npath=" << path
-            << "\nlockAspect=" << lockAspect << "\nplayer=" << player << "\ncrystals=" << crystals
-            << "\nmonster=" << monster << "\nvisuals=" << visuals << "\nwidth=" << width
-            << "\nheight=" << height << "\nfps=" << fps << "\nlevel=" << level << "\nseed=" << seed
-            << "\nautoStartGame=" << autoStartGame << "\ncaptureOverlay=" << captureOverlay
-            << "\nskipGameIntro=" << skipGameIntro << "\nopacity=" << opacity << '\n';
+        out << "version=" << FormatVersion << "\nframeLimitMode=" << frameLimitMode
+            << "\ngameFrameLimit=" << gameFrameLimit << "\nvSyncMode=" << vSyncMode << "\nreports=" << reports
+            << "\nrawSpawn=" << rawSpawn << "\ncompact=" << compact << "\nminimap=" << minimap
+            << "\npath=" << path << "\nlockAspect=" << lockAspect << "\nplayer=" << player
+            << "\ncrystals=" << crystals << "\nmonster=" << monster << "\nvisuals=" << visuals
+            << "\nwidth=" << width << "\nheight=" << height << "\nfps=" << fps << "\nlevel=" << level
+            << "\nseed=" << seed << "\nautoStartGame=" << autoStartGame
+            << "\ncaptureOverlay=" << captureOverlay << "\nskipGameIntro=" << skipGameIntro
+            << "\nopacity=" << opacity << '\n';
         const float *colors[] = {background, text, header, accent};
         const char *names[] = {"background", "text", "header", "accent"};
         for (int c = 0; c < 4; c++)
@@ -87,6 +92,7 @@ struct TrainerPreferences
                 out << names[c] << i << '=' << colors[c][i] << '\n';
         input.Encode(out);
         replay.Encode(out);
+        hotkeys.Encode(out);
         experience.Encode(out);
         inspector.Encode(out);
         appearance.Encode(out);
@@ -130,6 +136,8 @@ struct TrainerPreferences
                 result.input.Decode(key.substr(6), value);
             else if (key.rfind("replay.", 0) == 0)
                 result.replay.Decode(key.substr(7), value);
+            else if (key.rfind("hotkey.", 0) == 0)
+                result.hotkeys.Decode(key.substr(7), integer);
             else if (key.rfind("appearance.", 0) == 0)
                 result.appearance.Decode(key.substr(11), value);
             else if (key.rfind("inspector.", 0) == 0)

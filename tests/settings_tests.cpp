@@ -100,6 +100,7 @@ int main(int argc, char **argv)
     TrainerPreferences p;
     p.seed = 123;
     p.captureOverlay = true;
+    p.hotkeys.bindings[suite_keys::Menu] = {'J', suite_keys::Control | suite_keys::Shift};
     p.skipGameIntro = false;
     p.experience.volume = .34f;
     p.experience.motion = false;
@@ -121,7 +122,7 @@ int main(int argc, char **argv)
         TrainerSettings settings;
         auto loaded = settings.Load();
         assert(loaded.seed == 124 && loaded.captureOverlay && !loaded.skipGameIntro &&
-               !loaded.experience.motion && !loaded.experience.sounds &&
+               loaded.hotkeys == p.hotkeys && !loaded.experience.motion && !loaded.experience.sounds &&
                std::abs(loaded.experience.volume - .34f) < 1e-6);
         assert(std::filesystem::exists(path.string() + ".bak"));
     }

@@ -195,7 +195,7 @@ class TrainerSettings
                 return {};
             }
         }
-        if (Version(bytes) > 19)
+        if (Version(bytes) > TrainerPreferences::FormatVersion)
         {
             readOnly = true;
             error = "Display settings belong to a newer suite; writes are disabled.";

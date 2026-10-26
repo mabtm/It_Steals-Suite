@@ -75,7 +75,7 @@ inline void RenderDiagnosticScan()
                     detail(finding);
     }
     ImGui::BeginDisabled(!g_pShared || g_pShared->timerState == 1 || HasPendingRequest());
-    if (suite_ui::Button("Refresh map geometry [F5]"))
+    if (suite_ui::Button(suite_keys::Label("Refresh map geometry", suite_keys::RefreshMap).c_str()))
         g_commands.resetMapCmd = 1;
     ImGui::EndDisabled();
     if (suite_ui::CollapsingHeader("Technical details"))

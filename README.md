@@ -25,10 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.17.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.17.0)**
+**[v7.18.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.18.0)**
 
-- Improved large-route seed searches with a stronger, bounded spanning-tree lower bound. Seeds that are provably outside the Top 10 avoid full route optimization; every seed remains generated and checked, and the route solver and ranking rules stay the same. Repeatedly ineffective refinement automatically pauses to limit its overhead.
-- Improved performance verification with a repeatable Outside-geometry benchmark, pickup-radius comparisons, exact-optimum bound checks and Windows checks against frozen route orders and lengths, including 52-crystal layouts and directed input.
+- Improved the replay library with favorites, mode/status filters, searchable notes, recording dates and sortable columns. Favorites are local library preferences; recordings, notes and verification data are preserved.
+- Improved GUI efficiency by caching replay search/display text and filtered order until the archive or controls change. Recording dates are formatted only for visible rows, and fully registered shortcuts no longer trigger unnecessary fallback polling.
+- Improved trainer shortcuts: assign keys with Ctrl, Alt or Shift, remove assignments or restore defaults in Settings > Shortcuts. Conflicts and reserved combinations are explained, displayed hints follow the saved assignments, and text entry suspends shortcuts. Freecam, restart and replay playback keys keep their existing game controls.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -113,7 +114,7 @@ While the repository is private, open **Updates → Connect private releases** a
 
 **Replay & clips**
 
-- **Replay library:** Keep completed or aborted runs with their mode, seed, time, status, name, category, and notes.
+- **Replay library:** Search recordings and notes, filter by mode/status or favorites, and sort by name, date, time, seed, mode or status. Keep completed or aborted runs with their name, category and notes.
 - **2D review:** Compare your path with a planned route, including pickups, monster movement, and light flashes.
 - **3D playback:** Review movement with recorded, follow, or free cameras in the original or simplified scene.
 - **Timeline:** Seek, pause, loop, change speed, and add named markers.
@@ -129,6 +130,7 @@ While the repository is private, open **Updates → Connect private releases** a
 **Settings & maintenance**
 
 - **Appearance:** Customize themes, fonts, animations, interface sounds, and the intro.
+- **Trainer shortcuts:** Assign keys with Ctrl, Alt or Shift in Settings → Shortcuts. Conflicting or reserved combinations are explained; shortcuts pause during text entry.
 - **Display controls:** Set overlay refresh, temporary game FPS/VSync overrides, and borderless mode.
 - **Diagnostics:** Check connection and performance issues and save or copy a local report.
 - **Updates:** Check GitHub releases, install verified packages, restart automatically, and read the version history.
@@ -169,6 +171,8 @@ Plan a route, compare it with a recorded path, and inspect the objects behind it
 | **[Checksums](https://github.com/mabtm/It_Steals-Suite/releases/latest/download/SHA256SUMS.txt)** | SHA-256 hashes for the downloads. |
 
 ### Shortcuts
+
+These are the defaults. Change the eight native trainer actions in **Settings → Shortcuts**; button labels and hints follow your assignments. F1, the game's T restart and replay playback controls retain their game bindings. The tray menu can reopen the trainer even when its menu shortcut is unassigned.
 
 | Key | Action |
 | --- | --- |

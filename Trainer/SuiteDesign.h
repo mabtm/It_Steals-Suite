@@ -227,7 +227,7 @@ inline void Sidebar(float height)
                            "Appearance, HUD, minimap and system preferences.",
                            "Review recordings with events and route playback.",
                            "Scan the connection and inspect technical details.",
-                           "F7 Picker, compact object card and engine details on request.",
+                           "Picker shortcut, compact object card and engine details on request.",
                            "Stable releases, automatic installation and the full version history."};
     for (int i = 0; i < PageCount; i++)
     {
