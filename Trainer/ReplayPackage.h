@@ -187,6 +187,7 @@ inline constexpr ReplayPackageExporter ReplayPackageExporters[] = {
     {"7.16.0", true},
     {"7.16.1", true},
     {"7.16.2", true},
+    {"7.18.0", true},
     {"7.17.0", true},
     {"7.14.2", true},
     {"7.14.1", true},

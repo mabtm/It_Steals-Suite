@@ -96,6 +96,26 @@ python3 tests/run.py --ui --only hotkey_tests replay_library_tests settings_test
 
 The regressions cover search/notes, combined filters, deterministic sorting, snapshot invalidation, favorite persistence without recording edits, settings migration and shortcut conflicts/capture/focus edges. Actual ImGui controls exercise sorting, favorite/filter buttons and shortcut assignment/cancel/default restoration at small/normal viewports and 100/150% DPI. The Windows launcher job also runs the portable shortcut/library models with MSVC. Actual keyboard reservation/focus behavior still needs the live check below.
 
+### Performance comparison: 7.18.0 to 7.18.1
+
+Wide pickup regions can leave every Outside seed requiring the complete 52-crystal heuristic, even with the stronger 7.17 bound. The search now prepares sorted center-distance neighbors once per map, then filters those rows for each generated layout. Descending catalog IDs preserve the original local-index tie order. Small tours, sparse catalogs and noncanonical layouts retain the original sort. The shared table is limited to catalogs of at most 256 candidate points (about 12 KiB for the 71-point Outside fixture). Pickup DP also reads each leg's cost/verification tables directly; predecessor order and tie choices are unchanged.
+
+Sequential Linux/GCC 13.3 measurements used the same benchmark source, asset-derived geometry and synthetic deterministic RNG/pickup regions for both revisions. Three alternating pairs per workload ran with CPU affinity and no concurrent builds/tests. Searches warm the geometry with 128 seeds, so these timings exclude cold preparation. Medians and [all 42 measurements](tests/outside_search_performance.csv) are recorded below; these are CPU benchmarks, not measurements from the user's live game or guarantees of FPS/throughput on another PC.
+
+| Workload | Seeds | Workers | Synthetic pickup radius | 7.18.0 seeds/s | 7.18.1 seeds/s | Change |
+| --- | --- | --- | --- | --- | --- | --- |
+| Outside, complete route scoring | 6,000 | 1 | 1.35 | 1,764 | 2,142 | +21.4% |
+| Outside, complete search | 6,000 | 1 | 1.35 | 1,622 | 1,929 | +18.9% |
+| Outside, complete search | 6,000 | 4 | 1.35 | 6,080 | 6,372 | +4.8% |
+| Outside, complete search | 60,000 | 4 | 1.35 | 4,921 | 6,265 | +27.3% |
+| Outside, complete search | 6,000 | 1 | 0.5 | 2,512 | 2,880 | +14.6% |
+| Outside, complete search | 6,000 | 1 | 0 (centers) | 11,956 | 12,678 | +6.0% |
+| Inside, complete search | 6,000 | 1 | 1.35 | 81,680 | 86,958 | +6.5% |
+
+Short multicore measurements vary noticeably; the longer workload is included rather than treating a subsecond sample as a stable estimate. All compared final Top-10 seed indices, route lengths and visit-order hashes match within each workload. Complete-scoring fingerprints also match across all 6,000 layouts. Every requested seed is still generated and checked. The wide-contact Outside searches score all 6,000 seeds in the short runs and 59,992–59,998 of 60,000 in the long runs. The improvement comes from cheaper scoring; coverage and route quality are preserved.
+
+The neighbor regression compares 384 cases (plus prepared-matrix calls) with independently sorted route matrices, including 1–64 crystals, exact/heuristic mode, equal-distance ties, shuffled selections and sparse fallback. MSVC runs the same regression in the Windows launcher checks. Existing physical-contact and frozen-order tests remain required. Copy results (TSV) now includes backend, workers, generated/scored/cache counters, elapsed time including preparation, average throughput and preparation time to diagnose live results.
+
 ### Performance comparison: 7.16.2 to 7.17.0
 
 Sequential Linux/GCC 13.3 comparisons used the same benchmark source, static game-asset geometry/catalogs and synthetic deterministic RNG descriptor on both revisions. Each workload has three alternating before/after pairs of 6,000 seeds; values are median seeds per second. CPU affinity allows the workers plus one coordinator core. A preceding 128-seed search prepares the shared geometry, so timings include generation, bounds, scoring, ranking and drawing, but exclude cold preparation. Raw measurements and Top-10 fingerprints are in [tests/seed_search_performance.csv](tests/seed_search_performance.csv).

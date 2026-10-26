@@ -27,6 +27,7 @@ class SearchDistances
     int estimatedPairs = 0;
     std::unique_ptr<PickupRouting> pickups;
     std::shared_ptr<const PreparedRoutes> table;
+    std::vector<std::vector<uint16_t>> nearest;
 
   public:
     SearchDistances(const MapData &catalog, const NavGraph &nav, const Cancel &canceled,
@@ -35,6 +36,25 @@ class SearchDistances
     {
         table = graph.Routes(canceled, progress);
         int count = table->count;
+        // Seed layouts retain descending catalog IDs. Equal-distance ties in
+        // this shared order therefore match the solver's local-index ties.
+        // Sparse catalogs use the original per-selection sort instead.
+        if (data.points.size() <= 4 * 64)
+        {
+            nearest.resize(count);
+            for (int from = int(data.spawns.size()); from < count; from++)
+            {
+                if (canceled())
+                    throw std::runtime_error("Canceled");
+                auto &row = nearest[from];
+                row.resize(data.points.size());
+                std::iota(row.begin(), row.end(), uint16_t(data.spawns.size()));
+                std::sort(row.begin(), row.end(), [&](int a, int b) {
+                    double x = table->lengths[from][a], y = table->lengths[from][b];
+                    return x < y || (x == y && a > b);
+                });
+            }
+        }
         const auto &estimates = table->estimates;
         estimatedPairs = 0;
         for (int a = 0; a < count; a++)
@@ -129,7 +149,26 @@ class SearchDistances
         // can serve both pruning and scoring without filling the matrix twice.
         int count = boundPrepared && !pickups->Active() ? static_cast<int>(selection.crystals.size()) + 1
                                                         : FillMatrix(selection, work);
-        auto result = SolveOrderFlat(work.matrix.data(), count, work, canceled, !fast);
+        RouteNeighbors neighbors;
+        const RouteNeighbors *prepared = nullptr;
+        if (count > 16 && data.points.size() <= 4 * selection.crystals.size() &&
+            std::adjacent_find(selection.crystals.begin(), selection.crystals.end(),
+                               std::less_equal<int>()) == selection.crystals.end())
+        {
+            std::array<int16_t, 1152> local; // wire limits: 128 spawns + 1024 candidate points
+            local.fill(-1);
+            for (int i = 0; i < count - 1; i++)
+                local[Node(selection, i + 1)] = int16_t(i);
+            for (int i = 0; i < count - 1; i++)
+            {
+                int rank = 0;
+                for (int node : nearest[Node(selection, i + 1)])
+                    if (local[node] >= 0)
+                        neighbors[i][rank++] = uint8_t(local[node]);
+            }
+            prepared = &neighbors;
+        }
+        auto result = SolveOrderFlat(work.matrix.data(), count, work, canceled, !fast, prepared);
         if (pickups->Active())
         {
             std::array<int, 65> nodes;
@@ -267,7 +306,12 @@ inline std::string SeedResultsText(const SeedSearchState &state)
         << " | scene: " << r.scene << " | game hash: " << r.hash << "\n# Search key: " << std::hex << r.key
         << std::dec << " | requested: " << r.count << " | checked: " << state.evaluated
         << " | spawn filtered: " << state.filtered << " | proven outside Top 10: " << state.pruned
-        << "\n# Navigation: " << state.navigationModel
+        << "\n# Search performance: backend: " << (state.portable ? "verified CPU" : "Unity game thread")
+        << " | workers: " << r.workers << " | generated: " << state.generated << " | scored: " << state.scored
+        << " | cache hits: " << state.cacheHits
+        << "\n# Timing: elapsed_s (including preparation): " << state.elapsed
+        << " | average_checked_per_s: " << (state.elapsed > 0 ? state.evaluated / state.elapsed : 0)
+        << " | preparation_ms: " << state.preparationMs << "\n# Navigation: " << state.navigationModel
         << "\n# Navigation details: " << (state.source ? state.source->data->navigationNote : std::string())
         << "\n# Layouts with center navigation gaps: " << state.estimated
         << " | missing center pairs: " << state.estimatedPairs << "\n# Player spawn filter: "

@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.18.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.18.0)**
+**[v7.18.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.18.1)**
 
-- Improved the replay library with favorites, mode/status filters, searchable notes, recording dates and sortable columns. Favorites are local library preferences; recordings, notes and verification data are preserved.
-- Improved GUI efficiency by caching replay search/display text and filtered order until the archive or controls change. Recording dates are formatted only for visible rows, and fully registered shortcuts no longer trigger unnecessary fallback polling.
-- Improved trainer shortcuts: assign keys with Ctrl, Alt or Shift, remove assignments or restore defaults in Settings > Shortcuts. Conflicts and reserved combinations are explained, displayed hints follow the saved assignments, and text entry suspends shortcuts. Freecam, restart and replay playback keys keep their existing game controls.
+- Improved large-layout seed scoring by preparing the crystal-neighbor order once per map and filtering it for each seed. Equal-distance ties, all starting routes, optimization passes and ranking stay the same. This also reduces work when pickup-contact bounds cannot reject seeds.
+- Improved pickup-contact evaluation by reusing each leg's distance and verification tables inside the solver. Continuous contacts and verification priorities are preserved.
+- Improved seed-search reports: Copy results (TSV) now includes the active generator, worker count, generated/scored/cache counters and average throughput with preparation time for useful performance comparisons.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

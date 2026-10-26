@@ -2,6 +2,12 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.18.1 Changelog
+
+- Improved large-layout seed scoring by preparing the crystal-neighbor order once per map and filtering it for each seed. Equal-distance ties, all starting routes, optimization passes and ranking stay the same. This also reduces work when pickup-contact bounds cannot reject seeds.
+- Improved pickup-contact evaluation by reusing each leg's distance and verification tables inside the solver. Continuous contacts and verification priorities are preserved.
+- Improved seed-search reports: Copy results (TSV) now includes the active generator, worker count, generated/scored/cache counters and average throughput with preparation time for useful performance comparisons.
+
 ### v7.18.0 Changelog
 
 - Improved the replay library with favorites, mode/status filters, searchable notes, recording dates and sortable columns. Favorites are local library preferences; recordings, notes and verification data are preserved.

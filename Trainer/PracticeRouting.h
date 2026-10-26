@@ -878,6 +878,8 @@ inline void DescribeRouteEstimate(RouteResult &route, bool estimated)
             route.message;
 }
 
+using RouteNeighbors = std::array<std::array<uint8_t, 64>, 64>;
+
 // Each route worker owns this scratch space. Matrices and the exact solver's
 // tables are reused across seeds. Exact-DP ties and all heuristic starts are retained.
 struct RouteWorkspace
@@ -1014,7 +1016,8 @@ inline double TightenRouteLowerBound(const double *matrix, int size, double lowe
 }
 
 inline RouteResult SolveOrderFlat(const double *matrix, int size, RouteWorkspace &work,
-                                  const Cancel &canceled, bool exactWhenPossible)
+                                  const Cancel &canceled, bool exactWhenPossible,
+                                  const RouteNeighbors *preparedNearest = nullptr)
 {
     RouteResult result;
     int n = size - 1;
@@ -1101,10 +1104,11 @@ inline RouteResult SolveOrderFlat(const double *matrix, int size, RouteWorkspace
     {
         result.length = Unreachable;
         std::array<int, 64> order;
-        std::array<std::array<uint8_t, 64>, 64> nearest;
-        for (int from = 0; from < n; from++)
+        RouteNeighbors localNearest;
+        const auto &nearest = preparedNearest ? *preparedNearest : localNearest;
+        for (int from = 0; !preparedNearest && from < n; from++)
         {
-            auto &row = nearest[from];
+            auto &row = localNearest[from];
             for (int i = 0; i < n; i++)
                 row[i] = uint8_t(i);
             std::sort(row.begin(), row.begin() + n, [&](int a, int b) {

@@ -34,12 +34,6 @@ class PickupRouting
         return legs[Slot(std::min(a, b), std::max(a, b))];
     }
 
-    double Cost(int a, int ca, int b, int cb) const
-    {
-        return a < b ? Pair(a, b).cost[ca * contacts[b].size() + cb]
-                     : Pair(a, b).cost[cb * contacts[a].size() + ca];
-    }
-
   public:
     PickupRouting(
         const MapData &data, const NavGraph &nav, const std::vector<int> &ids,
@@ -270,13 +264,17 @@ class PickupRouting
             int to = nodes[result.order[layer] + 1];
             std::fill_n(next.begin(), contacts[to].size(), Unreachable);
             std::fill_n(nextUnknown.begin(), contacts[to].size(), uint8_t{255});
-            for (size_t j = 0; j < contacts[to].size(); j++)
-                for (size_t i = 0; i < contacts[from].size(); i++)
+            const auto &leg = Pair(from, to);
+            size_t fromCount = contacts[from].size(), toCount = contacts[to].size();
+            // Keep predecessor order (including ties), read each pair once.
+            for (size_t i = 0; i < fromCount; i++)
+                for (size_t j = 0; j < toCount; j++)
                 {
-                    double cost = previous[i] + Cost(from, int(i), to, int(j));
+                    size_t slot = from < to ? i * toCount + j : j * fromCount + i;
+                    double cost = previous[i] + leg.cost[slot];
                     if (!std::isfinite(cost))
                         continue;
-                    int unknown = previousUnknown[i] + int(Estimated(from, int(i), to, int(j)));
+                    int unknown = previousUnknown[i] + int((leg.mode[slot] & 16) != 0);
                     if (unknown < nextUnknown[j] || (unknown == nextUnknown[j] && cost < next[j]))
                     {
                         next[j] = cost;
