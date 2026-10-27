@@ -45,11 +45,12 @@ GPU_PRECISE double GpuFirstRoute(uint n, uint first, uint testId, GPU_ORDER(orde
     GPU_LOOP for (uint iteration = 0; iteration < 32; iteration++)
     {
         bool improved = false;
-        GPU_LOOP for (uint a = 0; a + 1 < n; a++)
+        GPU_LOOP for (int a = 0; a < (int)n - 1; a++)
         {
-            uint previous = a ? order[a - 1] + 1 : 0, firstNode = order[a] + 1;
+            uint previous = 0, firstNode = order[a] + 1;
+            if (a > 0) previous = order[a - 1] + 1;
             GPU_PRECISE double before = GpuEdge(previous, firstNode, n + 1);
-            GPU_LOOP for (uint b = a + 1; b < n; b++)
+            GPU_LOOP for (int b = a + 1; b < (int)n; b++)
             {
                 uint last = order[b] + 1;
                 GPU_PRECISE double delta = GpuEdge(previous, last, n + 1) - before;
@@ -58,7 +59,7 @@ GPU_PRECISE double GpuFirstRoute(uint n, uint first, uint testId, GPU_ORDER(orde
                              GpuEdge(last, order[b + 1] + 1, n + 1);
                 if (delta < -GPU_EPS)
                 {
-                    uint left = a, right = b;
+                    int left = a, right = b;
                     GPU_LOOP while (left < right)
                     {
                         uint swapValue = order[left]; order[left] = order[right]; order[right] = swapValue;
@@ -85,10 +86,11 @@ void GpuRelocate(uint n, GPU_ORDER(order))
             GPU_LOOP for (int after = -1; after < (int)n; after++)
             {
                 if (after == a || after == a - 1) continue;
-                int node = (int)order[a] + 1, previous = a ? (int)order[a - 1] + 1 : 0;
-                int next = a + 1 < (int)n ? (int)order[a + 1] + 1 : -1;
-                int left = after < 0 ? 0 : (int)order[after] + 1;
-                int right = after + 1 < (int)n ? (int)order[after + 1] + 1 : -1;
+                int node = (int)order[a] + 1, previous = 0, next = -1, left = 0, right = -1;
+                if (a > 0) previous = (int)order[a - 1] + 1;
+                if (a + 1 < (int)n) next = (int)order[a + 1] + 1;
+                if (after >= 0) left = (int)order[after] + 1;
+                if (after + 1 < (int)n) right = (int)order[after + 1] + 1;
                 GPU_PRECISE double delta = -GpuEdge(previous, node, n + 1) +
                     (next >= 0 ? GpuEdge(previous, next, n + 1) - GpuEdge(node, next, n + 1) : GPU_ZERO) +
                     GpuEdge(left, node, n + 1) +
@@ -96,9 +98,9 @@ void GpuRelocate(uint n, GPU_ORDER(order))
                 if (delta < -GPU_EPS)
                 {
                     uint value = order[a];
-                    GPU_LOOP for (uint i = (uint)a; i + 1 < n; i++) order[i] = order[i + 1];
+                    GPU_LOOP for (int shiftLeft = a; shiftLeft + 1 < (int)n; shiftLeft++) order[shiftLeft] = order[shiftLeft + 1];
                     int at = after < a ? after + 1 : after;
-                    GPU_LOOP for (int i = (int)n - 1; i > at; i--) order[i] = order[i - 1];
+                    GPU_LOOP for (int shiftRight = (int)n - 1; shiftRight > at; shiftRight--) order[shiftRight] = order[shiftRight - 1];
                     order[at] = value;
                     improved = true;
                     break;

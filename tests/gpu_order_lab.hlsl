@@ -17,8 +17,8 @@ uint GpuNearest(uint testId, uint from, uint rank) { return nearest[testId * 52 
 void Main(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 {
     uint testId = group.x, n = sizes[testId], side = n + 1;
-    for (uint i = lane; i < side * side; i += 64)
-        tile[i] = matrices[testId * 53 * 53 + i];
+    for (uint loadIndex = lane; loadIndex < side * side; loadIndex += 64)
+        tile[loadIndex] = matrices[testId * 53 * 53 + loadIndex];
     GroupMemoryBarrierWithGroupSync();
     uint order[52];
     precise double value = asdouble(0u, 0x7ff00000u);
@@ -37,21 +37,21 @@ void Main(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
         GroupMemoryBarrierWithGroupSync();
     }
     if (lane == indices[0])
-        for (uint i = 0; i < n; i++) winner[i] = order[i];
+        for (uint copyIndex = 0; copyIndex < n; copyIndex++) winner[copyIndex] = order[copyIndex];
     GroupMemoryBarrierWithGroupSync();
     if (lane == 0)
     {
-        for (uint i = 0; i < n; i++) order[i] = winner[i];
+        for (uint recoverIndex = 0; recoverIndex < n; recoverIndex++) order[recoverIndex] = winner[recoverIndex];
         GpuRelocate(n, order);
         precise double length = 0.0L;
         uint previous = 0;
-        for (uint i = 0; i < n; i++)
+        for (uint outputIndex = 0; outputIndex < n; outputIndex++)
         {
-            outputOrders[testId * 52 + i] = order[i];
-            length += GpuEdge(previous, order[i] + 1, side);
-            previous = order[i] + 1;
+            outputOrders[testId * 52 + outputIndex] = order[outputIndex];
+            length += GpuEdge(previous, order[outputIndex] + 1, side);
+            previous = order[outputIndex] + 1;
         }
-        for (uint i = n; i < 52; i++) outputOrders[testId * 52 + i] = 0xffffffffu;
+        for (uint padIndex = n; padIndex < 52; padIndex++) outputOrders[testId * 52 + padIndex] = 0xffffffffu;
         outputLengths[testId] = length;
     }
 }
