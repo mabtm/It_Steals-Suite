@@ -23,5 +23,5 @@ $binary = Join-Path $out 'gpu-dev-probe.exe'
 if ($LASTEXITCODE -ne 0) { throw 'GPU dev probe compilation failed.' }
 & $binary (Join-Path $root 'tests/fixtures') $out
 if ($LASTEXITCODE -ne 0) { throw 'Integrated GPU scoring or reporting failed.' }
-python -c "import json,pathlib; p=pathlib.Path(r'$out'); rows=[json.loads(f.read_text()) for f in p.glob('*.json')]; assert len(rows)==6; good=[r for r in rows if r['status']=='Completed']; assert len(good)==2; assert all(r['checked']==24 and r['mismatches']==0 and r['sourceKind']=='asset_fixture' for r in good); assert all(c['cpu']['length']==c['gpu']['length'] and c['cpu']['contacts']==c['gpu']['contacts'] for r in good for c in r['cases']); print('All six dev JSON reports parsed and validated: PASS')"
+python (Join-Path $root 'tests/gpu_dev_validate.py') $out
 if ($LASTEXITCODE -ne 0) { throw 'Exported GPU reports failed JSON validation.' }
