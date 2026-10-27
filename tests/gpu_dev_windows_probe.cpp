@@ -43,8 +43,21 @@ int main(int argc, char **argv)
         assert(r.cases.size() == 25 && r.timings.size() == 3 && r.fp64);
         assert(r.model == "physical clearance + pickup contacts");
         for (const auto &c : r.cases)
-            assert(c.orderMatch && c.scoreMatch && c.cpu.pickupOptimized && c.gpu.pickupOptimized);
+            assert(c.orderMatch && c.scoreMatch && c.centerLengthMatch && c.cpu.pickupOptimized && c.gpu.pickupOptimized);
         Save(output / (name + ".json"), r);
+        if (name == "hide-seek-boxes")
+        {
+            Session session;
+            session.directory = output / "automatic";
+            auto automatic = options;
+            automatic.seeds = automatic.pairs = 1;
+            session.Start(source, automatic, {});
+            auto deadline = Clock::now() + std::chrono::seconds(60);
+            while (session.Busy() && Clock::now() < deadline) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            assert(!session.Busy());
+            auto saved = session.Get();
+            assert(saved && !saved->savedPath.empty() && std::filesystem::is_regular_file(saved->savedPath));
+        }
         options.adapter = std::numeric_limits<int>::max();
         auto failed = Run(source, options, [] { return false; }, [](Phase, int) {}, true);
         assert(failed.phase == Phase::Failed && !failed.error.empty() && failed.checked == 0);

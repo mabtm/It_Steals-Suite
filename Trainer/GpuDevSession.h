@@ -75,6 +75,7 @@ inline Report Run(std::shared_ptr<const practice::MapAnalysis> source, Options o
             timing.cpuMs += Ms(at);
             return result;
         };
+        std::vector<double> centerLengths;
         auto gpuBatch = [&](int offset, int count, PairTiming &timing) {
             auto all = Clock::now(), at = all;
             for (int i = 0; i < count; i++)
@@ -89,9 +90,11 @@ inline Report Run(std::shared_ptr<const practice::MapAnalysis> source, Options o
             auto result = device.Execute(count);
             timing.dispatchMs += Ms(at);
             at = Clock::now();
+            centerLengths.clear();
             for (int i = 0; i < count; i++)
             {
                 check();
+                centerLengths.push_back(result[i].length);
                 if (result[i].complete)
                     result[i] = distances.FinishOrder(selections[offset + i], std::move(result[i]), canceled);
             }
@@ -108,11 +111,19 @@ inline Report Run(std::shared_ptr<const practice::MapAnalysis> source, Options o
             row.crystals = selections[index].crystals;
             row.orderMatch = cpu.order == gpu.order;
             row.scoreMatch = SameScore(cpu, gpu);
-            bool mismatch = !row.orderMatch || !row.scoreMatch;
+            int side = distances.FillMatrix(selections[index], work);
+            int previous = 0;
+            for (int id : cpu.order)
+            {
+                row.cpuCenterLength += work.matrix[previous * side + id + 1];
+                previous = id + 1;
+            }
+            row.gpuCenterLength = centerLengths[index % options.batch];
+            row.centerLengthMatch = std::isfinite(row.gpuCenterLength) && row.cpuCenterLength == row.gpuCenterLength;
+            bool mismatch = !row.orderMatch || !row.scoreMatch || !row.centerLengthMatch;
             report.mismatches += mismatch;
             if (matrixExamples < 8 && (mismatch || pair == 0))
             {
-                int side = distances.FillMatrix(selections[index], work);
                 row.matrix.assign(work.matrix.begin(), work.matrix.begin() + side * side);
                 matrixExamples++;
             }

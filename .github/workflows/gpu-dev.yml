@@ -38,7 +38,6 @@ jobs:
             build/gpu-dev-sanitizers/**/*.log
 
   windows:
-    needs: verify
     runs-on: windows-2022
     timeout-minutes: 25
     permissions:
@@ -95,12 +94,34 @@ jobs:
             build/release/GPU-Dev-SHA256SUMS.txt
             build/gpu-dev-check/*.json
             build/windows-launcher-tests/summary.json
+  publish:
+    needs: [verify, windows]
+    runs-on: windows-2022
+    permissions:
+      contents: write
+      actions: read
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Retrieve the verified dev archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download $env:GITHUB_RUN_ID --repo $env:GITHUB_REPOSITORY --name gpu-dev-windows --dir build/dev-distribution
+          if ($LASTEXITCODE -ne 0) { throw 'Could not retrieve the verified Windows dev package.' }
       - name: Publish the verified dev prerelease
         if: github.ref == 'refs/heads/dev/gpu-7.19.0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'gpu-dev-7.19.0.1'
+          $archive = Get-ChildItem build/dev-distribution -Filter ItStealsSuite-GPU-Dev.zip -Recurse | Select-Object -First 1
+          if (-not $archive) { throw 'Verified dev archive is missing.' }
+          $assetFolder = $archive.Directory.FullName
+          $info = Get-Content (Join-Path $assetFolder 'GPU-Dev-Info.json') -Raw | ConvertFrom-Json
+          if ($info.sourceCommit -ne $env:GITHUB_SHA -or (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $info.archiveSha256) { throw 'Dev package provenance/checksum mismatch.' }
+          $tag = 'gpu-dev-7.19.0.1' 
           $existing = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect existing releases.' }
           $release = @($existing | ConvertFrom-Json) | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
@@ -110,7 +131,8 @@ jobs:
             gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'PracticeSuite 7.19.0 / GPU Dev 1' --notes-file GPU_DEV.md --draft --prerelease --latest=false
             if ($LASTEXITCODE -ne 0) { throw 'Could not create dev prerelease draft.' }
           }
-          gh release upload $tag build/release/ItStealsSuite-GPU-Dev.zip build/release/GPU-Dev-Info.json build/release/GPU-Dev-SHA256SUMS.txt --repo $env:GITHUB_REPOSITORY --clobber
+          $assets = @('ItStealsSuite-GPU-Dev.zip','GPU-Dev-Info.json','GPU-Dev-SHA256SUMS.txt') | ForEach-Object { Join-Path $assetFolder $_ }
+          gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Dev assets could not be uploaded; release remains a draft.' }
           gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish the dev prerelease.' }

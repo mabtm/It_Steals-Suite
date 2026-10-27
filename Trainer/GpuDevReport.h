@@ -42,7 +42,8 @@ struct PairTiming
 struct Case
 {
     int pair = 0, seed = 0, spawn = -1;
-    bool orderMatch = false, scoreMatch = false;
+    bool orderMatch = false, scoreMatch = false, centerLengthMatch = false;
+    double cpuCenterLength = 0, gpuCenterLength = 0;
     std::vector<int> crystals;
     practice::RouteResult cpu, gpu;
     std::vector<double> matrix;
@@ -229,7 +230,11 @@ inline std::string Json(const Report &r)
         const auto &c = r.cases[i];
         if (i) out << ',';
         out << "\n{\"pair\":" << c.pair << ",\"seed\":" << c.seed << ",\"spawn\":" << c.spawn
-            << ",\"orderMatch\":" << c.orderMatch << ",\"scoreMatch\":" << c.scoreMatch << ",\"crystals\":";
+            << ",\"orderMatch\":" << c.orderMatch << ",\"scoreMatch\":" << c.scoreMatch
+            << ",\"centerLengthMatch\":" << c.centerLengthMatch << ",\"cpuCenterLength\":";
+        Number(out, c.cpuCenterLength);
+        out << ",\"gpuCenterLength\":"; Number(out, c.gpuCenterLength);
+        out << ",\"crystals\":";
         Array(out, c.crystals);
         out << ",\"cpu\":"; RouteJson(out, c.cpu);
         out << ",\"gpu\":"; RouteJson(out, c.gpu);
