@@ -7,8 +7,11 @@
 #define GPU_ZERO 0.0
 #define GPU_LOOP
 #else
+#ifndef GPU_MAX_CRYSTALS
+#define GPU_MAX_CRYSTALS 52
+#endif
 #define GPU_PRECISE precise
-#define GPU_ORDER(name) inout uint name[52]
+#define GPU_ORDER(name) inout uint name[GPU_MAX_CRYSTALS]
 #define GPU_EPS 0.000001L
 #define GPU_ZERO 0.0L
 #define GPU_LOOP [loop]

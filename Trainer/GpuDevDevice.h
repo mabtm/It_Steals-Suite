@@ -7,6 +7,7 @@
 #include <d3dcompiler.h>
 #include <dxgi1_2.h>
 #include <wrl/client.h>
+#include <map>
 #include "GpuDevReport.h"
 #include "GpuDevCatalog.h"
 
@@ -84,6 +85,9 @@ class Device
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
     ComPtr<ID3D11ComputeShader> shader;
+    std::map<int, ComPtr<ID3D11ComputeShader>> kernels;
+    std::string source;
+    int fixedCrystals = 0;
     Buffer matrices, neighbors, sizes, orders, lengths;
     Buffer selected, catalogEdges, catalogNearest;
     ComPtr<ID3D11Buffer> catalogInfo;
@@ -103,6 +107,27 @@ class Device
     static double Elapsed(std::chrono::steady_clock::time_point start)
     {
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    }
+
+    ComPtr<ID3D11ComputeShader> Compile(int crystals)
+    {
+        std::string count = std::to_string(crystals ? crystals : 52);
+        std::string threads = std::to_string(crystals && crystals <= 32 ? 32 : 64);
+        std::vector<D3D_SHADER_MACRO> macros{{"GPU_MAX_CRYSTALS", count.c_str()}, {"GPU_THREADS", threads.c_str()}};
+        if (compact) macros.push_back({"GPU_CATALOG_INPUT", "1"});
+        if (crystals) macros.push_back({"GPU_FIXED_CRYSTALS", "1"});
+        macros.push_back({nullptr, nullptr});
+        ComPtr<ID3DBlob> code, errors;
+        HRESULT compiled = D3DCompile(source.data(), source.size(), "gpu_dev", macros.data(), nullptr,
+                                      "Main", "cs_5_0", D3DCOMPILE_ENABLE_STRICTNESS |
+                                      D3DCOMPILE_IEEE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3,
+                                      0, &code, &errors);
+        if (FAILED(compiled) && errors)
+            throw std::runtime_error(std::string(static_cast<const char *>(errors->GetBufferPointer()), errors->GetBufferSize()));
+        Check(compiled, "Compile embedded GPU shader");
+        ComPtr<ID3D11ComputeShader> result;
+        Check(device->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &result), "Create GPU compute shader");
+        return result;
     }
 
     Buffer Make(UINT stride, UINT count, bool output, const void *initial = nullptr)
@@ -167,21 +192,13 @@ class Device
                       support.DoublePrecisionFloatShaderOps;
         if (!report.fp64)
             throw std::runtime_error("This adapter/driver does not expose the required D3D11 FP64 operations.");
-        std::string source = Resource(105), kernel = Resource(106);
+        source = Resource(105);
+        std::string kernel = Resource(106);
         const std::string include = "#include \"gpu_order_kernel.hlsli\"";
         auto at = source.find(include);
         if (at == std::string::npos) throw std::runtime_error("Embedded shader include is invalid");
         source.replace(at, include.size(), kernel);
-        ComPtr<ID3DBlob> code, errors;
-        D3D_SHADER_MACRO macros[]{{"GPU_CATALOG_INPUT", "1"}, {nullptr, nullptr}};
-        HRESULT compiled = D3DCompile(source.data(), source.size(), "gpu_dev", compact ? macros : nullptr, nullptr,
-                                      "Main", "cs_5_0", D3DCOMPILE_ENABLE_STRICTNESS |
-                                      D3DCOMPILE_IEEE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3,
-                                      0, &code, &errors);
-        if (FAILED(compiled) && errors)
-            throw std::runtime_error(std::string(static_cast<const char *>(errors->GetBufferPointer()), errors->GetBufferSize()));
-        Check(compiled, "Compile embedded GPU shader");
-        Check(device->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &shader), "Create GPU compute shader");
+        shader = kernels[0] = Compile(0);
         if (!compact) Resize(capacity, report);
         // Allocate once outside all scoring timings. One disjoint interval spans
         // a complete GPU pass, rather than beginning/ending one per batch/frame.
@@ -191,13 +208,37 @@ class Device
         {
             auto batches = Batches(report.options);
             int minimumBatch = *std::min_element(batches.begin(), batches.end());
-            timestamps.resize(size_t((report.options.seeds + minimumBatch - 1) / minimumBatch));
+            timestamps.resize(size_t((report.options.seeds + minimumBatch - 1) / minimumBatch) + 1);
             query.Query = D3D11_QUERY_TIMESTAMP;
             for (auto &batch : timestamps)
                 for (auto &marker : batch)
                     if (FAILED(device->CreateQuery(&query, &marker))) report.timestampsSupported = false;
             if (!report.timestampsSupported) { disjoint.Reset(); timestamps.clear(); }
         }
+    }
+
+    double PrepareKernel(int crystals)
+    {
+        if (crystals < 1 || crystals > 52 || pending || recording) throw std::runtime_error("Invalid shader specialization");
+        if (kernels.contains(crystals)) return 0;
+        auto start = std::chrono::steady_clock::now();
+        kernels[crystals] = Compile(crystals);
+        return Elapsed(start);
+    }
+
+    void SelectKernel(int crystals)
+    {
+        auto found = kernels.find(crystals);
+        if (pending || recording || found == kernels.end()) throw std::runtime_error("GPU shader was not prepared");
+        fixedCrystals = crystals; shader = found->second;
+        context->CSSetShader(shader.Get(), nullptr, 0);
+    }
+
+    int KernelThreads() const { return fixedCrystals && fixedCrystals <= 32 ? 32 : 64; }
+    int KernelSharedBytes() const
+    {
+        int n = fixedCrystals ? fixedCrystals : 52;
+        return 8 * (n + 1) * (n + 1) + 12 * KernelThreads() + 4 * n + (compact ? 256 + 4 * n * ((n + 1) / 2) : 0);
     }
 
     void SetCatalog(std::shared_ptr<const Catalog> value, Report &report)
@@ -295,7 +336,7 @@ class Device
 
     void Pack(int slot, const double *matrix, int n)
     {
-        if (compact || slot < 0 || slot >= capacity || n < 1 || n > 52)
+        if (compact || slot < 0 || slot >= capacity || n < 1 || n > 52 || (fixedCrystals && n != fixedCrystals))
             throw std::runtime_error("GPU input exceeds the supported batch/crystal range");
         int side = n + 1;
         for (int i = 0; i < side * side; i++)
@@ -315,7 +356,8 @@ class Device
 
     void PackSelection(int slot, const practice::Selection &selection)
     {
-        if (!compact || !catalog || slot < 0 || slot >= capacity)
+        if (!compact || !catalog || slot < 0 || slot >= capacity ||
+            (fixedCrystals && selection.crystals.size() != size_t(fixedCrystals)))
             throw std::runtime_error("Invalid GPU catalog input slot");
         catalog->Pack(selection, packedIds.data() + size_t(slot) * 53);
         packedSizes[slot] = uint32_t(selection.crystals.size());

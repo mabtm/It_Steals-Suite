@@ -71,7 +71,7 @@ jobs:
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Dev packaging failed.' }
           Copy-Item build/release/ItStealsSuite-Portable.zip build/release/ItStealsSuite-GPU-Dev.zip
           $info = [ordered]@{
-            channel = 'GPU Dev 4'
+            channel = 'GPU Dev 5'
             sourceCommit = $env:GITHUB_SHA
             baseVersion = '7.19.0'
             modVersion = '7.19.0'
@@ -121,14 +121,14 @@ jobs:
           $assetFolder = $archive.Directory.FullName
           $info = Get-Content (Join-Path $assetFolder 'GPU-Dev-Info.json') -Raw | ConvertFrom-Json
           if ($info.sourceCommit -ne $env:GITHUB_SHA -or (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $info.archiveSha256) { throw 'Dev package provenance/checksum mismatch.' }
-          $tag = 'gpu-dev-7.19.0.4.1' 
+          $tag = 'gpu-dev-7.19.0.5' 
           $existing = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect existing releases.' }
           $release = @($existing | ConvertFrom-Json) | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
           if ($release -and -not $release.draft) { throw 'This dev tag is already published. Increment the dev tag before publishing another build.' }
           if ($release -and $release.target_commitish -ne $env:GITHUB_SHA) { throw 'This draft belongs to another source commit.' }
           if (-not $release) {
-            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'PracticeSuite 7.19.0 / GPU Dev 4' --notes-file GPU_DEV.md --draft --prerelease --latest=false
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'PracticeSuite 7.19.0 / GPU Dev 5' --notes-file GPU_DEV.md --draft --prerelease --latest=false
             if ($LASTEXITCODE -ne 0) { throw 'Could not create dev prerelease draft.' }
           }
           $assets = @('ItStealsSuite-GPU-Dev.zip','GPU-Dev-Info.json','GPU-Dev-SHA256SUMS.txt') | ForEach-Object { Join-Path $assetFolder $_ }

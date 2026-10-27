@@ -7,7 +7,7 @@ folder = pathlib.Path(sys.argv[1])
 reports = {p.stem: json.loads(p.read_text(encoding="utf-8-sig")) for p in folder.glob("*.json")}
 assert len(reports) == 12, list(reports)
 for report in reports.values():
-    assert report["schema"] == "practice-suite.gpu-dev.v4"
+    assert report["schema"] == "practice-suite.gpu-dev.v5"
     assert report["mismatches"] == 0
     assert report["caseRetention"]["stored"] == len(report["cases"])
     assert len(report["cases"]) <= 84
@@ -49,16 +49,32 @@ assert not list(folder.rglob("*.tmp"))
 assert list((folder / "automatic").glob("*.json"))
 print("Twelve GPU dev JSON reports, legacy/catalog parity, timestamp/control runs, rotating sweep, partial stop and replacement checkpoints: PASS")
 
-summary_files = list((folder / "automatic-suite").rglob("Dev4-Summary.json"))
+summary_files = list((folder / "automatic-suite").rglob("Dev5-Summary.json"))
 assert len(summary_files) == 2
 summaries = [(p, json.loads(p.read_text())) for p in summary_files]
 complete_path, summary = next((p, s) for p, s in summaries if s["status"] == "Completed")
 stopped = [s for _, s in summaries if s["status"] == "Stopped"]
 assert len(stopped) == 1 and stopped[0]["completedTests"] == 0
-assert summary["schema"] == "practice-suite.gpu-suite.v4" and summary["status"] == "Completed"
-assert summary["completedMaps"] == 2 and summary["completedTests"] == summary["totalTests"] == 24
-assert {r["scene"] for r in summary["runs"]} == {13, 14}
+assert summary["schema"] == "practice-suite.gpu-suite.v5" and summary["status"] == "Completed"
+assert summary["completedMaps"] == 3 and summary["completedTests"] == summary["totalTests"] == 138
+assert {r["scene"] for r in summary["runs"]} == {5, 13, 14}
 assert all(r["top10Match"] and r["audited"] == r["scored"] and r["evaluated"] == r["requested"] for r in summary["runs"])
-assert len(list(complete_path.parent.glob("hide-seek-outside_*.json"))) == 12
-assert len(list(complete_path.parent.glob("classic-bonus_*.json"))) == 12
-print("Automatic two-map plan, exact score audits, named reports, Unicode paths, one summary and immediate Clean-mode cancellation: PASS")
+assert list(complete_path.parent.iterdir()) == [complete_path]
+assert len(summary["plan"]["keys"]) == 2
+assert {v["crystals"] for v in summary["shaderPreparation"]} == {22, 40, 52}
+references = {(r["scene"], r["key"], r["spawnFilter"]): r for r in summary["runs"] if r["reference"]}
+for r in summary["runs"]:
+    assert r["top10"] == references[r["scene"], r["key"], r["spawnFilter"]]["top10"]
+    assert r["evaluated"] == r["scored"] + r["pruned"] + r["filtered"]
+    assert r["key"] == summary["plan"]["keys"][r["keyIndex"]]
+    if r["backend"] == "GPU pipeline":
+        assert r["shader"] in {"generic", "specialized"}
+        assert r["shaderThreads"] == (32 if r["shaderCrystals"] and r["shaderCrystals"] <= 32 else 64)
+        if r["boundsMode"] == "off":
+            assert r["boundsChecked"] == r["pruned"] == 0
+            metadata = next(m for m in summary["mapMetadata"] if m["capture"]["scene"] == r["scene"])
+            if r["spawnFilter"] < 0 and metadata["adapter"]["timestampsSupported"]:
+                assert r["gpuTimestampBatches"] + r["gpuTimestampInvalid"] == 2
+        if r["boundsMode"] == "on": assert r["boundsSkipped"] == 0
+assert {r["boundsMode"] for r in summary["runs"] if r["backend"] == "GPU pipeline"} == {"on", "off", "adaptive"}
+print("Automatic three-map/two-key shader and bounds plan, strict score audits, Unicode paths, single-file export and immediate Clean-mode cancellation: PASS")

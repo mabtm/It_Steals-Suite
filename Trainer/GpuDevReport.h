@@ -271,9 +271,9 @@ inline std::string Json(const Report &r)
     std::ostringstream out;
     out.imbue(std::locale::classic());
     out << std::boolalpha << std::setprecision(17);
-    out << "{\n\"schema\":\"practice-suite.gpu-dev.v4\",\n\"version\":";
+    out << "{\n\"schema\":\"practice-suite.gpu-dev.v5\",\n\"version\":";
     Quote(out, suite_brand::Version);
-    out << ",\"channel\":\"GPU Dev 4\",\"sourceCommit\":";
+    out << ",\"channel\":\"GPU Dev 5\",\"sourceCommit\":";
 #ifdef SUITE_DEV_SOURCE_COMMIT
     Quote(out, SUITE_DEV_SOURCE_COMMIT);
 #else

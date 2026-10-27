@@ -7,6 +7,34 @@ namespace gpu_dev
 using SearchAudit = std::function<void(uint64_t, const practice::Selection &, const practice::RouteResult &)>;
 using BatchScorer = std::function<std::vector<practice::RouteResult>(std::span<const practice::SeedLayout>)>;
 
+enum class BoundsMode { Enabled, Disabled, Adaptive };
+inline const char *BoundsName(BoundsMode mode)
+{
+    return mode == BoundsMode::Enabled ? "on" : mode == BoundsMode::Disabled ? "off" : "adaptive";
+}
+struct BoundsStats { uint64_t checked = 0, skipped = 0; };
+struct BoundsBudget
+{
+    BoundsMode mode;
+    int tested = 0, rejected = 0, cooldown = 0;
+    bool Use()
+    {
+        if (mode == BoundsMode::Disabled) return false;
+        if (mode == BoundsMode::Adaptive && cooldown) { cooldown--; return false; }
+        return true;
+    }
+    void Result(bool reject)
+    {
+        if (mode != BoundsMode::Adaptive) return;
+        rejected += reject;
+        if (++tested == 64)
+        {
+            if (rejected < 2) cooldown = 512;
+            tested = rejected = 0;
+        }
+    }
+};
+
 inline bool SameTop(const std::vector<practice::SeedResult> &a, const std::vector<practice::SeedResult> &b)
 {
     if (a.size() != b.size()) return false;
@@ -21,12 +49,14 @@ inline bool SameTop(const std::vector<practice::SeedResult> &a, const std::vecto
 inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAnalysis> source,
     const practice::SearchDistances &distances, practice::SeedSearchRequest request, int batch,
     const BatchScorer &score, const practice::Cancel &canceled,
-    const std::function<void(uint64_t)> &progress = {}, const SearchAudit &audit = {})
+    const std::function<void(uint64_t)> &progress = {}, const SearchAudit &audit = {},
+    BoundsMode bounds = BoundsMode::Enabled, BoundsStats *boundsStats = nullptr)
 {
     using namespace practice;
     using Timer = std::chrono::steady_clock;
     struct Packet { std::vector<SeedLayout> layouts; std::vector<uint64_t> indices; std::vector<RouteResult> routes; bool ready = false; };
     SeedSearchState state;
+    if (boundsStats) *boundsStats = {};
     state.source = std::move(source); state.request = request; state.portable = true;
     state.phase = SearchPhase::Searching; state.navigationModel = distances.ModelName();
     std::mutex gate;
@@ -43,7 +73,7 @@ inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAn
         failed = true; changed.notify_all();
     };
     auto finishPacket = [&](const std::shared_ptr<Packet> &packet, uint64_t begin, uint64_t end,
-                    uint64_t filtered, uint64_t pruned) {
+                    uint64_t filtered, uint64_t pruned, BoundsStats measured = {}) {
         std::vector<SeedResult> localTop;
         for (size_t i = 0; i < packet->layouts.size(); i++)
         {
@@ -68,6 +98,7 @@ inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAn
             std::lock_guard lock(gate);
             state.evaluated += end - begin; state.filtered += filtered; state.pruned += pruned;
             state.scored += packet->layouts.size(); state.matched += packet->layouts.size();
+            if (boundsStats) { boundsStats->checked += measured.checked; boundsStats->skipped += measured.skipped; }
             for (auto &row : localTop) RankSeed(state.top, std::move(row), request.criteria.objective);
         }
     };
@@ -78,12 +109,14 @@ inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAn
             RandomSeedOrder order(request.key);
             RouteWorkspace workspace;
             int misses = 0, cooldown = 0;
+            BoundsBudget budget{bounds};
             while (!stop())
             {
                 uint64_t begin = next.fetch_add(uint64_t(batch));
                 if (begin >= request.count) break;
                 uint64_t end = std::min(begin + uint64_t(batch), request.count), filtered = 0, pruned = 0;
                 auto packet = std::make_shared<Packet>();
+                BoundsStats measured;
                 double cutoff = Unreachable;
                 {
                     std::lock_guard lock(gate);
@@ -99,16 +132,22 @@ inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAn
                     bool reject = false;
                     if (!request.exhaustive && request.criteria.objective == SearchObjective::ShortestRoute && std::isfinite(cutoff))
                     {
-                        int count = distances.FillBoundMatrix(layout.selection, workspace);
-                        double lower = MstRouteLowerBound(workspace.matrix.data(), count, stop);
-                        if (!std::isfinite(lower)) throw std::runtime_error("Invalid prepared route distances");
-                        if (!cooldown && count > 16 && lower <= cutoff + 1e-6 && lower >= .75 * cutoff)
+                        if (!budget.Use()) measured.skipped++;
+                        else
                         {
-                            lower = TightenRouteLowerBound(workspace.matrix.data(), count, lower, cutoff, stop);
-                            if (lower > cutoff + 1e-6) misses = 0;
-                            else if (++misses == 16) { misses = 0; cooldown = 256; }
+                            measured.checked++;
+                            int count = distances.FillBoundMatrix(layout.selection, workspace);
+                            double lower = MstRouteLowerBound(workspace.matrix.data(), count, stop);
+                            if (!std::isfinite(lower)) throw std::runtime_error("Invalid prepared route distances");
+                            if (!cooldown && count > 16 && lower <= cutoff + 1e-6 && lower >= .75 * cutoff)
+                            {
+                                lower = TightenRouteLowerBound(workspace.matrix.data(), count, lower, cutoff, stop);
+                                if (lower > cutoff + 1e-6) misses = 0;
+                                else if (++misses == 16) { misses = 0; cooldown = 256; }
+                            }
+                            reject = lower > cutoff + 1e-6;
+                            budget.Result(reject);
                         }
-                        reject = lower > cutoff + 1e-6;
                     }
                     if (reject) { pruned++; continue; }
                     packet->indices.push_back(index); packet->layouts.push_back(std::move(layout));
@@ -124,7 +163,7 @@ inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAn
                         if (stop()) break;
                     }
                 }
-                finishPacket(packet, begin, end, filtered, pruned);
+                finishPacket(packet, begin, end, filtered, pruned, measured);
                 changed.notify_all();
             }
         }
@@ -134,7 +173,8 @@ inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAn
     try
     {
         if (!state.source || !state.source->data || batch < 1 || batch > 2048 || request.workers < 1 || request.workers > 6 ||
-            !request.count || !request.criteria.Valid()) throw std::runtime_error("Invalid GPU search request");
+            !request.count || !request.criteria.Valid() || int(bounds) < 0 || int(bounds) > 2)
+            throw std::runtime_error("Invalid GPU search request");
         auto error = request.criteria.CheckCatalog(*state.source->data, true);
         if (!error.empty()) throw std::runtime_error(error);
         // Establish a real cutoff from the first 64 candidates before large

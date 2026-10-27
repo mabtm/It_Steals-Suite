@@ -40,6 +40,22 @@ int main(int argc, char **argv)
         assert(gpu.phase == SearchPhase::Completed && SameTop(reference.top, gpu.top));
         assert(gpu.evaluated == r.count && gpu.generated == r.count && gpu.evaluated == gpu.scored + gpu.pruned + gpu.filtered);
     }
+    r.workers = 2;
+    for (auto mode : {BoundsMode::Enabled, BoundsMode::Disabled, BoundsMode::Adaptive})
+    {
+        BoundsStats measured;
+        auto gpu = SearchGpu(source, distances, r, 32, score, [] { return false; }, {}, audit, mode, &measured);
+        assert(gpu.phase == SearchPhase::Completed && SameTop(reference.top, gpu.top));
+        assert(gpu.scored + gpu.pruned == r.count && measured.checked + measured.skipped <= r.count - 64);
+        if (mode == BoundsMode::Disabled) assert(!measured.checked && measured.skipped && !gpu.pruned && gpu.scored == r.count);
+        if (mode == BoundsMode::Enabled) assert(measured.checked && !measured.skipped);
+    }
+    BoundsBudget adaptive{BoundsMode::Adaptive};
+    for (int i = 0; i < 64; i++) { assert(adaptive.Use()); adaptive.Result(false); }
+    for (int i = 0; i < 512; i++) assert(!adaptive.Use());
+    assert(adaptive.Use());
+    BoundsBudget useful{BoundsMode::Adaptive};
+    for (int i = 0; i < 128; i++) { assert(useful.Use()); useful.Result(i % 16 == 0); }
     r.criteria.spawn = 0; r.criteria.catalog = CatalogKey(*source->data); r.exhaustive = true; r.workers = 1;
     auto filtered = SeedSearch::RunFrozen(source, distances, r, [] { return false; });
     r.exhaustive = false; r.workers = 6;
@@ -64,14 +80,22 @@ int main(int argc, char **argv)
     }, [&] { return stopped.load(); });
     assert(canceled.phase == SearchPhase::Stopped && canceled.evaluated < r.count);
     SuiteOptions options;
-    auto plan = Experiments(options); assert(plan.size() == 76);
+    auto plan = Experiments(options); assert(plan.size() == 183 && options.levels.size() == 3);
     std::set<std::string> names; for (auto e : plan) names.insert(e.Name()); assert(names.size() == plan.size());
     assert(plan.front().reference && !plan.front().gpu && plan.back().gpu && plan.back().spawn == 0);
+    std::set<uint64_t> keys;
+    for (int i = 0; i < options.keys; i++) keys.insert(SearchKey(options, i));
+    assert(keys.size() == 3 && SearchKey(options, 0) == options.key);
+    auto quick = options; quick.keys = quick.rounds = 1;
+    assert(Experiments(quick).size() == 23);
+    auto bad = options; bad.levels = {7, 5, 7};
+    bool rejected = false; try { Experiments(bad); } catch (const std::runtime_error &) { rejected = true; }
+    assert(rejected && std::string(ModeName(5)) == "Hide & Seek");
     SuiteState suite; suite.options = options; suite.status = "Completed";
     SearchRun run; run.state = gpuFilter; run.topMatch = true; run.audited = gpuFilter.scored;
     suite.runs.push_back(run);
     auto text = SuiteJson(suite);
-    assert(text.find("practice-suite.gpu-suite.v4") != std::string::npos && text.find("\"top10Match\":true") != std::string::npos);
-    SaveJson(std::filesystem::path(argv[2]) / "Dev4-Summary.json", text);
+    assert(text.find("practice-suite.gpu-suite.v5") != std::string::npos && text.find("\"top10Match\":true") != std::string::npos);
+    SaveJson(std::filesystem::path(argv[2]) / "Dev5-Summary.json", text);
     std::cout << "Full production CPU workers 1-6 / bounded GPU pipeline: exhaustive score audits, identical Top10, pruning, spawn filters, longest objective, errors, cancellation and automatic plan/JSON: PASS\n";
 }

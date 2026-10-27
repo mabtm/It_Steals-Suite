@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     assert(json.find("\"18446744073709551615\"") != std::string::npos);
     assert(json.find("\"length\":null") != std::string::npos);
     assert(json.find("\"gpuKernelMs\":null") != std::string::npos);
-    assert(json.find("practice-suite.gpu-dev.v4") != std::string::npos);
+    assert(json.find("practice-suite.gpu-dev.v5") != std::string::npos);
     auto folder = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::temp_directory_path() / "suite-gpu-report-tests";
     Save(folder / "gpu-report.json", r);
     r.error = "replacement checkpoint";

@@ -1,61 +1,85 @@
 #pragma once
 #include "GpuDevSearch.h"
+#include "MapLevels.h"
 
 namespace gpu_dev
 {
 struct SuiteOptions
 {
-    int adapter = 0, count = 16384, rounds = 3, workers = 6, recipe = 1;
+    int adapter = 0, count = 16384, rounds = 3, workers = 2, recipe = 1, keys = 3;
     uint64_t key = 0;
-    std::vector<int> levels{7, 5};
+    std::vector<int> levels{7, 5, 2};
 };
+inline uint64_t SearchKey(const SuiteOptions &o, int index) { return o.key + uint64_t(index) * 0x9e3779b97f4a7c15ULL; }
 struct Experiment
 {
-    bool gpu = false, reference = false;
-    int workers = 1, batch = 1024, round = 0, spawn = -1;
+    bool gpu = false, reference = false, specialized = false;
+    int workers = 1, batch = 1024, round = 0, spawn = -1, keyIndex = 0;
+    BoundsMode bounds = BoundsMode::Enabled;
     uint64_t count = 0;
     std::string Name() const
     {
-        return std::string(reference ? "reference" : gpu ? "gpu" : "cpu") + "-w" + std::to_string(workers) +
-            (gpu ? "-b" + std::to_string(batch) : "") + "-r" + std::to_string(round) +
+        return "k" + std::to_string(keyIndex + 1) + "-" + (reference ? "reference" : gpu ? "gpu" : "cpu") +
+            "-w" + std::to_string(workers) + (gpu ? "-b" + std::to_string(batch) +
+            (specialized ? "-specialized" : "-generic") : "") + "-bounds-" + BoundsName(bounds) + "-r" + std::to_string(round) +
             (spawn < 0 ? "-all-spawns" : "-spawn" + std::to_string(spawn)) + "-n" + std::to_string(count);
     }
 };
 inline std::vector<Experiment> Experiments(const SuiteOptions &o)
 {
     if (o.count < 32 || o.count > 16384 || o.rounds < 1 || o.rounds > 3 || o.workers < 1 || o.workers > 6 ||
-        o.recipe < 1 || o.recipe > 2 || o.levels.empty() || o.levels.size() > 2)
+        o.recipe < 1 || o.recipe > 2 || o.keys < 1 || o.keys > 3 || o.levels.empty() || o.levels.size() > 3)
         throw std::runtime_error("Invalid automatic benchmark plan");
-    if (o.levels.size() == 2 && o.levels[0] == o.levels[1]) throw std::runtime_error("Duplicate benchmark map");
-    for (int level : o.levels) if (level != 5 && level != 7) throw std::runtime_error("Choose Outside or Classic Bonus");
-    std::vector<Experiment> result{{false, true, 1, 1024, 0, -1, uint64_t(o.count)}};
-    std::vector<Experiment> base;
-    for (int w = 1; w <= o.workers; w++) base.push_back({false, false, w, 1024, 0, -1, uint64_t(o.count)});
-    for (int batch : {512, 1024, 2048})
-        for (int w = 1; w <= o.workers; w++) base.push_back({true, false, w, batch, 0, -1, uint64_t(o.count)});
-    for (int round = 1; round <= o.rounds; round++)
-        for (size_t i = 0; i < base.size(); i++)
-        {
-            auto e = base[(i + size_t((round - 1) * o.workers)) % base.size()];
-            e.round = round; result.push_back(e);
-        }
-    uint64_t filtered = uint64_t(std::min(o.count, 1024));
-    result.push_back({false, true, 1, 1024, 0, 0, filtered});
-    result.push_back({false, false, o.workers, 1024, 0, 0, filtered});
-    result.push_back({true, false, o.workers, 1024, 0, 0, filtered});
+    for (size_t i = 0; i < o.levels.size(); i++)
+    {
+        if (o.levels[i] != 2 && o.levels[i] != 5 && o.levels[i] != 7)
+            throw std::runtime_error("Choose Hide & Seek, Outside or Classic Bonus");
+        if (std::find(o.levels.begin(), o.levels.begin() + i, o.levels[i]) != o.levels.begin() + i)
+            throw std::runtime_error("Duplicate benchmark map");
+    }
+    std::vector<Experiment> result;
+    for (int key = 0; key < o.keys; key++)
+    {
+        Experiment reference; reference.reference = true; reference.bounds = BoundsMode::Disabled;
+        reference.keyIndex = key; reference.count = uint64_t(o.count); result.push_back(reference);
+        Experiment cpu = reference; cpu.reference = false; cpu.workers = 6; cpu.bounds = BoundsMode::Enabled;
+        std::vector<Experiment> base{cpu};
+        for (int batch : {512, 1024, 2048})
+            for (bool specialized : {false, true})
+                for (auto bounds : {BoundsMode::Enabled, BoundsMode::Disabled, BoundsMode::Adaptive})
+                {
+                    auto e = cpu; e.gpu = true; e.workers = o.workers; e.batch = batch;
+                    e.specialized = specialized; e.bounds = bounds; base.push_back(e);
+                }
+        for (int round = 1; round <= o.rounds; round++)
+            for (size_t i = 0; i < base.size(); i++)
+            {
+                auto e = base[(i + size_t((round - 1) * 5 + key * 7)) % base.size()];
+                e.round = round; result.push_back(e);
+            }
+        reference.spawn = cpu.spawn = 0;
+        reference.count = cpu.count = uint64_t(std::min(o.count, 1024));
+        result.push_back(reference); result.push_back(cpu);
+        auto filteredGpu = cpu; filteredGpu.gpu = filteredGpu.specialized = true;
+        filteredGpu.workers = o.workers; filteredGpu.bounds = BoundsMode::Adaptive; result.push_back(filteredGpu);
+    }
     return result;
 }
-inline const char *ModeSlug(int scene) { return scene == 13 ? "hide-seek-outside" : scene == 14 ? "classic-bonus" : "unknown"; }
-inline const char *ModeName(int scene) { return scene == 13 ? "Hide & Seek Outside" : scene == 14 ? "Classic Bonus" : "Unknown"; }
+inline const char *ModeName(int scene)
+{
+    int level = MapLevelIndex(scene);
+    return level < 0 ? "Unknown" : kMapLevelNames[level];
+}
 struct SearchRun
 {
     Experiment experiment;
     practice::SeedSearchState state;
     PairTiming gpu;
+    BoundsStats bounds;
     uint64_t audited = 0;
     double bufferSetupMs = 0;
     bool topMatch = false;
-    std::string file;
+    int shaderCrystals = 0, shaderThreads = 0, shaderSharedBytes = 0;
 };
 inline const char *SearchStatus(practice::SearchPhase phase)
 {
@@ -65,8 +89,8 @@ inline std::string SearchJson(const SearchRun &r)
 {
     const auto &s = r.state;
     std::ostringstream out; out.imbue(std::locale::classic()); out << std::boolalpha << std::setprecision(17);
-    out << "{\"schema\":\"practice-suite.gpu-search.v4\",\"version\":"; Quote(out, suite_brand::Version);
-    out << ",\"channel\":\"GPU Dev 4\",\"sourceCommit\":";
+    out << "{\"schema\":\"practice-suite.gpu-search.v5\",\"version\":"; Quote(out, suite_brand::Version);
+    out << ",\"channel\":\"GPU Dev 5\",\"sourceCommit\":";
 #ifdef SUITE_DEV_SOURCE_COMMIT
     Quote(out, SUITE_DEV_SOURCE_COMMIT);
 #else
@@ -82,13 +106,20 @@ inline std::string SearchJson(const SearchRun &r)
         << ",\"round\":" << r.experiment.round << ",\"reference\":" << r.experiment.reference
         << ",\"spawnFilter\":" << s.request.criteria.spawn << ",\"objective\":\"shortest route\",\"recipe\":" << s.request.recipe
         << ",\"key\":"; Quote(out, std::to_string(s.request.key));
+    out << ",\"keyIndex\":" << r.experiment.keyIndex << ",\"boundsMode\":"; Quote(out, BoundsName(r.experiment.bounds));
+    out << ",\"boundsChecked\":"; if (r.experiment.gpu) out << r.bounds.checked; else out << "null";
+    out << ",\"boundsSkipped\":"; if (r.experiment.gpu) out << r.bounds.skipped; else out << "null";
+    out << ",\"shader\":"; Quote(out, !r.experiment.gpu ? "cpu" : r.experiment.specialized ? "specialized" : "generic");
+    out << ",\"shaderCrystals\":" << r.shaderCrystals << ",\"shaderThreads\":" << r.shaderThreads
+        << ",\"shaderSharedBytes\":" << r.shaderSharedBytes;
     out << ",\"requested\":" << s.request.count << ",\"generated\":" << s.generated
         << ",\"evaluated\":" << s.evaluated << ",\"filtered\":" << s.filtered << ",\"pruned\":" << s.pruned
         << ",\"scored\":" << s.scored << ",\"cacheHits\":" << s.cacheHits
         << ",\"audited\":" << r.audited << ",\"top10Match\":" << r.topMatch
         << ",\"elapsedMs\":" << s.elapsed * 1000. << ",\"seedsPerSecond\":" << (s.elapsed > 0 ? s.evaluated / s.elapsed : 0)
-        << ",\"bufferSetupMs\":" << r.bufferSetupMs << ",\"generationMicros\":" << s.generationMicros
-        << ",\"gpuTimestampBatches\":" << r.gpu.timestampBatches << ",\"gpuTimestampInvalid\":" << r.gpu.timestampInvalid
+        << ",\"bufferSetupMs\":" << r.bufferSetupMs << ",\"generationMicros\":";
+    if (r.experiment.gpu) out << "null"; else out << s.generationMicros;
+    out << ",\"gpuTimestampBatches\":" << r.gpu.timestampBatches << ",\"gpuTimestampInvalid\":" << r.gpu.timestampInvalid
         << ",\"gpuKernelMs\":"; Number(out, r.gpu.timestampBatches ? r.gpu.gpuKernelMs : NAN);
     out << ",\"gpuHostUploadMs\":" << r.gpu.hostUploadMs << ",\"gpuHostReadbackMs\":" << r.gpu.hostReadbackMs
         << ",\"gpuQueryCollectMs\":" << r.gpu.queryCollectMs << ",\"top10\":[";
@@ -110,28 +141,41 @@ struct SuiteState
     int64_t startedUtcMs = 0;
     std::vector<SearchRun> runs;
     std::vector<Report> maps;
+    struct ShaderPreparation { int scene = 0, crystals = 0, threads = 0, sharedBytes = 0; double compileMs = 0; };
+    std::vector<ShaderPreparation> shaders;
 };
 inline std::string SuiteJson(const SuiteState &s)
 {
     std::ostringstream out; out.imbue(std::locale::classic()); out << std::boolalpha << std::setprecision(17);
-    out << "{\"schema\":\"practice-suite.gpu-suite.v4\",\"version\":"; Quote(out, suite_brand::Version);
-    out << ",\"channel\":\"GPU Dev 4\",\"sourceCommit\":";
+    out << "{\"schema\":\"practice-suite.gpu-suite.v5\",\"version\":"; Quote(out, suite_brand::Version);
+    out << ",\"channel\":\"GPU Dev 5\",\"sourceCommit\":";
 #ifdef SUITE_DEV_SOURCE_COMMIT
     Quote(out, SUITE_DEV_SOURCE_COMMIT);
 #else
     Quote(out, "local");
 #endif
     out << ",\"plan\":{\"adapter\":" << s.options.adapter << ",\"seeds\":" << s.options.count
-        << ",\"rounds\":" << s.options.rounds << ",\"maxWorkers\":" << s.options.workers
+        << ",\"rounds\":" << s.options.rounds << ",\"gpuCpuHelpers\":" << s.options.workers << ",\"cpuWorkers\":6"
         << ",\"recipe\":" << s.options.recipe << ",\"key\":"; Quote(out, std::to_string(s.options.key));
     out << ",\"mapLevels\":"; Array(out, s.options.levels);
+    out << ",\"keys\":[";
+    for (int i = 0; i < s.options.keys; i++) { if (i) out << ','; Quote(out, std::to_string(SearchKey(s.options, i))); }
+    out << ']';
     out << "},\"mapMetadataAreSharedPreparationOnly\":true,\"status\":"; Quote(out, s.status);
     out << ",\"activeTest\":"; Quote(out, s.active); out << ",\"error\":"; Quote(out, s.error);
     out << ",\"startedUtcMs\":" << s.startedUtcMs << ",\"completedMaps\":" << s.completedMaps
         << ",\"completedTests\":" << s.completedTests << ",\"totalTests\":" << s.totalTests
         << ",\"warmupChecked\":" << s.warmupChecked << ",\"mapMetadata\":[";
     for (size_t i = 0; i < s.maps.size(); i++) { if (i) out << ','; out << Json(s.maps[i]); }
-    out << "],\"scope\":\"Complete frozen-map search: verified portable RNG, spawn filter, route bounds, scoring and Top10 ranking. Shared cold preparation is reported per map, outside timed searches. Every scored route is audited against the exhaustive CPU reference. CPU uses production per-worker caches; GPU uses bounded packets without route caches. No live Unity generation or preview rendering is timed.\",\"runs\":[";
+    out << "],\"shaderPreparation\":[";
+    for (size_t i = 0; i < s.shaders.size(); i++)
+    {
+        if (i) out << ',';
+        const auto &v = s.shaders[i];
+        out << "{\"scene\":" << v.scene << ",\"crystals\":" << v.crystals << ",\"threads\":" << v.threads
+            << ",\"sharedBytes\":" << v.sharedBytes << ",\"compileMs\":" << v.compileMs << '}';
+    }
+    out << "],\"scope\":\"Complete frozen-map search with strict per-seed CPU-reference audits and identical Top10. CPU uses production workers/caches. GPU compares generic and fixed-crystal FP64 shaders and on/off/adaptive bounds with bounded packets. Adaptive bounds sample 64 checks and skip 512 candidates when fewer than two checks reject. Disabling bounds fully scores candidates. Configurations share each map/key/recipe and rotate between repetitions. Shared geometry, device, shader compilation and warmup are outside search times; GPU buffer setup and query collection are included. No live Unity generation, scene loading or preview rendering is timed.\",\"runs\":[";
     for (size_t i = 0; i < s.runs.size(); i++) { if (i) out << ','; out << SearchJson(s.runs[i]); }
     out << "]}"; return out.str();
 }

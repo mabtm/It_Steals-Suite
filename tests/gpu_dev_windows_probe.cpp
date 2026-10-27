@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     kernel.options.cachedCatalog = false;
     kernel.options.adapter = available.front().index;
     Device device(kernel, true);
-    int checks = 0;
+    int checks = 0, specializedChecks = 0;
     for (int n : {1, 15, 16, 22, 31, 32, 33, 52})
         for (int profile = 0; profile < 5; profile++)
         {
@@ -27,6 +27,20 @@ int main(int argc, char **argv)
             assert(result[0].complete && result[0].order == f.expected.order && result[0].length == f.expected.length);
             checks++;
         }
+    for (int n : {1, 8, 15, 16, 22, 31, 32, 33, 40, 52})
+    {
+        device.PrepareKernel(n); device.SelectKernel(n);
+        assert(device.KernelThreads() == (n <= 32 ? 32 : 64));
+        for (int profile = 0; profile < 5; profile++)
+        {
+            GpuOrderFixture f(n, profile, 0x719005);
+            device.Pack(0, f.matrix.data(), n);
+            auto result = device.Execute(1);
+            assert(result[0].complete && result[0].order == f.expected.order && result[0].length == f.expected.length);
+            specializedChecks++;
+        }
+    }
+    device.SelectKernel(0);
     std::vector<GpuOrderFixture> fixtures;
     for (int n : {16, 33, 52}) fixtures.emplace_back(n, 1, 0x719002);
     int batchedChecks = 0;
@@ -69,6 +83,7 @@ int main(int argc, char **argv)
             : 1. + ((a * 71 + b * 17) % 32) * 1e-7; };
         auto catalog = std::make_shared<Catalog>(3, points, edge);
         cached.SetCatalog(catalog, compact);
+        cached.SelectKernel(0);
         std::vector<practice::Selection> layouts;
         std::vector<practice::RouteResult> expected;
         for (int n : {16, 33, 52})
@@ -106,7 +121,38 @@ int main(int argc, char **argv)
             if (compact.timestampsSupported) assert(timing.timestampBatches + timing.timestampInvalid == 2);
             compact.timings.push_back(timing);
         }
+        for (int n : {16, 22, 31, 32, 33, 40, 52})
+        {
+            cached.PrepareKernel(n); cached.SelectKernel(n); cached.Resize(4, compact);
+            practice::Selection selection; selection.spawn = 1;
+            for (int i = 0; i < n; i++) selection.crystals.push_back((points - 1) * (n - 1 - i) / (n - 1));
+            practice::RouteWorkspace work;
+            for (int a = 0; a <= n; a++) for (int b = a; b <= n; b++)
+            {
+                int from = a ? selection.crystals[a - 1] + 3 : selection.spawn;
+                int to = b ? selection.crystals[b - 1] + 3 : selection.spawn;
+                work.matrix[a * (n + 1) + b] = work.matrix[b * (n + 1) + a] = a == b ? 0. : edge(from, to);
+            }
+            auto expected = practice::SolveOrderFlat(work.matrix.data(), n + 1, work, [] { return false; }, false);
+            for (int i = 0; i < 2; i++) cached.PackSelection(i, selection);
+            auto result = cached.Execute(2);
+            for (const auto &route : result)
+            {
+                assert(route.complete && route.order == expected.order && route.length == expected.length);
+                specializedChecks++;
+            }
+            if (n == 22) assert(cached.KernelSharedBytes() == 5928);
+            if (n == 40) assert(cached.KernelSharedBytes() == 17832);
+            if (n == 52) assert(cached.KernelSharedBytes() == 29112);
+            auto wrong = selection; wrong.crystals.pop_back();
+            bool rejected = false; try { cached.PackSelection(0, wrong); } catch (const std::runtime_error &) { rejected = true; }
+            assert(rejected);
+            cached.Submit(1);
+            rejected = false; try { cached.SelectKernel(0); } catch (const std::runtime_error &) { rejected = true; }
+            assert(rejected); cached.Collect();
+        }
     }
+    assert(specializedChecks == 78);
     assert(compactChecks == 6660 && compact.inputBytesPerLayout == 216 && compact.catalogBytes > 12000000);
     compact.phase = Phase::Completed;
     Save(output / "catalog-kernel.json", compact);
@@ -170,7 +216,7 @@ int main(int argc, char **argv)
             Automation automaticSuite;
             automaticSuite.directory = output / "automatic-suite" / L"\u6e2c\u8a66";
             SuiteOptions automaticOptions;
-            automaticOptions.count = 32; automaticOptions.rounds = 1; automaticOptions.workers = 2;
+            automaticOptions.count = 128; automaticOptions.rounds = 1; automaticOptions.workers = 2; automaticOptions.keys = 2;
             automaticOptions.key = FixtureSearchKey; automaticOptions.adapter = available.front().index;
             automaticSuite.Start(automaticOptions, 42, 7, true);
             auto autoDeadline = Clock::now() + std::chrono::seconds(120);
@@ -180,7 +226,9 @@ int main(int argc, char **argv)
                 if (level >= 0)
                 {
                     auto map = std::make_shared<practice::MapAnalysis>(*source);
-                    auto data = std::make_shared<practice::MapData>(*source->data);
+                    auto data = std::make_shared<practice::MapData>(practice::LoadRouteBenchmarkFixture(
+                        (fixture / (level == 2 ? "hide-seek-boxes.routefixture" : "hide-seek-outside-boxes.routefixture")).string().c_str(),
+                        level == 2 ? 22 : level == 5 ? 40 : 52, 1.35f));
                     data->pid = 42; data->scene = kMapScenes[level]; data->epoch = 9;
                     map->data = data; map->session = 7;
                     assert(!automaticSuite.Offer(map, 42, data->scene, 8, 7));
@@ -193,9 +241,10 @@ int main(int argc, char **argv)
             if (automaticSuite.Busy()) { automaticSuite.Stop(); throw std::runtime_error("Automatic suite did not finish"); }
             auto complete = automaticSuite.Get();
             if (complete->status != "Completed") throw std::runtime_error(complete->error);
-            assert(complete->completedMaps == 2 && complete->runs.size() == 24 && complete->completedTests == complete->totalTests);
+            assert(complete->completedMaps == 3 && complete->runs.size() == 138 && complete->completedTests == complete->totalTests);
             for (const auto &test : complete->runs) assert(test.topMatch && test.audited == test.state.scored);
-            assert(std::filesystem::is_regular_file(std::filesystem::path(complete->directory) / "Dev4-Summary.json"));
+            assert(std::filesystem::is_regular_file(std::filesystem::path(complete->directory) / "Dev5-Summary.json"));
+            assert(std::distance(std::filesystem::directory_iterator(complete->directory), std::filesystem::directory_iterator{}) == 1);
             automaticSuite.Start(automaticOptions, 42, 7, true);
             auto stopDeadline = Clock::now() + std::chrono::seconds(10);
             while (automaticSuite.Busy() && automaticSuite.Wanted() < 0 && Clock::now() < stopDeadline)
@@ -231,6 +280,6 @@ int main(int argc, char **argv)
             assert(rejected.phase == Phase::Failed && rejected.adapter.software);
         }
     }
-    std::cout << checks << " single + " << batchedChecks << " legacy + " << compactChecks
+    std::cout << checks << " single + " << batchedChecks << " legacy + " << compactChecks << " catalog + " << specializedChecks << " specialized"
               << " catalog shader comparisons; live scoring fixtures, legacy/catalog parity, timing/control runs, partial cancellation, replacement checkpoints and automatic export: PASS\n";
 }

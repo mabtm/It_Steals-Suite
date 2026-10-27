@@ -12,8 +12,8 @@ inline constexpr char Version[] = SUITE_VERSION;
 inline constexpr char ModVersion[] = SUITE_MOD_VERSION;
 inline constexpr char Author[] = SUITE_AUTHOR;
 #ifdef SUITE_GPU_DEV
-inline constexpr char Credit[] = "v" SUITE_VERSION "  /  " SUITE_AUTHOR "  /  GPU DEV 4";
-inline constexpr char Title[] = "PRACTICE SUITE / GPU DEV 4";
+inline constexpr char Credit[] = "v" SUITE_VERSION "  /  " SUITE_AUTHOR "  /  GPU DEV 5";
+inline constexpr char Title[] = "PRACTICE SUITE / GPU DEV 5";
 #else
 inline constexpr char Credit[] = "v" SUITE_VERSION "  /  " SUITE_AUTHOR;
 inline constexpr char Title[] = "PRACTICE SUITE";
