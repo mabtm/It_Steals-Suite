@@ -5,6 +5,10 @@
 102 RCDATA "../Installer/Update.ps1"
 103 RCDATA "../CHANGELOG.md"
 104 RCDATA "../Installer/Install.ps1"
+#ifdef SUITE_GPU_DEV
+105 RCDATA "../tests/gpu_order_lab.hlsl"
+106 RCDATA "../tests/gpu_order_kernel.hlsli"
+#endif
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION SUITE_VERSION_COMPONENTS
  PRODUCTVERSION SUITE_VERSION_COMPONENTS

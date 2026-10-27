@@ -42,6 +42,9 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "PracticeMapClient.h"
 #include "InspectorClient.h"
 #include "SeedSearch.h"
+#ifdef SUITE_GPU_DEV
+#include "GpuDevSession.h"
+#endif
 #include "MovementTelemetry.h"
 #include "PerformanceTiming.h"
 #include "SuiteExperience.h"
@@ -126,6 +129,9 @@ practice::MapWorker g_mapWorker;
 PracticeMapClient g_mapClient;
 InspectorClient g_inspectorClient;
 practice::SeedSearch g_seedSearch;
+#ifdef SUITE_GPU_DEV
+gpu_dev::Session g_gpuDev;
+#endif
 std::string g_plannerRandomError;
 std::string g_connectionStatus = "Waiting for ItStealsHelper";
 
@@ -1166,6 +1172,11 @@ void SyncCommands(bool visible)
     g_commands.replayMinSeconds = suite_ui::replayPreferences.seconds;
     g_commands.replayMinCrystals =
         suite_ui::replayPreferences.mode == 1 ? uint32_t(suite_ui::replayPreferences.crystals) : 0;
+    #ifdef SUITE_GPU_DEV
+    g_gpuDev.CheckContext(g_pShared ? int(g_pShared->pid) : 0,
+                          g_pShared ? g_pShared->currentSceneIndex : -1,
+                          g_pShared ? int(g_pShared->sceneEpoch) : 0, g_session, restricted);
+    #endif
     bool searchWanted = !restricted && (g_seedSearch.Busy() || (visible && g_plannerTabActive));
     bool plannerWanted =
         searchWanted || (visible && !restricted &&
@@ -1529,6 +1540,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     ApplyPreferences(g_settings.Load());
     inspector::reportFolder = g_settings.Directory() / L"Diagnostics" / L"Inspector";
     g_mapWorker.SetDirectory(g_settings.Directory());
+#ifdef SUITE_GPU_DEV
+    g_gpuDev.directory = g_settings.Directory() / L"Diagnostics" / L"GpuDev";
+#endif
     g_mapWorker.LoadCaches();
     practice::g_replayArchive.SetDirectory(g_settings.Directory() / L"Replays");
     if (g_compactMode)
@@ -2286,8 +2300,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 }
                 nextFrame = now + std::chrono::milliseconds(100);
             }
-            (frameWasInteractive ? g_menuFrameCost : g_hudFrameCost)
-                .Observe(std::chrono::duration<double, std::milli>(Clock::now() - frameStarted).count());
+            double frameCpuMs = std::chrono::duration<double, std::milli>(Clock::now() - frameStarted).count();
+            (frameWasInteractive ? g_menuFrameCost : g_hudFrameCost).Observe(frameCpuMs);
+#ifdef SUITE_GPU_DEV
+            g_gpuDev.Observe(frameCpuMs, ImGui::GetIO().DeltaTime * 1000., frameWasInteractive,
+                             g_pShared ? g_pShared->gameFps : 0);
+#endif
         }
         auto deadline =
             Clock::now() + std::chrono::milliseconds(

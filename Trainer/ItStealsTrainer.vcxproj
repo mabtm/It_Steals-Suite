@@ -75,6 +75,13 @@
   <ItemDefinitionGroup Condition="'$(SuitePgoMode)'=='Use'">
     <Link><AdditionalOptions>/USEPROFILE:PGD="$(SuitePgoDatabase)" %(AdditionalOptions)</AdditionalOptions></Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(SuiteGpuDev)'=='true'">
+    <ClCompile>
+      <PreprocessorDefinitions>SUITE_GPU_DEV;SUITE_DEV_SOURCE_COMMIT="$(SuiteDevSourceCommit)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FloatingPointModel>Strict</FloatingPointModel>
+    </ClCompile>
+    <ResourceCompile><PreprocessorDefinitions>SUITE_GPU_DEV;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ResourceCompile Include="TrainerResources.rc" />
     <ClCompile Include="ItStealsTrainer.cpp" />

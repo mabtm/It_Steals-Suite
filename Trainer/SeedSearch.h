@@ -169,6 +169,12 @@ class SearchDistances
             prepared = &neighbors;
         }
         auto result = SolveOrderFlat(work.matrix.data(), count, work, canceled, !fast, prepared);
+        return FinishOrder(selection, std::move(result), canceled);
+    }
+
+    RouteResult FinishOrder(const Selection &selection, RouteResult result, const Cancel &canceled) const
+    {
+        int count = static_cast<int>(selection.crystals.size()) + 1;
         if (pickups->Active())
         {
             std::array<int, 65> nodes;

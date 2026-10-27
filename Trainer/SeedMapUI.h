@@ -7,6 +7,10 @@
 #include "RouteDrawing.h"
 
 inline bool g_selectSeedPreview = false;
+#ifdef SUITE_GPU_DEV
+#include "GpuDevUI.h"
+#endif
+
 inline void RenderSpawnPreview(const practice::MapAnalysis &source);
 
 inline const practice::TimingEstimate &PreviewMovementTiming(
@@ -1066,8 +1070,21 @@ inline void RenderSeedMapTab(bool restricted)
     }
     if (suite_ui::BeginTabItem("Seed search"))
     {
+#ifdef SUITE_GPU_DEV
+        ImGui::BeginDisabled(g_gpuDev.Busy());
+#endif
         RenderSeedSearchControls(base, verified, g_seedSearch.Busy());
+#ifdef SUITE_GPU_DEV
+        ImGui::EndDisabled();
+#endif
         suite_ui::EndTabItem();
     }
+#ifdef SUITE_GPU_DEV
+    if (suite_ui::BeginTabItem("GPU Dev"))
+    {
+        RenderGpuDevControls(base, verified);
+        suite_ui::EndTabItem();
+    }
+#endif
     ImGui::EndTabBar();
 }
