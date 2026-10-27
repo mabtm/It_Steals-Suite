@@ -7,7 +7,7 @@ the suite with a frozen snapshot of the current game map. It uses the existing
 
 1. Exit the running suite completely, then extract the dev portable ZIP into
    its own folder and start its ItStealsTrainer.exe. The title says GPU DEV 1.
-2. Load the map in Practice, open **Seeds → GPU Dev**, and select your GPU.
+2. Load the map in Practice, open **Seed Map → GPU Dev**, and select your GPU.
 3. Press **Compare live layouts**. The test checks 32–1024 layouts in three
    alternating CPU/GPU passes. One CPU worker is used for the reference.
 4. A JSON report is saved automatically, including on stop or unsupported GPU.
