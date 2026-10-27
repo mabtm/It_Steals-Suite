@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([int]$Seeds = 10000, [switch]$Trainer)
+param([int]$Seeds = 10000, [switch]$Trainer, [ValidateRange(1, 50000)][int]$CenterTrainingSeeds = 128)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -80,16 +80,27 @@ if ($runtime) { Copy-Item $runtime.FullName $out }
 # layouts already exercise millions of inner-loop branches without timing out.
 Run-Benchmark $trained 'hide-seek-outside-boxes' 52 32 '1.35' -Training | Out-File (Join-Path $out 'training.log')
 Run-Benchmark $trained 'hide-seek-outside-boxes' 52 32 '0.5' -Training | Out-File (Join-Path $out 'training.log') -Append
-Run-Benchmark $trained 'hide-seek-outside-boxes' 52 128 '0' -Training | Out-File (Join-Path $out 'training.log') -Append
+Run-Benchmark $trained 'hide-seek-outside-boxes' 52 $CenterTrainingSeeds '0' -Training | Out-File (Join-Path $out 'training.log') -Append
 Run-Benchmark $trained 'hide-seek-boxes' 22 64 '1.35' -Training | Out-File (Join-Path $out 'training.log') -Append
 if (-not (Test-Path $pgoDatabase)) { throw 'PGO training database was not produced.' }
 if ($Trainer) {
     $previousResearchPath = $env:PATH
+    $previousProfilePath = $env:VCPROFILE_PATH
+    $beforeUi = @(Get-ChildItem $out -Filter '*.pgc').Count
     try {
         $env:PATH = $out + ';' + $env:PATH
+        # The launcher copies the image to a temporary directory and removes it.
+        # Keep its six normal-exit profiles beside the PGD instead of deleting them.
+        $env:VCPROFILE_PATH = $out
         & (Join-Path $PSScriptRoot 'launcher_windows_tests.ps1') -TrainerBinary $trained
         if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Instrumented trainer UI training failed.' }
-    } finally { $env:PATH = $previousResearchPath }
+    } finally {
+        $env:PATH = $previousResearchPath
+        $env:VCPROFILE_PATH = $previousProfilePath
+    }
+    $uiProfiles = @(Get-ChildItem $out -Filter '*.pgc').Count - $beforeUi
+    if ($uiProfiles -lt 6) { throw "Only $uiProfiles launcher profiles were retained; expected all six normal exits." }
+    Write-Output "Retained $uiProfiles controlled launcher startup/shutdown profiles: PASS"
 }
 Build-Benchmark $trained ('/USEPROFILE:PGD="' + $pgoDatabase + '"')
 $inspect = Join-Path $out 'inspect.cmd'
@@ -120,7 +131,7 @@ for ($pair = 1; $pair -le 3; $pair++) {
             $rate = [double]::Parse($cells[5], [Globalization.CultureInfo]::InvariantCulture)
             $samples += [ordered]@{ pair=$pair; variant=$variant; radius=$radius; rate=$rate; raw=$line }
             Write-Output "$variant pair $pair radius $radius : $rate seeds/s"
-            @{ cpu=$cpu; compiler='MSVC v143 /O2 /GL /LTCG'; actualTrainer=[bool]$Trainer; samples=$samples } |
+            @{ cpu=$cpu; compiler='MSVC v143 /O2 /GL /LTCG'; actualTrainer=[bool]$Trainer; centerTrainingSeeds=$CenterTrainingSeeds; samples=$samples } |
                 ConvertTo-Json -Depth 6 | Set-Content (Join-Path $out 'pgo-results.json') -Encoding UTF8
         }
     }
@@ -131,7 +142,7 @@ foreach ($radius in @('1.35', '0.5', '0')) {
     Write-Output "MSVC radius $radius median: baseline=$before PGO=$after ratio=$($after/$before)"
 }
 Write-Output 'MSVC PGO training, paired complete searches and exact Top-10 parity: PASS'
-@{ cpu=$cpu; compiler='MSVC v143 /O2 /GL /LTCG'; actualTrainer=[bool]$Trainer; samples=$samples } |
+@{ cpu=$cpu; compiler='MSVC v143 /O2 /GL /LTCG'; actualTrainer=[bool]$Trainer; centerTrainingSeeds=$CenterTrainingSeeds; samples=$samples } |
     ConvertTo-Json -Depth 6 | Write-Output
 if ($Trainer) {
     & (Join-Path $PSScriptRoot 'launcher_windows_tests.ps1') -TrainerBinary $trained

@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Train and compare complete trainer images
         shell: powershell
-        run: .\tests\algorithm_windows_lab.ps1 -Trainer
+        run: .\tests\algorithm_windows_lab.ps1 -Trainer -CenterTrainingSeeds 8192
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
