@@ -2,7 +2,7 @@
 
 inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis> source, bool verified)
 {
-    static bool discovered = false, reuseKey = true;
+    static bool discovered = false, reuseKey = true, gpuTiming = true;
     static int selected = 0, profile = 1;
     static std::string exportStatus;
     static gpu_dev::Options running;
@@ -31,6 +31,9 @@ inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis> so
                            "Endurance / 8,192 layouts / 12 rounds / 16, 64, 128, 256"};
     ImGui::Combo("Test profile", &profile, profiles, 3);
     auto request = gpu_dev::Preset(profile);
+    ImGui::Checkbox("GPU timing queries", &gpuTiming);
+    request.gpuTiming = gpuTiming;
+    ImGui::TextDisabled("Disable queries for a throughput control run with the same seed key.");
     ImGui::TextDisabled("%s layouts per round | %d strict comparisons | %d s idle baseline",
                         profile == 2 ? "8,192" : profile == 1 ? "4,096" : "1,024",
                         gpu_dev::TotalChecks(request), request.baselineSeconds);

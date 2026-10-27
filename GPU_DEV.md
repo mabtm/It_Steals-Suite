@@ -28,6 +28,10 @@ round to distribute warm/late runs. Every batch size receives exactly the same
 seed selections. CPU/GPU full-pass order alternates, balanced across rounds.
 **Reuse previous test's seed key** makes repeated profiles use the same seed
 sequence; the source map remains part of the exported identity.
+For a throughput control run, repeat Batch sweep with the same seed key and
+**GPU timing queries** disabled. Host wall/readback measurements and strict
+comparisons remain active, while device timestamp instrumentation is removed.
+This separates a batch-size effect from the cost of the timing queries.
 
 Reports are saved automatically to
 `%LOCALAPPDATA%/ItStealsPracticeSuite/Diagnostics/GpuDev`. One JSON checkpoint

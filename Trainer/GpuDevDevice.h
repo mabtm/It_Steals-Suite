@@ -175,7 +175,7 @@ class Device
         // Allocate once outside all scoring timings. One disjoint interval spans
         // a complete GPU pass, rather than beginning/ending one per batch/frame.
         D3D11_QUERY_DESC query{D3D11_QUERY_TIMESTAMP_DISJOINT, 0};
-        report.timestampsSupported = SUCCEEDED(device->CreateQuery(&query, &disjoint));
+        report.timestampsSupported = report.options.gpuTiming && SUCCEEDED(device->CreateQuery(&query, &disjoint));
         if (report.timestampsSupported)
         {
             int minimumBatch = report.options.sweep ? 16 : capacity;

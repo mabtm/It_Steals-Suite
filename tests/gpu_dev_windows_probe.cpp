@@ -101,6 +101,12 @@ int main(int argc, char **argv)
             assert(partial.timings.size() == 1 && !partial.timings[0].complete);
             assert(partial.timings[0].cpuDigest == partial.timings[0].gpuDigest);
             Save(output / "partial-stop.json", partial);
+            auto control = options;
+            control.seeds = 3; control.pairs = 1; control.gpuTiming = false;
+            auto unprofiled = Run(source, control, [] { return false; }, ignore, true);
+            assert(unprofiled.phase == Phase::Completed && unprofiled.checked == 3 && unprofiled.mismatches == 0);
+            assert(!unprofiled.timestampsSupported && !unprofiled.timings[0].timestampBatches && unprofiled.timings[0].queryCollectMs == 0);
+            Save(output / "unprofiled.json", unprofiled);
             Session session;
             session.directory = output / "automatic";
             auto automatic = options;
@@ -126,5 +132,5 @@ int main(int argc, char **argv)
             assert(rejected.phase == Phase::Failed && rejected.adapter.software);
         }
     }
-    std::cout << checks << " single + " << batchedChecks << " full/tail embedded shader checks; 184 paired pickup scores, rotating sweep, timing queries, partial cancellation, replacement checkpoints and automatic export: PASS\n";
+    std::cout << checks << " single + " << batchedChecks << " full/tail embedded shader checks; 187 complete + 16 partial paired pickup scores, rotating sweep, timing/control runs, partial cancellation, replacement checkpoints and automatic export: PASS\n";
 }

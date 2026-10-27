@@ -5,7 +5,7 @@ import sys
 
 folder = pathlib.Path(sys.argv[1])
 reports = {p.stem: json.loads(p.read_text(encoding="utf-8-sig")) for p in folder.glob("*.json")}
-assert len(reports) == 9, list(reports)
+assert len(reports) == 10, list(reports)
 for report in reports.values():
     assert report["schema"] == "practice-suite.gpu-dev.v2"
     assert report["mismatches"] == 0
@@ -37,8 +37,11 @@ assert sweep["pairs"][0]["batch"] != sweep["pairs"][4]["batch"]
 partial = reports["partial-stop"]
 assert partial["status"] == "Stopped" and partial["checked"] == 16
 assert not partial["pairs"][0]["complete"]
+control = reports["unprofiled"]
+assert control["checked"] == 3 and not control["request"]["gpuTiming"]
+assert not control["adapter"]["timestampsSupported"] and control["pairs"][0]["queryCollectMs"] == 0
 checkpoint = json.loads((folder / "checkpoints/latest.json").read_text())
 assert checkpoint["checked"] == 136 and checkpoint["status"] == "Checking results / saving"
 assert not list(folder.rglob("*.tmp"))
 assert list((folder / "automatic").glob("*.json"))
-print("Nine GPU dev JSON reports, strict sampled routes, timestamp validity, rotating sweep, partial stop and replacement checkpoints: PASS")
+print("Ten GPU dev JSON reports, strict sampled routes, timestamp/control runs, rotating sweep, partial stop and replacement checkpoints: PASS")

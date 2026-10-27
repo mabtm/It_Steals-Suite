@@ -35,7 +35,7 @@ struct Options
 {
     int adapter = 0, seeds = 128, batch = 16, pairs = 3, recipe = 1, baselineSeconds = 0;
     uint64_t key = 0;
-    bool fixture = false, sweep = false;
+    bool fixture = false, sweep = false, gpuTiming = true;
 };
 
 inline std::vector<int> Batches(const Options &o) { return o.sweep ? std::vector<int>{16, 64, 128, 256} : std::vector<int>{o.batch}; }
@@ -296,6 +296,7 @@ inline std::string Json(const Report &r)
     Quote(out, std::to_string(r.options.key));
     out << ",\"batches\":"; Array(out, Batches(r.options));
     out << ",\"baselineSeconds\":" << r.options.baselineSeconds
+        << ",\"gpuTiming\":" << r.options.gpuTiming
         << ",\"exactWhenPossible\":true,\"cpuWorkers\":1,\"execution\":\"synchronous readback; rotating batch order; alternating full CPU/GPU passes\"}"
         << ",\"generated\":" << r.generated << ",\"checked\":" << r.checked
         << ",\"mismatches\":" << r.mismatches << ",\"warmupChecked\":" << r.warmupChecked
