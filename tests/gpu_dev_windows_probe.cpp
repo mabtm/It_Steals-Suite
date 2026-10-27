@@ -5,7 +5,7 @@
 #include <cassert>
 #include <iostream>
 
-int main(int argc, char **argv)
+int Probe(int argc, char **argv)
 {
     if (argc != 3) return 2;
     using namespace gpu_dev;
@@ -17,6 +17,7 @@ int main(int argc, char **argv)
     kernel.options.cachedCatalog = false;
     kernel.options.adapter = available.front().index;
     Device device(kernel, true);
+    std::cerr << "Embedded generic shader ready\n";
     int checks = 0, specializedChecks = 0;
     for (int n : {1, 15, 16, 22, 31, 32, 33, 52})
         for (int profile = 0; profile < 5; profile++)
@@ -29,6 +30,7 @@ int main(int argc, char **argv)
         }
     for (int n : {1, 8, 15, 16, 22, 31, 32, 33, 40, 52})
     {
+        std::cerr << "Check fixed " << n << "-crystal shader\n";
         device.PrepareKernel(n); device.SelectKernel(n);
         assert(device.KernelThreads() == (n <= 32 ? 32 : 64));
         for (int profile = 0; profile < 5; profile++)
@@ -41,6 +43,7 @@ int main(int argc, char **argv)
         }
     }
     device.SelectKernel(0);
+    std::cerr << "Generic/fixed legacy shader parity passed\n";
     std::vector<GpuOrderFixture> fixtures;
     for (int n : {16, 33, 52}) fixtures.emplace_back(n, 1, 0x719002);
     int batchedChecks = 0;
@@ -123,6 +126,7 @@ int main(int argc, char **argv)
         }
         for (int n : {16, 22, 31, 32, 33, 40, 52})
         {
+            std::cerr << "Check fixed catalog " << points << " points / " << n << " crystals\n";
             cached.PrepareKernel(n); cached.SelectKernel(n); cached.Resize(4, compact);
             practice::Selection selection; selection.spawn = 1;
             for (int i = 0; i < n; i++) selection.crystals.push_back((points - 1) * (n - 1 - i) / (n - 1));
@@ -282,4 +286,11 @@ int main(int argc, char **argv)
     }
     std::cout << checks << " single + " << batchedChecks << " legacy + " << compactChecks << " catalog + " << specializedChecks << " specialized"
               << " catalog shader comparisons; live scoring fixtures, legacy/catalog parity, timing/control runs, partial cancellation, replacement checkpoints and automatic export: PASS\n";
+}
+
+int main(int argc, char **argv)
+{
+    _set_error_mode(_OUT_TO_STDERR);
+    try { return Probe(argc, argv); }
+    catch (const std::exception &error) { std::cerr << "GPU probe: " << error.what() << '\n'; return 1; }
 }
