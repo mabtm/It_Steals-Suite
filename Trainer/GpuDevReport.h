@@ -33,16 +33,16 @@ struct Adapter
 
 struct Options
 {
-    int adapter = 0, seeds = 128, batch = 16, pairs = 3, recipe = 1, baselineSeconds = 0;
+    int adapter = 0, seeds = 128, batch = 256, pairs = 3, recipe = 1, baselineSeconds = 0;
     uint64_t key = 0;
-    bool fixture = false, sweep = false, gpuTiming = true;
+    bool fixture = false, sweep = false, gpuTiming = true, cachedCatalog = true, overlap = true;
 };
 
-inline std::vector<int> Batches(const Options &o) { return o.sweep ? std::vector<int>{16, 64, 128, 256} : std::vector<int>{o.batch}; }
+inline std::vector<int> Batches(const Options &o) { return o.sweep ? std::vector<int>{256, 512, 1024, 2048} : std::vector<int>{o.batch}; }
 inline int TotalChecks(const Options &o) { return o.seeds * o.pairs * int(Batches(o).size()); }
 inline bool ValidOptions(const Options &o)
 {
-    return o.seeds >= 1 && o.seeds <= 16384 && o.batch >= 1 && o.batch <= 256 &&
+    return o.seeds >= 1 && o.seeds <= 16384 && o.batch >= 1 && o.batch <= 2048 &&
            o.pairs >= 1 && o.pairs <= 12 && o.recipe >= 1 && o.recipe <= 2 &&
            o.baselineSeconds >= 0 && o.baselineSeconds <= 30;
 }
@@ -156,8 +156,9 @@ struct Report
     int generated = 0, checked = 0, mismatches = 0, warmupChecked = 0, successRows = 0, mismatchRows = 0;
     bool fp64 = false, liveCapture = false, timestampsSupported = false;
     uint64_t gpuBufferBytes = 0;
+    uint64_t catalogBytes = 0, inputBytesPerLayout = 0;
     unsigned logicalCpus = 0;
-    double preparationMs = 0, deviceMs = 0, generationMs = 0, warmupMs = 0, baselineMs = 0, elapsedMs = 0;
+    double preparationMs = 0, deviceMs = 0, generationMs = 0, catalogSetupMs = 0, warmupMs = 0, baselineMs = 0, elapsedMs = 0;
     std::string error, model, cpu;
     std::shared_ptr<const practice::MapData> source;
     std::vector<PairTiming> timings;
@@ -174,7 +175,7 @@ inline void Digest(uint64_t &hash, uint64_t value)
 inline void DigestRoute(uint64_t &hash, const practice::RouteResult &r)
 {
     Digest(hash, std::bit_cast<uint64_t>(r.length));
-    Digest(hash, r.complete | (r.exact << 1) | (r.pickupOptimized << 2) | (r.estimated << 3));
+    Digest(hash, uint64_t(r.complete) | (uint64_t(r.exact) << 1) | (uint64_t(r.pickupOptimized) << 2) | (uint64_t(r.estimated) << 3));
     Digest(hash, r.order.size()); for (int id : r.order) Digest(hash, uint64_t(id));
     Digest(hash, r.contacts.size()); for (int id : r.contacts) Digest(hash, uint64_t(id));
 }
@@ -270,9 +271,9 @@ inline std::string Json(const Report &r)
     std::ostringstream out;
     out.imbue(std::locale::classic());
     out << std::boolalpha << std::setprecision(17);
-    out << "{\n\"schema\":\"practice-suite.gpu-dev.v2\",\n\"version\":";
+    out << "{\n\"schema\":\"practice-suite.gpu-dev.v3\",\n\"version\":";
     Quote(out, suite_brand::Version);
-    out << ",\"channel\":\"GPU Dev 2\",\"sourceCommit\":";
+    out << ",\"channel\":\"GPU Dev 3\",\"sourceCommit\":";
 #ifdef SUITE_DEV_SOURCE_COMMIT
     Quote(out, SUITE_DEV_SOURCE_COMMIT);
 #else
@@ -290,20 +291,24 @@ inline std::string Json(const Report &r)
     out << ",\"vendorId\":" << r.adapter.vendor << ",\"deviceId\":" << r.adapter.device
         << ",\"software\":" << r.adapter.software << ",\"fp64\":" << r.fp64
         << ",\"dedicatedBytes\":" << r.adapter.dedicatedBytes << ",\"peakTestBufferBytes\":" << r.gpuBufferBytes
-        << ",\"timestampsSupported\":" << r.timestampsSupported << '}'
+        << ",\"timestampsSupported\":" << r.timestampsSupported
+        << ",\"catalogBufferBytes\":" << r.catalogBytes << ",\"dynamicInputBytesPerLayout\":" << r.inputBytesPerLayout << '}'
         << ",\n\"request\":{\"seeds\":" << r.options.seeds << ",\"pairs\":" << r.options.pairs
         << ",\"batch\":" << r.options.batch << ",\"recipe\":" << r.options.recipe << ",\"key\":";
     Quote(out, std::to_string(r.options.key));
     out << ",\"batches\":"; Array(out, Batches(r.options));
     out << ",\"baselineSeconds\":" << r.options.baselineSeconds
         << ",\"gpuTiming\":" << r.options.gpuTiming
-        << ",\"exactWhenPossible\":true,\"cpuWorkers\":1,\"execution\":\"synchronous readback; rotating batch order; alternating full CPU/GPU passes\"}"
+        << ",\"cachedCatalog\":" << r.options.cachedCatalog
+        << ",\"overlapPickup\":" << r.options.overlap
+        << ",\"exactWhenPossible\":true,\"cpuWorkers\":1,\"execution\":\"blocking result collection; optional next-batch dispatch before CPU pickup; rotating batch order; alternating full CPU/GPU passes\"}"
         << ",\"generated\":" << r.generated << ",\"checked\":" << r.checked
         << ",\"mismatches\":" << r.mismatches << ",\"warmupChecked\":" << r.warmupChecked
         << ",\"navigationModel\":"; Quote(out, r.model);
     out << ",\"preparationMs\":"; Number(out, r.preparationMs);
     out << ",\"deviceSetupMs\":"; Number(out, r.deviceMs);
     out << ",\"generationMs\":"; Number(out, r.generationMs);
+    out << ",\"catalogSetupMs\":"; Number(out, r.catalogSetupMs);
     out << ",\"warmupMs\":"; Number(out, r.warmupMs);
     out << ",\"baselineMs\":"; Number(out, r.baselineMs);
     out << ",\"elapsedMs\":"; Number(out, r.elapsedMs);
@@ -340,7 +345,7 @@ inline std::string Json(const Report &r)
         Number(out, p.gameSamples ? p.gameFpsSum / p.gameSamples : std::numeric_limits<double>::quiet_NaN());
         out << '}';
     }
-    out << "]},\n\"timingNotes\":\"Host wall times include instrumentation. GPU timestamps bracket input updates, Dispatch, and output copies on the GPU timeline; contention can be included. Invalid/disjoint timestamps are null and never used as zero-time results. Query collection is included in hybrid wall time.\",\n\"pairs\":[";
+    out << "]},\n\"timingNotes\":\"Host wall times include instrumentation. GPU timestamps bracket input updates, Dispatch (including GPU catalog preparation), and output copies; contention can be included. CPU pickup may overlap the next GPU batch. Invalid/disjoint timestamps are null and never used as zero-time results. Query collection is included in hybrid wall time.\",\n\"pairs\":[";
     for (size_t i = 0; i < r.timings.size(); i++)
     {
         const auto &p = r.timings[i];

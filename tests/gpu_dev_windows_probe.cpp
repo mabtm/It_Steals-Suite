@@ -13,6 +13,7 @@ int main(int argc, char **argv)
     if (available.empty()) throw std::runtime_error("No D3D11 adapter available for the Windows dev tests");
     Report kernel;
     kernel.options.batch = 8;
+    kernel.options.cachedCatalog = false;
     kernel.options.adapter = available.front().index;
     Device device(kernel, true);
     int checks = 0;
@@ -56,6 +57,58 @@ int main(int argc, char **argv)
     assert(kernel.gpuBufferBytes > 8000000 && batchedChecks == 916);
     kernel.phase = Phase::Completed;
     Save(output / "kernel-batches.json", kernel);
+    Report compact;
+    compact.options.adapter = available.front().index;
+    compact.options.seeds = 4096; compact.options.batch = 256;
+    Device cached(compact, true);
+    int compactChecks = 0;
+    for (int points : {71, 1024})
+    {
+        auto edge = [&](int a, int b) { return points == 71 ? double((a * 71 + b * 17) % 4)
+            : 1. + ((a * 71 + b * 17) % 32) * 1e-7; };
+        auto catalog = std::make_shared<Catalog>(3, points, edge);
+        cached.SetCatalog(catalog, compact);
+        std::vector<practice::Selection> layouts;
+        std::vector<practice::RouteResult> expected;
+        for (int n : {16, 33, 52})
+        {
+            practice::Selection selection; selection.spawn = n % 3;
+            for (int i = 0; i < n; i++) selection.crystals.push_back((points - 1) * (n - 1 - i) / (n - 1));
+            practice::RouteWorkspace work;
+            for (int a = 0; a <= n; a++)
+                for (int b = a; b <= n; b++)
+                {
+                    int from = a ? selection.crystals[a - 1] + 3 : selection.spawn;
+                    int to = b ? selection.crystals[b - 1] + 3 : selection.spawn;
+                    work.matrix[a * (n + 1) + b] = work.matrix[b * (n + 1) + a] = a == b ? 0. : edge(from, to);
+                }
+            expected.push_back(practice::SolveOrderFlat(work.matrix.data(), n + 1, work, [] { return false; }, false));
+            layouts.push_back(std::move(selection));
+        }
+        for (int batch : points == 71 ? std::vector<int>{256, 1024, 2048} : std::vector<int>{8})
+        {
+            cached.Resize(batch, compact);
+            for (int i = 0; i < batch; i++) cached.PackSelection(i, layouts[size_t(i) % layouts.size()]);
+            PairTiming timing; timing.batch = batch;
+            cached.BeginPass();
+            for (int count : {batch, batch - 3})
+            {
+                auto results = cached.Execute(count, &timing);
+                for (int i = 0; i < count; i++)
+                {
+                    const auto &r = results[i], &reference = expected[size_t(i) % 3];
+                    assert(r.complete && r.order == reference.order && r.length == reference.length);
+                    compactChecks++;
+                }
+            }
+            cached.EndPass(timing, [] { return false; });
+            if (compact.timestampsSupported) assert(timing.timestampBatches + timing.timestampInvalid == 2);
+            compact.timings.push_back(timing);
+        }
+    }
+    assert(compactChecks == 6660 && compact.inputBytesPerLayout == 216 && compact.catalogBytes > 12000000);
+    compact.phase = Phase::Completed;
+    Save(output / "catalog-kernel.json", compact);
     auto ignore = [](Phase, int, int, int) {};
     for (const auto &[name, crystals] : std::vector<std::pair<std::string,int>>{
              {"hide-seek-outside-boxes", 52}, {"hide-seek-boxes", 22}})
@@ -88,8 +141,8 @@ int main(int argc, char **argv)
                 Save(output / "checkpoints" / "latest.json", partial);
             });
             assert(result.phase == Phase::Completed && result.checked == 136 && result.mismatches == 0);
-            assert(result.warmupChecked == 67 && result.timings.size() == 8 && checkpoints == 8);
-            assert(result.timings[0].batch == 16 && result.timings[4].batch == 64);
+            assert(result.warmupChecked == 68 && result.timings.size() == 8 && checkpoints == 8);
+            assert(result.timings[0].batch == 256 && result.timings[4].batch == 512);
             for (const auto &p : result.timings) assert(p.complete && p.cpuDigest == p.gpuDigest);
             Save(output / "batch-sweep.json", result);
             auto cancel = options; cancel.seeds = 17; cancel.batch = 16; cancel.pairs = 1;
@@ -107,6 +160,12 @@ int main(int argc, char **argv)
             assert(unprofiled.phase == Phase::Completed && unprofiled.checked == 3 && unprofiled.mismatches == 0);
             assert(!unprofiled.timestampsSupported && !unprofiled.timings[0].timestampBatches && unprofiled.timings[0].queryCollectMs == 0);
             Save(output / "unprofiled.json", unprofiled);
+            auto legacy = options; legacy.cachedCatalog = legacy.overlap = false;
+            auto baseline = Run(source, legacy, [] { return false; }, ignore, true);
+            assert(baseline.phase == Phase::Completed && baseline.checked == r.checked && baseline.mismatches == 0);
+            assert(!baseline.catalogBytes && baseline.inputBytesPerLayout == 33292);
+            for (size_t i = 0; i < baseline.timings.size(); i++) assert(baseline.timings[i].cpuDigest == r.timings[i].gpuDigest);
+            Save(output / "legacy-input.json", baseline);
             Session session;
             session.directory = output / "automatic";
             auto automatic = options;
@@ -132,5 +191,6 @@ int main(int argc, char **argv)
             assert(rejected.phase == Phase::Failed && rejected.adapter.software);
         }
     }
-    std::cout << checks << " single + " << batchedChecks << " full/tail embedded shader checks; 187 complete + 16 partial paired pickup scores, rotating sweep, timing/control runs, partial cancellation, replacement checkpoints and automatic export: PASS\n";
+    std::cout << checks << " single + " << batchedChecks << " legacy + " << compactChecks
+              << " catalog shader comparisons; live scoring fixtures, legacy/catalog parity, timing/control runs, partial cancellation, replacement checkpoints and automatic export: PASS\n";
 }

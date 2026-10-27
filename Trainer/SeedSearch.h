@@ -112,6 +112,8 @@ class SearchDistances
                           : static_cast<int>(data.spawns.size()) + selection.crystals.at(index - 1);
     }
 
+    double CenterDistance(int from, int to) const { return table->lengths.at(from).at(to); }
+
     int FillMatrix(const Selection &selection, RouteWorkspace &work, bool bound = false) const
     {
         int count = static_cast<int>(selection.crystals.size()) + 1;

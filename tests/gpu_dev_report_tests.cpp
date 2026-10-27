@@ -30,7 +30,7 @@ int main(int argc, char **argv)
     assert(!SameScore(a, b));
     assert(ValidOptions(Preset(0)) && ValidOptions(Preset(1)) && ValidOptions(Preset(2)));
     assert(TotalChecks(Preset(1)) == 98304 && TotalChecks(Preset(2)) == 393216);
-    auto invalid = Preset(2); invalid.batch = 257; assert(!ValidOptions(invalid));
+    auto invalid = Preset(2); invalid.batch = 2049; assert(!ValidOptions(invalid));
     invalid = Preset(2); invalid.pairs = 13; assert(!ValidOptions(invalid));
     invalid = Preset(2); invalid.seeds = 16385; assert(!ValidOptions(invalid));
     uint64_t ah = 14695981039346656037ull, bh = ah;
@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     assert(json.find("\"18446744073709551615\"") != std::string::npos);
     assert(json.find("\"length\":null") != std::string::npos);
     assert(json.find("\"gpuKernelMs\":null") != std::string::npos);
-    assert(json.find("practice-suite.gpu-dev.v2") != std::string::npos);
+    assert(json.find("practice-suite.gpu-dev.v3") != std::string::npos);
     auto folder = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::temp_directory_path() / "suite-gpu-report-tests";
     Save(folder / "gpu-report.json", r);
     r.error = "replacement checkpoint";

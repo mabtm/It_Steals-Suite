@@ -2,6 +2,13 @@
 StructuredBuffer<double> matrices : register(t0);
 StructuredBuffer<uint> nearest : register(t1);
 StructuredBuffer<uint> sizes : register(t2);
+#ifdef GPU_CATALOG_INPUT
+StructuredBuffer<uint> selectedIds : register(t3);
+cbuffer CatalogInfo : register(b0) { uint pointCount, spawnCount, catalogSide, unusedCatalog; };
+groupshared uint selectedMask[32];
+groupshared uint aboveWords[32];
+groupshared uint localNearest[52 * 26];
+#endif
 RWStructuredBuffer<uint> outputOrders : register(u0);
 RWStructuredBuffer<double> outputLengths : register(u1);
 groupshared double tile[53 * 53];
@@ -10,15 +17,61 @@ groupshared uint indices[64];
 groupshared uint winner[52];
 
 double GpuEdge(uint from, uint to, uint side) { return tile[from * side + to]; }
+#ifdef GPU_CATALOG_INPUT
+uint GpuNearest(uint testId, uint from, uint rank)
+{
+    return (localNearest[from * 26 + rank / 2] >> ((rank & 1) * 16)) & 0xffffu;
+}
+#else
 uint GpuNearest(uint testId, uint from, uint rank) { return nearest[testId * 52 * 52 + from * 52 + rank]; }
+#endif
 #include "gpu_order_kernel.hlsli"
 
 [numthreads(64, 1, 1)]
 void Main(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 {
     uint testId = group.x, n = sizes[testId], side = n + 1;
+#ifdef GPU_CATALOG_INPUT
+    if (lane < 32) selectedMask[lane] = 0;
+    GroupMemoryBarrierWithGroupSync();
+    if (lane < n)
+    {
+        uint id = selectedIds[testId * 53 + lane + 1] - spawnCount;
+        InterlockedOr(selectedMask[id / 32], 1u << (id & 31));
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (lane < 32)
+    {
+        uint above = 0;
+        for (uint word = lane + 1; word < 32; word++) above += countbits(selectedMask[word]);
+        aboveWords[lane] = above;
+    }
+    for (uint loadIndex = lane; loadIndex < side * side; loadIndex += 64)
+    {
+        uint a = selectedIds[testId * 53 + loadIndex / side];
+        uint b = selectedIds[testId * 53 + loadIndex % side];
+        tile[loadIndex] = matrices[a * catalogSide + b];
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (lane < n)
+    {
+        uint from = selectedIds[testId * 53 + lane + 1] - spawnCount;
+        uint found = 0, packed = 0;
+        for (uint rank = 0; rank < pointCount && found < n; rank++)
+        {
+            uint id = nearest[from * pointCount + rank], word = id / 32, bit = id & 31;
+            if ((selectedMask[word] & (1u << bit)) == 0) continue;
+            uint local = aboveWords[word] + countbits(selectedMask[word] & (0xfffffffeu << bit));
+            if (found & 1) localNearest[lane * 26 + found / 2] = packed | (local << 16);
+            else packed = local;
+            found++;
+        }
+        if (found & 1) localNearest[lane * 26 + found / 2] = packed;
+    }
+#else
     for (uint loadIndex = lane; loadIndex < side * side; loadIndex += 64)
         tile[loadIndex] = matrices[testId * 53 * 53 + loadIndex];
+#endif
     GroupMemoryBarrierWithGroupSync();
     uint order[52];
     precise double value = asdouble(0u, 0x7ff00000u);

@@ -8,6 +8,7 @@
 #include <dxgi1_2.h>
 #include <wrl/client.h>
 #include "GpuDevReport.h"
+#include "GpuDevCatalog.h"
 
 namespace gpu_dev
 {
@@ -84,12 +85,19 @@ class Device
     ComPtr<ID3D11DeviceContext> context;
     ComPtr<ID3D11ComputeShader> shader;
     Buffer matrices, neighbors, sizes, orders, lengths;
+    Buffer selected, catalogEdges, catalogNearest;
+    ComPtr<ID3D11Buffer> catalogInfo;
+    std::shared_ptr<const Catalog> catalog;
+    bool compact;
+    uint64_t staticBytes = 0;
     int capacity;
     std::vector<double> packedMatrices, resetLengths;
     std::vector<uint32_t> packedNeighbors, packedSizes, resetOrders;
+    std::vector<uint32_t> packedIds;
     ComPtr<ID3D11Query> disjoint;
     std::vector<std::array<ComPtr<ID3D11Query>, 4>> timestamps;
     size_t timedBatches = 0;
+    int pending = 0;
     bool recording = false;
 
     static double Elapsed(std::chrono::steady_clock::time_point start)
@@ -97,7 +105,7 @@ class Device
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     }
 
-    Buffer Make(UINT stride, UINT count, bool output)
+    Buffer Make(UINT stride, UINT count, bool output, const void *initial = nullptr)
     {
         Buffer result;
         D3D11_BUFFER_DESC desc{};
@@ -106,7 +114,8 @@ class Device
         desc.BindFlags = output ? D3D11_BIND_UNORDERED_ACCESS : D3D11_BIND_SHADER_RESOURCE;
         desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
         desc.StructureByteStride = stride;
-        Check(device->CreateBuffer(&desc, nullptr, &result.buffer), "Allocate GPU buffer");
+        D3D11_SUBRESOURCE_DATA data{initial, 0, 0};
+        Check(device->CreateBuffer(&desc, initial ? &data : nullptr, &result.buffer), "Allocate GPU buffer");
         if (output)
         {
             D3D11_UNORDERED_ACCESS_VIEW_DESC view{};
@@ -139,7 +148,8 @@ class Device
     }
 
   public:
-    explicit Device(Report &report, bool allowSoftware = false) : capacity(report.options.batch)
+    explicit Device(Report &report, bool allowSoftware = false)
+        : compact(report.options.cachedCatalog), capacity(report.options.batch)
     {
         ComPtr<IDXGIFactory1> factory;
         ComPtr<IDXGIAdapter1> adapter;
@@ -163,7 +173,8 @@ class Device
         if (at == std::string::npos) throw std::runtime_error("Embedded shader include is invalid");
         source.replace(at, include.size(), kernel);
         ComPtr<ID3DBlob> code, errors;
-        HRESULT compiled = D3DCompile(source.data(), source.size(), "gpu_dev", nullptr, nullptr,
+        D3D_SHADER_MACRO macros[]{{"GPU_CATALOG_INPUT", "1"}, {nullptr, nullptr}};
+        HRESULT compiled = D3DCompile(source.data(), source.size(), "gpu_dev", compact ? macros : nullptr, nullptr,
                                       "Main", "cs_5_0", D3DCOMPILE_ENABLE_STRICTNESS |
                                       D3DCOMPILE_IEEE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3,
                                       0, &code, &errors);
@@ -171,14 +182,15 @@ class Device
             throw std::runtime_error(std::string(static_cast<const char *>(errors->GetBufferPointer()), errors->GetBufferSize()));
         Check(compiled, "Compile embedded GPU shader");
         Check(device->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &shader), "Create GPU compute shader");
-        Resize(capacity, report);
+        if (!compact) Resize(capacity, report);
         // Allocate once outside all scoring timings. One disjoint interval spans
         // a complete GPU pass, rather than beginning/ending one per batch/frame.
         D3D11_QUERY_DESC query{D3D11_QUERY_TIMESTAMP_DISJOINT, 0};
         report.timestampsSupported = report.options.gpuTiming && SUCCEEDED(device->CreateQuery(&query, &disjoint));
         if (report.timestampsSupported)
         {
-            int minimumBatch = report.options.sweep ? 16 : capacity;
+            auto batches = Batches(report.options);
+            int minimumBatch = *std::min_element(batches.begin(), batches.end());
             timestamps.resize(size_t((report.options.seeds + minimumBatch - 1) / minimumBatch));
             query.Query = D3D11_QUERY_TIMESTAMP;
             for (auto &batch : timestamps)
@@ -188,26 +200,58 @@ class Device
         }
     }
 
+    void SetCatalog(std::shared_ptr<const Catalog> value, Report &report)
+    {
+        if (!compact || !value) throw std::runtime_error("GPU device was not created for catalog inputs");
+        catalog = std::move(value);
+        catalogEdges = Make(8, UINT(catalog->edges.size()), false, catalog->edges.data());
+        catalogNearest = Make(4, UINT(catalog->nearest.size()), false, catalog->nearest.data());
+        uint32_t info[]{uint32_t(catalog->points), uint32_t(catalog->spawns), uint32_t(catalog->side), 0};
+        D3D11_BUFFER_DESC desc{};
+        desc.ByteWidth = sizeof(info); desc.Usage = D3D11_USAGE_DEFAULT; desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        D3D11_SUBRESOURCE_DATA initial{info, 0, 0};
+        catalogInfo.Reset();
+        Check(device->CreateBuffer(&desc, &initial, &catalogInfo), "Allocate GPU catalog constants");
+        staticBytes = catalog->edges.size() * 8 + catalog->nearest.size() * 4 + sizeof(info);
+        report.catalogBytes = staticBytes;
+        Resize(capacity, report);
+    }
+
     void Resize(int count, Report &report)
     {
-        if (count < 1 || count > 256) throw std::runtime_error("Invalid GPU buffer capacity");
+        if (pending) throw std::runtime_error("Cannot resize GPU buffers while a batch is pending");
+        if (count < 1 || count > 2048) throw std::runtime_error("Invalid GPU buffer capacity");
         capacity = count;
-        packedMatrices.resize(size_t(capacity) * 53 * 53);
-        packedNeighbors.resize(size_t(capacity) * 52 * 52);
+        if (compact)
+        {
+            if (!catalog) throw std::runtime_error("GPU catalog has not been prepared");
+            packedIds.resize(size_t(capacity) * 53);
+            selected = Make(4, UINT(packedIds.size()), false);
+        }
+        else
+        {
+            packedMatrices.resize(size_t(capacity) * 53 * 53);
+            packedNeighbors.resize(size_t(capacity) * 52 * 52);
+            matrices = Make(8, UINT(packedMatrices.size()), false);
+            neighbors = Make(4, UINT(packedNeighbors.size()), false);
+        }
         packedSizes.resize(capacity);
         resetOrders.assign(size_t(capacity) * 52 + 8, 0xcdcdcdcdu);
         resetLengths.assign(size_t(capacity) + 8, -12345.);
-        matrices = Make(8, UINT(packedMatrices.size()), false);
-        neighbors = Make(4, UINT(packedNeighbors.size()), false);
         sizes = Make(4, UINT(packedSizes.size()), false);
         orders = Make(4, UINT(resetOrders.size()), true);
         lengths = Make(8, UINT(resetLengths.size()), true);
-        uint64_t bytes = packedMatrices.size() * 8 + packedNeighbors.size() * 4 + packedSizes.size() * 4 +
+        report.inputBytesPerLayout = compact ? 53 * 4 + 4 : 53 * 53 * 8 + 52 * 52 * 4 + 4;
+        uint64_t bytes = staticBytes + packedIds.size() * 4 + packedMatrices.size() * 8 + packedNeighbors.size() * 4 + packedSizes.size() * 4 +
                          2 * (resetOrders.size() * 4 + resetLengths.size() * 8);
         report.gpuBufferBytes = std::max(report.gpuBufferBytes, bytes);
         context->CSSetShader(shader.Get(), nullptr, 0);
-        ID3D11ShaderResourceView *inputs[]{matrices.read.Get(), neighbors.read.Get(), sizes.read.Get()};
-        context->CSSetShaderResources(0, 3, inputs);
+        ID3D11ShaderResourceView *inputs[]{compact ? catalogEdges.read.Get() : matrices.read.Get(),
+                                         compact ? catalogNearest.read.Get() : neighbors.read.Get(),
+                                         sizes.read.Get(), compact ? selected.read.Get() : nullptr};
+        context->CSSetShaderResources(0, 4, inputs);
+        ID3D11Buffer *constants = catalogInfo.Get();
+        context->CSSetConstantBuffers(0, 1, &constants);
     }
 
     void BeginPass()
@@ -219,6 +263,8 @@ class Device
 
     void EndPass(PairTiming &timing, const practice::Cancel &canceled)
     {
+        // A cancellation can leave the batch submitted ahead of pickup scoring.
+        if (pending) Collect(&timing);
         if (!recording) return;
         recording = false;
         auto start = std::chrono::steady_clock::now();
@@ -249,7 +295,7 @@ class Device
 
     void Pack(int slot, const double *matrix, int n)
     {
-        if (slot < 0 || slot >= capacity || n < 1 || n > 52)
+        if (compact || slot < 0 || slot >= capacity || n < 1 || n > 52)
             throw std::runtime_error("GPU input exceeds the supported batch/crystal range");
         int side = n + 1;
         for (int i = 0; i < side * side; i++)
@@ -267,14 +313,26 @@ class Device
         }
     }
 
-    std::vector<practice::RouteResult> Execute(int count, PairTiming *timing = nullptr)
+    void PackSelection(int slot, const practice::Selection &selection)
     {
-        if (count < 1 || count > capacity) throw std::runtime_error("Invalid GPU batch size");
+        if (!compact || !catalog || slot < 0 || slot >= capacity)
+            throw std::runtime_error("Invalid GPU catalog input slot");
+        catalog->Pack(selection, packedIds.data() + size_t(slot) * 53);
+        packedSizes[slot] = uint32_t(selection.crystals.size());
+    }
+
+    void Submit(int count, PairTiming *timing = nullptr)
+    {
+        if (pending || count < 1 || count > capacity) throw std::runtime_error("Invalid or already pending GPU batch");
         auto start = std::chrono::steady_clock::now();
         bool measured = recording && timedBatches < timestamps.size();
         if (measured) context->End(timestamps[timedBatches][0].Get());
-        context->UpdateSubresource(matrices.buffer.Get(), 0, nullptr, packedMatrices.data(), 0, 0);
-        context->UpdateSubresource(neighbors.buffer.Get(), 0, nullptr, packedNeighbors.data(), 0, 0);
+        if (compact) context->UpdateSubresource(selected.buffer.Get(), 0, nullptr, packedIds.data(), 0, 0);
+        else
+        {
+            context->UpdateSubresource(matrices.buffer.Get(), 0, nullptr, packedMatrices.data(), 0, 0);
+            context->UpdateSubresource(neighbors.buffer.Get(), 0, nullptr, packedNeighbors.data(), 0, 0);
+        }
         context->UpdateSubresource(sizes.buffer.Get(), 0, nullptr, packedSizes.data(), 0, 0);
         context->UpdateSubresource(orders.buffer.Get(), 0, nullptr, resetOrders.data(), 0, 0);
         context->UpdateSubresource(lengths.buffer.Get(), 0, nullptr, resetLengths.data(), 0, 0);
@@ -291,6 +349,16 @@ class Device
         context->CopyResource(orders.staging.Get(), orders.buffer.Get());
         context->CopyResource(lengths.staging.Get(), lengths.buffer.Get());
         if (measured) { context->End(timestamps[timedBatches][3].Get()); timedBatches++; }
+        context->Flush();
+        pending = count;
+        if (timing) timing->hostReadbackMs += Elapsed(start);
+    }
+
+    std::vector<practice::RouteResult> Collect(PairTiming *timing = nullptr)
+    {
+        if (!pending) throw std::runtime_error("No GPU batch is pending");
+        int count = pending;
+        auto start = std::chrono::steady_clock::now();
         auto order = Read<uint32_t>(orders, resetOrders.size());
         auto length = Read<double>(lengths, resetLengths.size());
         if (timing) timing->hostReadbackMs += Elapsed(start);
@@ -311,7 +379,14 @@ class Device
             r.message = r.complete ? "GPU multi-start nearest neighbor + 2-opt + relocation."
                                    : "GPU returned an invalid route.";
         }
+        pending = 0;
         return result;
+    }
+
+    std::vector<practice::RouteResult> Execute(int count, PairTiming *timing = nullptr)
+    {
+        Submit(count, timing);
+        return Collect(timing);
     }
 };
 } // namespace gpu_dev

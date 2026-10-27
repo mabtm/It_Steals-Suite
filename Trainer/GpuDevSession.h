@@ -79,6 +79,14 @@ inline Report Run(std::shared_ptr<const practice::MapAnalysis> source, Options o
         practice::SearchDistances distances(data, graph, canceled, [](int, int) {});
         report.preparationMs = Ms(setup);
         report.model = distances.ModelName();
+        if (options.cachedCatalog)
+        {
+            setup = Clock::now();
+            auto catalog = std::make_shared<Catalog>(int(data.spawns.size()), int(data.points.size()),
+                [&](int from, int to) { return distances.CenterDistance(from, to); });
+            device.SetCatalog(std::move(catalog), report);
+            report.catalogSetupMs = Ms(setup);
+        }
         practice::RouteWorkspace work;
         auto configurations = Batches(options);
         std::vector<practice::RouteResult> cpu(options.seeds), gpu(options.seeds);
@@ -106,22 +114,34 @@ inline Report Run(std::shared_ptr<const practice::MapAnalysis> source, Options o
             std::exception_ptr failure;
             try
             {
-                for (int offset = 0; offset < count; offset += timing.batch)
-                {
-                    check();
+                auto submit = [&](int offset) {
                     int size = std::min(timing.batch, count - offset);
                     auto at = Clock::now();
                     for (int i = 0; i < size; i++)
                     {
                         check();
-                        int side = distances.FillMatrix(selections[offset + i], work);
-                        device.Pack(i, work.matrix.data(), side - 1);
+                        if (options.cachedCatalog) device.PackSelection(i, selections[offset + i]);
+                        else
+                        {
+                            int side = distances.FillMatrix(selections[offset + i], work);
+                            device.Pack(i, work.matrix.data(), side - 1);
+                        }
                     }
                     timing.packMs += Ms(at);
                     check();
                     at = Clock::now();
-                    auto result = device.Execute(size, &timing);
+                    device.Submit(size, &timing);
                     timing.dispatchMs += Ms(at);
+                };
+                submit(0);
+                for (int offset = 0; offset < count; offset += timing.batch)
+                {
+                    check();
+                    int size = std::min(timing.batch, count - offset), next = offset + size;
+                    auto at = Clock::now();
+                    auto result = device.Collect(&timing);
+                    timing.dispatchMs += Ms(at);
+                    if (options.overlap && next < count) submit(next);
                     at = Clock::now();
                     for (int i = 0; i < size; i++)
                     {
@@ -135,6 +155,7 @@ inline Report Run(std::shared_ptr<const practice::MapAnalysis> source, Options o
                     }
                     timing.contactsMs += Ms(at);
                     if (!warmup) progress(Phase::Gpu, processed, timing.batch, timing.pair);
+                    if (!options.overlap && next < count) submit(next);
                 }
             }
             catch (...) { failure = std::current_exception(); }
@@ -305,7 +326,7 @@ class Session
         busy.store(true, std::memory_order_release);
         auto folder = directory;
         worker = std::jthread([this, source, options, folder](std::stop_token stop) {
-            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
             auto publish = [&](const Report &result) {
                 auto snapshot = std::make_shared<Report>(result);
                 { std::lock_guard lock(frameGate); snapshot->observations = frames; }

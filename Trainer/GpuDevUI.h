@@ -2,7 +2,7 @@
 
 inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis> source, bool verified)
 {
-    static bool discovered = false, reuseKey = true, gpuTiming = true;
+    static bool discovered = false, reuseKey = true, gpuTiming = true, cachedCatalog = true, overlap = true;
     static int selected = 0, profile = 1;
     static std::string exportStatus;
     static gpu_dev::Options running;
@@ -10,7 +10,7 @@ inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis> so
     auto adapters = g_gpuDev.GetAdapters();
     auto report = g_gpuDev.Get();
     bool busy = g_gpuDev.Busy();
-    ImGui::TextColored(g_accentCol, "GPU DEV 2 / batch scaling and endurance");
+    ImGui::TextColored(g_accentCol, "GPU DEV 3 / shared map data / maximum throughput");
     ImGui::TextWrapped("Compare identical frozen layouts with the CPU reference. Every route, length and pickup contact is checked. Batch order rotates between rounds; CPU/GPU execution order alternates.");
     ImGui::Spacing();
     ImGui::BeginDisabled(busy);
@@ -26,13 +26,18 @@ inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis> so
         ImGui::EndCombo();
     }
     if (suite_ui::Button("Refresh adapters")) g_gpuDev.RefreshAdapters();
-    const char *profiles[]{"Quick check / 1,024 layouts / 4 rounds / batch 16",
-                           "Batch sweep / 4,096 layouts / 6 rounds / 16, 64, 128, 256",
-                           "Endurance / 8,192 layouts / 12 rounds / 16, 64, 128, 256"};
+    const char *profiles[]{"Quick check / 1,024 layouts / 4 rounds / batch 256",
+                           "Batch sweep / 4,096 layouts / 6 rounds / 256, 512, 1024, 2048",
+                           "Endurance / 8,192 layouts / 12 rounds / 256, 512, 1024, 2048"};
     ImGui::Combo("Test profile", &profile, profiles, 3);
     auto request = gpu_dev::Preset(profile);
     ImGui::Checkbox("GPU timing queries", &gpuTiming);
     request.gpuTiming = gpuTiming;
+    ImGui::Checkbox("Shared map data (Dev 3)", &cachedCatalog);
+    request.cachedCatalog = cachedCatalog;
+    ImGui::Checkbox("Overlap GPU work with CPU pickup scoring", &overlap);
+    request.overlap = overlap;
+    ImGui::TextDisabled("Enabled: upload point IDs; disabled: Dev 2 matrix/sort baseline.");
     ImGui::TextDisabled("Disable queries for a throughput control run with the same seed key.");
     ImGui::TextDisabled("%s layouts per round | %d strict comparisons | %d s idle baseline",
                         profile == 2 ? "8,192" : profile == 1 ? "4,096" : "1,024",
@@ -94,6 +99,10 @@ inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis> so
                           "%s | %d checked | %d mismatches", gpu_dev::PhaseName(report->phase),
                           report->checked, report->mismatches);
         ImGui::TextWrapped("%s | %s", report->adapter.name.c_str(), report->model.c_str());
+        ImGui::TextDisabled("Input: %s | %llu bytes/layout | fixed catalog: %llu bytes",
+                            report->options.cachedCatalog ? "shared catalog IDs" : "layout matrices",
+                            static_cast<unsigned long long>(report->inputBytesPerLayout),
+                            static_cast<unsigned long long>(report->catalogBytes));
         if (ImGui::BeginTable("GpuDevSummary", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
         {
             for (const char *column : {"Batch", "Passes", "CPU layouts/s", "Hybrid layouts/s", "CPU / hybrid"})
