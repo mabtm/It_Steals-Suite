@@ -1458,8 +1458,16 @@ HANDLE CreateFrameTimer()
     return value ? value : CreateWaitableTimerW(nullptr, FALSE, nullptr);
 }
 
+#ifdef SUITE_SEED_PGO_RESEARCH
+#include "../tests/trainer_pgo_entry.h"
+#endif
+
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+#ifdef SUITE_SEED_PGO_RESEARCH
+    int profileResult = TrainerPgoEntry();
+    if (profileResult >= 0) return profileResult;
+#endif
     OwnedHandle singleInstance(CreateMutexW(nullptr, FALSE, L"Local\\ItStealsPracticeSuite.Trainer"));
     if (!singleInstance.Get() || GetLastError() == ERROR_ALREADY_EXISTS)
     {

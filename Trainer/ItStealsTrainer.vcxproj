@@ -65,6 +65,16 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(SuitePgoResearch)'=='true'">
+    <ClCompile><PreprocessorDefinitions>SUITE_SEED_PGO_RESEARCH;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+    <Link><LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration></Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(SuitePgoMode)'=='Instrument'">
+    <Link><AdditionalOptions>/GENPROFILE:EXACT,PGD="$(SuitePgoDatabase)" %(AdditionalOptions)</AdditionalOptions></Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(SuitePgoMode)'=='Use'">
+    <Link><AdditionalOptions>/USEPROFILE:PGD="$(SuitePgoDatabase)" %(AdditionalOptions)</AdditionalOptions></Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ResourceCompile Include="TrainerResources.rc" />
     <ClCompile Include="ItStealsTrainer.cpp" />

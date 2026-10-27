@@ -43,7 +43,26 @@ jobs:
         if: always()
         with:
           name: msvc-seed-research
-          path: build/algorithm-windows-lab
+          path: |
+            build/algorithm-windows-lab/*.json
+            build/algorithm-windows-lab/*.log
+          retention-days: 14
+
+  native-trainer-pgo:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Train and compare complete trainer images
+        shell: powershell
+        run: .\tests\algorithm_windows_lab.ps1 -Trainer
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: native-trainer-pgo
+          path: |
+            build/trainer-pgo-lab/*.json
+            build/trainer-pgo-lab/*.log
           retention-days: 14
 
   gpu-kernel:
