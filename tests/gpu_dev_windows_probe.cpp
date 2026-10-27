@@ -4,6 +4,7 @@
 #include "seed_route_fixture.h"
 #include <cassert>
 #include <iostream>
+#include <cstdlib>
 
 int Probe(int argc, char **argv)
 {
@@ -286,6 +287,7 @@ int Probe(int argc, char **argv)
     }
     std::cout << checks << " single + " << batchedChecks << " legacy + " << compactChecks << " catalog + " << specializedChecks << " specialized"
               << " catalog shader comparisons; live scoring fixtures, legacy/catalog parity, timing/control runs, partial cancellation, replacement checkpoints and automatic export: PASS\n";
+    return 0;
 }
 
 int main(int argc, char **argv)

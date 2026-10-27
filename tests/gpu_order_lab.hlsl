@@ -88,7 +88,12 @@ void Main(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     GroupMemoryBarrierWithGroupSync();
     uint order[GPU_MAX_CRYSTALS];
     precise double value = asdouble(0u, 0x7ff00000u);
+#if defined(GPU_FIXED_CRYSTALS) && GPU_MAX_CRYSTALS == 1
+    // One possible order. FXC otherwise diagnoses the unreachable order[1] loop.
+    if (lane == 0) { order[0] = 0; value = GpuEdge(0, 1, side); }
+#else
     if (lane < n) value = GpuFirstRoute(n, lane, testId, order);
+#endif
     starts[lane] = value;
     indices[lane] = lane;
     GroupMemoryBarrierWithGroupSync();
@@ -108,7 +113,9 @@ void Main(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     if (lane == 0)
     {
         for (uint recoverIndex = 0; recoverIndex < n; recoverIndex++) order[recoverIndex] = winner[recoverIndex];
+#if !defined(GPU_FIXED_CRYSTALS) || GPU_MAX_CRYSTALS > 1
         GpuRelocate(n, order);
+#endif
         precise double length = 0.0L;
         uint previous = 0;
         for (uint outputIndex = 0; outputIndex < n; outputIndex++)
