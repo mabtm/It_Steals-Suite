@@ -154,7 +154,7 @@ class Automation
     std::filesystem::path directory;
     ~Automation() { Stop(); if (worker.joinable()) worker.join(); }
     bool Busy() const { return busy.load(std::memory_order_acquire); }
-    int Wanted() const { return wanted.load(); }
+    int Wanted() const { return worker.get_stop_token().stop_requested() ? -1 : wanted.load(); }
     uint64_t Checked() const { return progress.load(); }
     std::shared_ptr<const SuiteState> Get() const { return std::atomic_load(&current); }
     std::shared_ptr<const AdapterList> GetAdapters() const { return std::atomic_load(&adapters); }

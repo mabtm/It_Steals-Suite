@@ -121,7 +121,7 @@ jobs:
           $assetFolder = $archive.Directory.FullName
           $info = Get-Content (Join-Path $assetFolder 'GPU-Dev-Info.json') -Raw | ConvertFrom-Json
           if ($info.sourceCommit -ne $env:GITHUB_SHA -or (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $info.archiveSha256) { throw 'Dev package provenance/checksum mismatch.' }
-          $tag = 'gpu-dev-7.19.0.4' 
+          $tag = 'gpu-dev-7.19.0.4.1' 
           $existing = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect existing releases.' }
           $release = @($existing | ConvertFrom-Json) | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1

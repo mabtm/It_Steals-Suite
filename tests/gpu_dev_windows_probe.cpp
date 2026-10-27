@@ -196,6 +196,16 @@ int main(int argc, char **argv)
             assert(complete->completedMaps == 2 && complete->runs.size() == 24 && complete->completedTests == complete->totalTests);
             for (const auto &test : complete->runs) assert(test.topMatch && test.audited == test.state.scored);
             assert(std::filesystem::is_regular_file(std::filesystem::path(complete->directory) / "Dev4-Summary.json"));
+            automaticSuite.Start(automaticOptions, 42, 7, true);
+            auto stopDeadline = Clock::now() + std::chrono::seconds(10);
+            while (automaticSuite.Busy() && automaticSuite.Wanted() < 0 && Clock::now() < stopDeadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            assert(automaticSuite.Wanted() >= 0);
+            automaticSuite.CheckContext(42, 13, 9, 7, true);
+            assert(automaticSuite.Wanted() == -1);
+            while (automaticSuite.Busy() && Clock::now() < stopDeadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            assert(!automaticSuite.Busy() && automaticSuite.Get()->status == "Stopped");
             Session session;
             session.directory = output / "automatic";
             auto automatic = options;

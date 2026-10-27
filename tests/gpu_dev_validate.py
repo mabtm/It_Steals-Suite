@@ -50,12 +50,15 @@ assert list((folder / "automatic").glob("*.json"))
 print("Twelve GPU dev JSON reports, legacy/catalog parity, timestamp/control runs, rotating sweep, partial stop and replacement checkpoints: PASS")
 
 summary_files = list((folder / "automatic-suite").rglob("Dev4-Summary.json"))
-assert len(summary_files) == 1
-summary = json.loads(summary_files[0].read_text())
+assert len(summary_files) == 2
+summaries = [(p, json.loads(p.read_text())) for p in summary_files]
+complete_path, summary = next((p, s) for p, s in summaries if s["status"] == "Completed")
+stopped = [s for _, s in summaries if s["status"] == "Stopped"]
+assert len(stopped) == 1 and stopped[0]["completedTests"] == 0
 assert summary["schema"] == "practice-suite.gpu-suite.v4" and summary["status"] == "Completed"
 assert summary["completedMaps"] == 2 and summary["completedTests"] == summary["totalTests"] == 24
 assert {r["scene"] for r in summary["runs"]} == {13, 14}
 assert all(r["top10Match"] and r["audited"] == r["scored"] and r["evaluated"] == r["requested"] for r in summary["runs"])
-assert len(list(summary_files[0].parent.glob("hide-seek-outside_*.json"))) == 12
-assert len(list(summary_files[0].parent.glob("classic-bonus_*.json"))) == 12
-print("Automatic two-map plan, exact score audits, named per-test reports and one summary: PASS")
+assert len(list(complete_path.parent.glob("hide-seek-outside_*.json"))) == 12
+assert len(list(complete_path.parent.glob("classic-bonus_*.json"))) == 12
+print("Automatic two-map plan, exact score audits, named reports, Unicode paths, one summary and immediate Clean-mode cancellation: PASS")

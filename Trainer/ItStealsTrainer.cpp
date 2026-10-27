@@ -1182,7 +1182,7 @@ void SyncCommands(bool visible)
     if (devIdentity != devSuite) { devSuite = devIdentity; devLoad = devCaptureEpoch = -1; }
     int devLevel = g_gpuDev.Wanted();
     if (!g_gpuDev.Busy()) devLoad = devCaptureEpoch = -1;
-    if (devLevel >= 0 && g_pShared)
+    if (devLevel >= 0 && g_pShared && !restricted)
     {
         g_plannerOptions.level = devLevel;
         bool inMode = g_pShared->currentSceneIndex == kMapScenes[devLevel] &&
@@ -1250,7 +1250,7 @@ void SyncCommands(bool visible)
                                 (g_plannerOptions.calculateRoutes ? 0u : 8u) |
                                 (g_plannerOptions.portableGeneration ? 16u : 0u);
 #ifdef SUITE_GPU_DEV
-    if (g_gpuDev.Busy()) g_commands.plannerOptions = (g_commands.plannerOptions & ~8u) | 16u;
+    if (g_gpuDev.Busy() && !restricted) g_commands.plannerOptions = (g_commands.plannerOptions & ~8u) | 16u;
 #endif
     g_commands.inputCapture = visible && MenuInputRequested() ? 1u : 0u;
     g_commands.frameLimitMode = g_frameLimitMode;
@@ -1264,7 +1264,7 @@ void SyncCommands(bool visible)
     if (inspectorWanted)
         g_commands.telemetryOptions |= kTelemetryInspector;
 #ifdef SUITE_GPU_DEV
-    if (g_gpuDev.Busy()) g_commands.telemetryOptions |= kTelemetryPlanner | kTelemetryGeometry;
+    if (g_gpuDev.Busy() && !restricted) g_commands.telemetryOptions |= kTelemetryPlanner | kTelemetryGeometry;
 #endif
     if (visible && suite_input::preferences.enabled && !suite_hud::active && !ClipInputRequested())
         g_commands.telemetryOptions |= kTelemetryInputs | kTelemetryLive;
