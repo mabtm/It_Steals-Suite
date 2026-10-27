@@ -70,7 +70,7 @@
     <Link><LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration></Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(SuitePgoMode)'=='Instrument'">
-    <Link><AdditionalOptions>/GENPROFILE:EXACT,PGD="$(SuitePgoDatabase)" %(AdditionalOptions)</AdditionalOptions></Link>
+    <Link><AdditionalOptions>/GENPROFILE:NOEXACT,PGD="$(SuitePgoDatabase)" %(AdditionalOptions)</AdditionalOptions></Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(SuitePgoMode)'=='Use'">
     <Link><AdditionalOptions>/USEPROFILE:PGD="$(SuitePgoDatabase)" %(AdditionalOptions)</AdditionalOptions></Link>

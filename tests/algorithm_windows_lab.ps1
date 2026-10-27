@@ -70,14 +70,14 @@ function Median($Values) {
 }
 
 Build-Benchmark $baseline ''
-Build-Benchmark $trained ('/GENPROFILE:EXACT,PGD="' + $pgoDatabase + '"')
+Build-Benchmark $trained ('/GENPROFILE:NOEXACT,PGD="' + $pgoDatabase + '"')
 # The instrumentation runtime is a build input, never a release dependency.
 $runtime = Get-ChildItem (Join-Path $studio 'VC/Tools/MSVC') -Filter pgort140.dll -Recurse |
     Where-Object { $_.DirectoryName -match 'bin\\Hostx64\\x64$' } |
     Sort-Object FullName -Descending | Select-Object -First 1
 if ($runtime) { Copy-Item $runtime.FullName $out }
-# Atomic instrumentation is intentionally much slower. These representative
-# layouts already exercise millions of inner-loop branches without timing out.
+# Use the compiler's fast profiling counters: they guide optimization only.
+# Final search lengths/orders and seed coverage are still checked exactly.
 Run-Benchmark $trained 'hide-seek-outside-boxes' 52 32 '1.35' -Training | Out-File (Join-Path $out 'training.log')
 Run-Benchmark $trained 'hide-seek-outside-boxes' 52 32 '0.5' -Training | Out-File (Join-Path $out 'training.log') -Append
 Run-Benchmark $trained 'hide-seek-outside-boxes' 52 $CenterTrainingSeeds '0' -Training | Out-File (Join-Path $out 'training.log') -Append
