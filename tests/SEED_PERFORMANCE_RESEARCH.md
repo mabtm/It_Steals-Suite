@@ -25,7 +25,8 @@ and 10,000-seed workload.
 
 ## Contact-aware lower bounds
 
-For every selected node v and each of its possible contact positions, take the
+For the existing symmetric contact-cost model, for every selected node v and
+each of its possible contact positions, take the
 cheapest incident edge (m1) and the cheapest pair of edges to distinct selected
 neighbors (m2). Both incident edges in m2 must use the same contact position.
 
@@ -164,8 +165,25 @@ samples. It is not performance evidence for the balanced profile.
 The final experiment uses the compiler's documented NOEXACT profiling counters
 to avoid synchronized-counter overhead. Those counters guide compilation;
 the search arithmetic and exact result/coverage checks are unchanged. Standard
-release builds still do not enable PGO. The complete-image comparison is
-pending below.
+release builds still do not enable PGO. The final complete-image run **40494231974** passed, including all six retained
+launcher profiles (ten PGC files merged), exact Top 10 parity and complete seed
+coverage in all 18 searches. The optimized image had no PGORT import. Both
+instrumented and optimized Windows launcher/native-contract checks passed.
+
+| Radius | Baseline median seeds/s | PGO median seeds/s | Change |
+| --- | ---: | ---: | ---: |
+| 1.35 | 2187.302 | 2211.967 | +1.13% |
+| 0.5 | 3608.731 | 3454.506 | -4.27% |
+| 0 | 16379.692 | 15211.228 | -7.13% |
+
+CPU: AMD EPYC 9V74. The three paired changes at radius 1.35 were +1.13%,
++25.09%, -0.29%; the aggregate median gain is small and inconsistent.
+The narrower-radius and point-only cases were slower in every pair.
+Consequently this corrected training configuration is also **not adopted**.
+
+The final standalone NOEXACT run, on the same CPU model, measured +5.75%,
++3.96%, -2.03% for the three radii. It likewise does not demonstrate a universal
+improvement. A standalone gain must not be presented as a complete-trainer gain.
 
 Reproduce on Windows with Visual Studio C++ tools:
 
@@ -216,8 +234,16 @@ and logs for 14 days. Permanent rate snapshots and final decisions are below.
 - [Standalone PGO, run 40491195866](research/2026-10-27/pgo-standalone-40491195866.json).
 - [Standalone PGO, run 40492735156](research/2026-10-27/pgo-standalone-40492735156.json).
 - [Complete-trainer PGO, run 40491195866](research/2026-10-27/pgo-trainer-40491195866.json).
-- [Final corrected-profile run](https://github.com/mabtm/It_Steals-Suite/actions/runs/40494231974), currently in progress.
+- [Complete-trainer corrected profile](research/2026-10-27/pgo-trainer-40494231974.json) and [standalone NOEXACT comparison](research/2026-10-27/pgo-standalone-40494231974.json).
+- [Final workflow run](https://github.com/mabtm/It_Steals-Suite/actions/runs/40494231974): all four jobs passed.
+- [GPU correctness metadata](research/2026-10-27/gpu-40494231974.json); the compiled Windows prototype is in [the GPU artifact](https://github.com/mabtm/It_Steals-Suite/actions/runs/40494231974/artifacts/12730496337) (14-day retention).
 
-Current decision: retain the stable 7.19.0 search and normal release settings.
-The final corrected-profile comparison will be recorded before this study is
-closed. A functional shader comparison is not a measured GPU search speedup.
+Final decision: retain the stable 7.19.0 search and normal release settings.
+The tested bounds and PGO configurations have no reliable general net advantage.
+The research stays on this branch; no experimental runtime change or updater
+release is published. The GPU prototype needs physical-hardware and complete
+pipeline measurements before an integration decision.
+
+These results do not establish a global optimum. They identify which specific
+approaches did not earn their complexity in the measured workloads, while
+preserving reproducible experiments for later hardware or algorithm work.

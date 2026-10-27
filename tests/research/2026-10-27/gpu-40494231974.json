@@ -1,0 +1,16 @@
+{
+  "sourceCommit": "a1e987702a2a61f1937a3d2d75b5496bf862815f",
+  "runId": 40494231974,
+  "adapterDescription": "Microsoft Basic Render Driver",
+  "sharedCpuComparisons": 440,
+  "physicalGpuPerformanceProven": false,
+  "shaderCompiled": true,
+  "execution": "passed",
+  "creationDriver": "hardware",
+  "adapterVendorId": 5140,
+  "adapterDeviceId": 140,
+  "reportedSoftwareFlag": false,
+  "cases": 45,
+  "dispatchAndReadbackMs": 99.1146,
+  "liveGameOrObsTested": false
+}
