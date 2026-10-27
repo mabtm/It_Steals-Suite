@@ -1,6 +1,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <d3d11.h>
+#include <dxgi1_2.h>
 #include <d3dcompiler.h>
 #include <wrl/client.h>
 #include "gpu_order_fixture.h"
@@ -122,12 +123,22 @@ int main(int argc, char **argv)
         {
             std::ofstream(resultPath)
                 << "{\"shaderCompiled\":true,\"execution\":\"unavailable\","
-                   "\"reason\":\"No FP64-capable D3D11 device; WARP does not provide optional doubles\"}\n";
+                   "\"reason\":\"No available D3D11 device supports the required FP64 operations\"}\n";
             std::cout
                 << "FP64 shader compiled; execution unavailable on this machine. No GPU performance claim.\n";
             return 77;
         }
         ComPtr<ID3D11ComputeShader> shader;
+        ComPtr<IDXGIDevice> dxgiDevice;
+        ComPtr<IDXGIAdapter> adapter;
+        ComPtr<IDXGIAdapter1> adapter1;
+        Check(device.As(&dxgiDevice));
+        Check(dxgiDevice->GetAdapter(&adapter));
+        Check(adapter.As(&adapter1));
+        DXGI_ADAPTER_DESC1 adapterInfo{};
+        Check(adapter1->GetDesc1(&adapterInfo));
+        bool software = (adapterInfo.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
+        std::wcout << L"Adapter: " << adapterInfo.Description << L"; software=" << software << L'\n';
         Check(device->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &shader));
         std::vector<GpuOrderFixture> fixtures;
         std::vector<double> matrices;
@@ -179,8 +190,11 @@ int main(int argc, char **argv)
         for (size_t i = fixtures.size(); i < returnedLengths.size(); i++)
             if (returnedLengths[i] != -12345)
                 throw std::runtime_error("Shader wrote beyond length range");
-        std::ofstream(resultPath) << "{\"shaderCompiled\":true,\"execution\":\"passed\",\"deviceType\":\""
-                                  << driver << "\",\"cases\":" << fixtures.size()
+        std::ofstream(resultPath) << "{\"shaderCompiled\":true,\"execution\":\"passed\",\"creationDriver\":\""
+                                  << driver << "\",\"adapterVendorId\":" << adapterInfo.VendorId
+                                  << ",\"adapterDeviceId\":" << adapterInfo.DeviceId
+                                  << ",\"softwareAdapter\":" << (software ? "true" : "false")
+                                  << ",\"cases\":" << fixtures.size()
                                   << ",\"dispatchAndReadbackMs\":" << elapsed
                                   << ",\"liveGameOrObsTested\":false}\n";
         std::cout << fixtures.size() << " FP64 shader/production comparisons and output guards on " << driver

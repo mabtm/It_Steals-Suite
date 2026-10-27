@@ -7,7 +7,7 @@
 using namespace practice;
 using Clock = std::chrono::steady_clock;
 
-int main(int argc, char **argv)
+int RunBenchmark(int argc, char **argv)
 {
     const char *path = argc > 1 ? argv[1] : "tests/fixtures/hide-seek-outside-boxes.routefixture";
     int count = argc > 2 ? std::stoi(argv[2]) : 1000;
@@ -26,13 +26,13 @@ int main(int argc, char **argv)
         auto warmup = StreamingRequest(*source, 128, workers, true);
         search.Begin(warmup);
         search.Update(source);
-        if (AwaitStreaming(search)->phase != SearchPhase::Completed)
+        if (AwaitStreaming(search, std::chrono::seconds(300))->phase != SearchPhase::Completed)
             throw std::runtime_error("Warmup search failed");
         auto request = StreamingRequest(*source, count, workers, true);
         auto started = Clock::now();
         search.Begin(request);
         search.Update(source);
-        auto result = AwaitStreaming(search);
+        auto result = AwaitStreaming(search, std::chrono::seconds(300));
         if (result->phase != SearchPhase::Completed || result->evaluated != uint64_t(count))
             throw std::runtime_error(result->error);
         auto seconds = std::chrono::duration<double>(Clock::now() - started).count();
@@ -92,4 +92,18 @@ int main(int argc, char **argv)
     std::cout << std::setprecision(17) << "score," << crystals << ',' << count << ",generation=" << generation
               << ",bounds=" << bounds << ",scoring=" << scoring << ",layouts/s=" << count / scoring
               << ",lengths=" << total << ",fingerprint=" << fingerprint << '\n';
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    try
+    {
+        return RunBenchmark(argc, argv);
+    }
+    catch (const std::exception &error)
+    {
+        std::cerr << "Benchmark failed: " << error.what() << '\n';
+        return 1;
+    }
 }

@@ -54,7 +54,7 @@ GPU_PRECISE double GpuFirstRoute(uint n, uint first, uint testId, GPU_ORDER(orde
             {
                 uint last = order[b] + 1;
                 GPU_PRECISE double delta = GpuEdge(previous, last, n + 1) - before;
-                if (b + 1 < n)
+                if (b + 1 < (int)n)
                     delta += GpuEdge(firstNode, order[b + 1] + 1, n + 1) -
                              GpuEdge(last, order[b + 1] + 1, n + 1);
                 if (delta < -GPU_EPS)

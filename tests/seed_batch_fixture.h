@@ -127,9 +127,10 @@ inline void FeedStreaming(practice::SeedSearch &search, const practice::SeedSear
     }
 }
 
-inline std::shared_ptr<const practice::SeedSearchState> AwaitStreaming(practice::SeedSearch &search)
+inline std::shared_ptr<const practice::SeedSearchState> AwaitStreaming(
+    practice::SeedSearch &search, std::chrono::seconds timeout = std::chrono::seconds(60))
 {
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline)
     {
         auto state = search.Get();
