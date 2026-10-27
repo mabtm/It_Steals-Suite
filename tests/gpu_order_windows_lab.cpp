@@ -138,7 +138,7 @@ int main(int argc, char **argv)
         DXGI_ADAPTER_DESC1 adapterInfo{};
         Check(adapter1->GetDesc1(&adapterInfo));
         bool software = (adapterInfo.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
-        std::wcout << L"Adapter: " << adapterInfo.Description << L"; software=" << software << L'\n';
+        std::wcout << L"Adapter: " << adapterInfo.Description << L"; reportedSoftwareFlag=" << software << L'\n';
         Check(device->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &shader));
         std::vector<GpuOrderFixture> fixtures;
         std::vector<double> matrices;
@@ -193,11 +193,11 @@ int main(int argc, char **argv)
         std::ofstream(resultPath) << "{\"shaderCompiled\":true,\"execution\":\"passed\",\"creationDriver\":\""
                                   << driver << "\",\"adapterVendorId\":" << adapterInfo.VendorId
                                   << ",\"adapterDeviceId\":" << adapterInfo.DeviceId
-                                  << ",\"softwareAdapter\":" << (software ? "true" : "false")
+                                  << ",\"reportedSoftwareFlag\":" << (software ? "true" : "false")
                                   << ",\"cases\":" << fixtures.size()
                                   << ",\"dispatchAndReadbackMs\":" << elapsed
                                   << ",\"liveGameOrObsTested\":false}\n";
-        std::cout << fixtures.size() << " FP64 shader/production comparisons and output guards on " << driver
+        std::cout << fixtures.size() << " FP64 shader/production comparisons and output guards; D3D11 creation driver=" << driver
                   << ": PASS; not a live game/OBS throughput measurement.\n";
         return 0;
     }

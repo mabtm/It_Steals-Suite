@@ -23,7 +23,8 @@ int RunBenchmark(int argc, char **argv)
     if (argc > 5 && std::string_view(argv[5]) == "search")
     {
         SeedSearch search;
-        auto warmup = StreamingRequest(*source, 128, workers, true);
+        int warmupCount = argc > 7 && std::string_view(argv[7]) == "training" ? 16 : 128;
+        auto warmup = StreamingRequest(*source, warmupCount, workers, true);
         search.Begin(warmup);
         search.Update(source);
         if (AwaitStreaming(search, std::chrono::seconds(300))->phase != SearchPhase::Completed)
@@ -34,7 +35,10 @@ int RunBenchmark(int argc, char **argv)
         search.Update(source);
         auto result = AwaitStreaming(search, std::chrono::seconds(300));
         if (result->phase != SearchPhase::Completed || result->evaluated != uint64_t(count))
-            throw std::runtime_error(result->error);
+            throw std::runtime_error(result->error.empty()
+                                         ? "Search did not complete: checked=" + std::to_string(result->evaluated) +
+                                               ", expected=" + std::to_string(count)
+                                         : result->error);
         auto seconds = std::chrono::duration<double>(Clock::now() - started).count();
         std::cout << "search," << crystals << ',' << result->request.workers << ',' << count << ','
                   << std::setprecision(17) << seconds << ',' << count / seconds

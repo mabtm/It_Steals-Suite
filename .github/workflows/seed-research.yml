@@ -22,6 +22,8 @@ jobs:
         run: python3 tests/run.py --only contact_bound_tests gpu_order_kernel_tests route_bound_tests physical_seed_tests --jobs 2 --output build/research-checks
       - name: Contact-bound memory and undefined-behavior checks
         run: python3 tests/run.py --sanitize --only contact_bound_tests gpu_order_kernel_tests --jobs 1 --output build/research-sanitizers
+      - name: Paired complete-search comparisons
+        run: python3 tests/contact_bound_experiments.py --variants reference degree dual residual quarter half three-quarter --pairs 3 --count 6000 --output build/contact-experiments
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -29,6 +31,7 @@ jobs:
           path: |
             build/research-checks
             build/research-sanitizers
+            build/contact-experiments/*.json
           retention-days: 14
 
   msvc-pgo:
@@ -63,6 +66,7 @@ jobs:
           path: |
             build/trainer-pgo-lab/*.json
             build/trainer-pgo-lab/*.log
+            build/trainer-pgo-lab/*.txt
           retention-days: 14
 
   gpu-kernel:

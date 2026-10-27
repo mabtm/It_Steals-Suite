@@ -16,6 +16,7 @@ $pgoDatabase = Join-Path $out 'search.pgd'
 $baseline = Join-Path $out 'baseline.exe'
 $trained = Join-Path $out 'trained.exe'
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name
+Write-Output "CPU: $cpu; actual trainer: $([bool]$Trainer)"
 
 function Build-Benchmark([string]$Target, [string]$Options) {
     if ($Trainer) {
@@ -40,21 +41,23 @@ function Build-Benchmark([string]$Target, [string]$Options) {
     & $env:ComSpec /d /c $cmd
     if ($LASTEXITCODE -ne 0) { throw 'Search benchmark compilation failed.' }
 }
-function Run-Benchmark([string]$Binary, [string]$Fixture, [int]$Crystals, [int]$Count, [string]$Radius) {
+function Run-Benchmark([string]$Binary, [string]$Fixture, [int]$Crystals, [int]$Count, [string]$Radius, [switch]$Training) {
     $map = Join-Path $root ('tests/fixtures/' + $Fixture + '.routefixture')
     if ($Trainer) {
         $resultFile = Join-Path $out 'last-benchmark.txt'
         $launchArgs = @('--suite-pgo-benchmark', $resultFile, $map, $Count, $Crystals, 1, 'search', $Radius)
+        if ($Training) { $launchArgs += 'training' }
         $quoted = ($launchArgs | ForEach-Object { '"' + $_ + '"' }) -join ' '
         $process = Start-Process -FilePath $Binary -ArgumentList $quoted -Wait -PassThru
         $exitCode = $process.ExitCode
         $text = @(Get-Content $resultFile)
     } else {
-        $text = @(& $Binary $map $Count $Crystals 1 search $Radius)
+        $extra = if ($Training) { @('training') } else { @() }
+        $text = @(& $Binary $map $Count $Crystals 1 search $Radius @extra)
         $exitCode = $LASTEXITCODE
     }
     if ($exitCode -ne 0) {
-        $text | Write-Output
+        Write-Host ($text -join [Environment]::NewLine)
         throw "Search benchmark failed: $Binary, $Fixture, radius=$Radius, exit=$exitCode"
     }
     $line = $text | Where-Object { $_ -like 'search,*' } | Select-Object -Last 1
@@ -75,10 +78,10 @@ $runtime = Get-ChildItem (Join-Path $studio 'VC/Tools/MSVC') -Filter pgort140.dl
 if ($runtime) { Copy-Item $runtime.FullName $out }
 # Atomic instrumentation is intentionally much slower. These representative
 # layouts already exercise millions of inner-loop branches without timing out.
-Run-Benchmark $trained 'hide-seek-outside-boxes' 52 128 '1.35' | Out-File (Join-Path $out 'training.log')
-Run-Benchmark $trained 'hide-seek-outside-boxes' 52 128 '0.5' | Out-File (Join-Path $out 'training.log') -Append
-Run-Benchmark $trained 'hide-seek-outside-boxes' 52 256 '0' | Out-File (Join-Path $out 'training.log') -Append
-Run-Benchmark $trained 'hide-seek-boxes' 22 256 '1.35' | Out-File (Join-Path $out 'training.log') -Append
+Run-Benchmark $trained 'hide-seek-outside-boxes' 52 32 '1.35' -Training | Out-File (Join-Path $out 'training.log')
+Run-Benchmark $trained 'hide-seek-outside-boxes' 52 32 '0.5' -Training | Out-File (Join-Path $out 'training.log') -Append
+Run-Benchmark $trained 'hide-seek-outside-boxes' 52 128 '0' -Training | Out-File (Join-Path $out 'training.log') -Append
+Run-Benchmark $trained 'hide-seek-boxes' 22 64 '1.35' -Training | Out-File (Join-Path $out 'training.log') -Append
 if (-not (Test-Path $pgoDatabase)) { throw 'PGO training database was not produced.' }
 if ($Trainer) {
     $previousResearchPath = $env:PATH
@@ -89,6 +92,16 @@ if ($Trainer) {
     } finally { $env:PATH = $previousResearchPath }
 }
 Build-Benchmark $trained ('/USEPROFILE:PGD="' + $pgoDatabase + '"')
+$inspect = Join-Path $out 'inspect.cmd'
+$imports = Join-Path $out 'imports.log'
+[IO.File]::WriteAllLines($inspect, @(
+    '@echo off', ('call "' + $vcvars + '" >nul'),
+    ('dumpbin /nologo /imports "' + $trained + '" > "' + $imports + '"'), 'exit /b %errorlevel%'
+), [Text.Encoding]::ASCII)
+& $env:ComSpec /d /c $inspect
+if ($LASTEXITCODE -ne 0) { throw 'Could not inspect the optimized image imports.' }
+if (Select-String -Path $imports -Pattern 'pgort' -Quiet) { throw 'The optimized image still requires the instrumentation runtime.' }
+Write-Output 'Optimized image has no PGO instrumentation runtime dependency: PASS'
 
 $samples = @()
 $reference = @{}
@@ -118,6 +131,8 @@ foreach ($radius in @('1.35', '0.5', '0')) {
     Write-Output "MSVC radius $radius median: baseline=$before PGO=$after ratio=$($after/$before)"
 }
 Write-Output 'MSVC PGO training, paired complete searches and exact Top-10 parity: PASS'
+@{ cpu=$cpu; compiler='MSVC v143 /O2 /GL /LTCG'; actualTrainer=[bool]$Trainer; samples=$samples } |
+    ConvertTo-Json -Depth 6 | Write-Output
 if ($Trainer) {
     & (Join-Path $PSScriptRoot 'launcher_windows_tests.ps1') -TrainerBinary $trained
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Optimized actual trainer smoke tests failed.' }
