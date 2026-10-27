@@ -35,7 +35,7 @@ int main(int argc, char **argv)
         options.adapter = available.front().index;
         options.seeds = 8;
         options.batch = 4;
-        options.key = practice::FixtureSearchKey;
+        options.key = FixtureSearchKey;
         options.fixture = true;
         auto r = Run(source, options, [] { return false; }, [](Phase, int) {}, true);
         if (r.phase != Phase::Completed) throw std::runtime_error(r.error);

@@ -64,7 +64,7 @@ inline std::vector<Adapter> Adapters()
 
 inline std::string Resource(int id)
 {
-    HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(id), RT_RCDATA);
+    HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(id), MAKEINTRESOURCEW(10));
     if (!resource) throw std::runtime_error("Embedded GPU shader is missing from this build");
     HGLOBAL data = LoadResource(nullptr, resource);
     const char *bytes = static_cast<const char *>(LockResource(data));
