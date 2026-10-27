@@ -21,7 +21,9 @@ function Build-Benchmark([string]$Target, [string]$Options) {
     if ($Trainer) {
         $mode = if ($Options -like '/GENPROFILE*') { 'Instrument' } elseif ($Options -like '/USEPROFILE*') { 'Use' } else { 'Baseline' }
         $name = [IO.Path]::GetFileNameWithoutExtension($Target)
-        & $msbuild (Join-Path $root 'Trainer/ItStealsTrainer.vcxproj') /m /t:Rebuild /nologo /verbosity:minimal `
+        # Rebuild would delete the training .pgd. Reuse the same /GL objects and relink for /USEPROFILE.
+        $buildTarget = if ($mode -eq 'Use') { '/t:Build' } else { '/t:Rebuild' }
+        & $msbuild (Join-Path $root 'Trainer/ItStealsTrainer.vcxproj') /m $buildTarget /nologo /verbosity:minimal `
             /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:SuitePgoResearch=true `
             "/p:SuitePgoMode=$mode" "/p:SuitePgoDatabase=$pgoDatabase" "/p:TargetName=$name" `
             "/p:OutDir=$out/" "/p:IntDir=$out/obj-$name/"
