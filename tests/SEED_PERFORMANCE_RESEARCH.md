@@ -215,9 +215,15 @@ Reproduce:
 
 ```powershell
 .\tests\gpu_order_windows_lab.ps1
-# With the artifact files in the same directory:
-.\gpu_order_windows_lab.exe .\gpu_order_lab.hlsl .\result.json --hardware
+# Extract the GPU artifact and open PowerShell in that folder:
+.\gpu-order-lab.exe .\gpu_order_lab.hlsl .\my-gpu-results.json --hardware 2>&1 | Tee-Object .\my-gpu-test.log
 ```
+
+Keep gpu-order-lab.exe, gpu_order_lab.hlsl and gpu_order_kernel.hlsli in the
+same folder. The artifact includes a prebuilt executable, so Visual Studio is
+only needed to rebuild it. Share the newly generated my-gpu-results.json and
+my-gpu-test.log; gpu-results.json already in the archive belongs to the CI
+renderer. If the test exits before creating JSON, the new log is sufficient.
 
 `--hardware` restricts the D3D11 creation type. Inspect the adapter description
 and IDs in addition to that type before interpreting a result as physical GPU
