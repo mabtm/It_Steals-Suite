@@ -7,7 +7,7 @@ folder = pathlib.Path(sys.argv[1])
 reports = {p.stem: json.loads(p.read_text(encoding="utf-8-sig")) for p in folder.glob("*.json")}
 assert len(reports) == 12, list(reports)
 for report in reports.values():
-    assert report["schema"] == "practice-suite.gpu-dev.v3"
+    assert report["schema"] == "practice-suite.gpu-dev.v4"
     assert report["mismatches"] == 0
     assert report["caseRetention"]["stored"] == len(report["cases"])
     assert len(report["cases"]) <= 84
@@ -48,3 +48,14 @@ assert checkpoint["checked"] == 136 and checkpoint["status"] == "Checking result
 assert not list(folder.rglob("*.tmp"))
 assert list((folder / "automatic").glob("*.json"))
 print("Twelve GPU dev JSON reports, legacy/catalog parity, timestamp/control runs, rotating sweep, partial stop and replacement checkpoints: PASS")
+
+summary_files = list((folder / "automatic-suite").rglob("Dev4-Summary.json"))
+assert len(summary_files) == 1
+summary = json.loads(summary_files[0].read_text())
+assert summary["schema"] == "practice-suite.gpu-suite.v4" and summary["status"] == "Completed"
+assert summary["completedMaps"] == 2 and summary["completedTests"] == summary["totalTests"] == 24
+assert {r["scene"] for r in summary["runs"]} == {13, 14}
+assert all(r["top10Match"] and r["audited"] == r["scored"] and r["evaluated"] == r["requested"] for r in summary["runs"])
+assert len(list(summary_files[0].parent.glob("hide-seek-outside_*.json"))) == 12
+assert len(list(summary_files[0].parent.glob("classic-bonus_*.json"))) == 12
+print("Automatic two-map plan, exact score audits, named per-test reports and one summary: PASS")

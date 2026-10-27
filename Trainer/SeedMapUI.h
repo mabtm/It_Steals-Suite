@@ -858,9 +858,16 @@ inline void RenderSeedMapTab(bool restricted)
         return;
     }
     g_plannerTabActive = true;
+#ifdef SUITE_GPU_DEV
+    bool automated = g_gpuDev.Busy();
+#else
+    bool automated = false;
+#endif
+    ImGui::BeginDisabled(automated);
     ImGui::Combo("Map", &g_plannerOptions.level, kMapLevelNames, kMapLevelCount);
+    ImGui::EndDisabled();
     static int selected = -1;
-    if (selected != g_plannerOptions.level)
+    if (!automated && selected != g_plannerOptions.level)
     {
         g_seedSearch.Stop();
         g_seedSearch.HidePreview();
@@ -872,9 +879,9 @@ inline void RenderSeedMapTab(bool restricted)
             g_mapWorker.LoadCache(selected);
     }
     auto base = g_mapWorker.Get(g_plannerOptions.level);
-    if (base && base->needsAnalysis)
+    if (!automated && base && base->needsAnalysis)
         g_mapWorker.AnalyzeSaved(g_plannerOptions.level);
-    if (!base && g_pShared && !HasPendingRequest() && g_plannerAutoLevel != g_plannerOptions.level)
+    if (!automated && !base && g_pShared && !HasPendingRequest() && g_plannerAutoLevel != g_plannerOptions.level)
     {
         g_plannerAutoLevel = g_plannerOptions.level;
         PlannerRequest(2);
@@ -884,7 +891,7 @@ inline void RenderSeedMapTab(bool restricted)
     bool live = base && base->live && base->data && g_pShared && base->session == g_session &&
                 base->data->pid == g_pShared->pid;
     bool verified = live && base->data->Verified() && g_pShared->rngPatchComplete;
-    ImGui::BeginDisabled(!g_pShared || g_seedSearch.Busy() || HasPendingRequest());
+    ImGui::BeginDisabled(automated || !g_pShared || g_seedSearch.Busy() || HasPendingRequest());
     if (suite_ui::Button("Load level in Practice"))
     {
         g_speedrunMode = g_practiceMode = true;
@@ -906,6 +913,7 @@ inline void RenderSeedMapTab(bool restricted)
                                g_selectSeedPreview ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None))
     {
         g_selectSeedPreview = false;
+        ImGui::BeginDisabled(automated);
         ImGui::BeginDisabled(g_seedSearch.Busy() || HasPendingRequest());
         ImGui::InputInt("Seed##preview-number", &g_plannerOptions.seed);
         ImGui::EndDisabled();
@@ -1066,6 +1074,7 @@ inline void RenderSeedMapTab(bool restricted)
                 208);
         if (!g_plannerRandomError.empty())
             ImGui::TextWrapped("%s", g_plannerRandomError.c_str());
+        ImGui::EndDisabled();
         suite_ui::EndTabItem();
     }
     if (suite_ui::BeginTabItem("Seed search"))

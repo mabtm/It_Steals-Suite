@@ -271,9 +271,9 @@ inline std::string Json(const Report &r)
     std::ostringstream out;
     out.imbue(std::locale::classic());
     out << std::boolalpha << std::setprecision(17);
-    out << "{\n\"schema\":\"practice-suite.gpu-dev.v3\",\n\"version\":";
+    out << "{\n\"schema\":\"practice-suite.gpu-dev.v4\",\n\"version\":";
     Quote(out, suite_brand::Version);
-    out << ",\"channel\":\"GPU Dev 3\",\"sourceCommit\":";
+    out << ",\"channel\":\"GPU Dev 4\",\"sourceCommit\":";
 #ifdef SUITE_DEV_SOURCE_COMMIT
     Quote(out, SUITE_DEV_SOURCE_COMMIT);
 #else
@@ -391,7 +391,7 @@ inline std::string Json(const Report &r)
     return out.str();
 }
 
-inline void Save(const std::filesystem::path &path, const Report &report)
+inline void SaveJson(const std::filesystem::path &path, std::string_view json)
 {
     std::filesystem::create_directories(path.parent_path());
     auto temporary = path;
@@ -399,7 +399,7 @@ inline void Save(const std::filesystem::path &path, const Report &report)
     try
     {
         std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
-        out << Json(report);
+        out << json;
         out.close();
         if (!out) throw std::runtime_error("Could not write the GPU JSON report");
 #ifdef _WIN32
@@ -416,4 +416,5 @@ inline void Save(const std::filesystem::path &path, const Report &report)
         throw;
     }
 }
+inline void Save(const std::filesystem::path &path, const Report &report) { SaveJson(path, Json(report)); }
 } // namespace gpu_dev

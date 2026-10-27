@@ -1,4 +1,5 @@
-#include "GpuDevSession.h"
+#define SUITE_GPU_DEV 1
+#include "GpuDevAutomation.h"
 #include "gpu_order_fixture.h"
 #include "seed_route_fixture.h"
 #include <cassert>
@@ -166,6 +167,35 @@ int main(int argc, char **argv)
             assert(!baseline.catalogBytes && baseline.inputBytesPerLayout == 33292);
             for (size_t i = 0; i < baseline.timings.size(); i++) assert(baseline.timings[i].cpuDigest == r.timings[i].gpuDigest);
             Save(output / "legacy-input.json", baseline);
+            Automation automaticSuite;
+            automaticSuite.directory = output / "automatic-suite" / L"\u6e2c\u8a66";
+            SuiteOptions automaticOptions;
+            automaticOptions.count = 32; automaticOptions.rounds = 1; automaticOptions.workers = 2;
+            automaticOptions.key = FixtureSearchKey; automaticOptions.adapter = available.front().index;
+            automaticSuite.Start(automaticOptions, 42, 7, true);
+            auto autoDeadline = Clock::now() + std::chrono::seconds(120);
+            while (automaticSuite.Busy() && Clock::now() < autoDeadline)
+            {
+                int level = automaticSuite.Wanted();
+                if (level >= 0)
+                {
+                    auto map = std::make_shared<practice::MapAnalysis>(*source);
+                    auto data = std::make_shared<practice::MapData>(*source->data);
+                    data->pid = 42; data->scene = kMapScenes[level]; data->epoch = 9;
+                    map->data = data; map->session = 7;
+                    assert(!automaticSuite.Offer(map, 42, data->scene, 8, 7));
+                    bool accepted = automaticSuite.Offer(map, 42, data->scene, 9, 7);
+                    if (!accepted) assert(automaticSuite.Wanted() != level || !automaticSuite.Busy());
+                    automaticSuite.CheckContext(42, data->scene, 9, 7, false);
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+            if (automaticSuite.Busy()) { automaticSuite.Stop(); throw std::runtime_error("Automatic suite did not finish"); }
+            auto complete = automaticSuite.Get();
+            if (complete->status != "Completed") throw std::runtime_error(complete->error);
+            assert(complete->completedMaps == 2 && complete->runs.size() == 24 && complete->completedTests == complete->totalTests);
+            for (const auto &test : complete->runs) assert(test.topMatch && test.audited == test.state.scored);
+            assert(std::filesystem::is_regular_file(std::filesystem::path(complete->directory) / "Dev4-Summary.json"));
             Session session;
             session.directory = output / "automatic";
             auto automatic = options;

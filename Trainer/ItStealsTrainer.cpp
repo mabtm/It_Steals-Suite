@@ -43,7 +43,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "InspectorClient.h"
 #include "SeedSearch.h"
 #ifdef SUITE_GPU_DEV
-#include "GpuDevSession.h"
+#include "GpuDevAutomation.h"
 #endif
 #include "MovementTelemetry.h"
 #include "PerformanceTiming.h"
@@ -130,7 +130,7 @@ PracticeMapClient g_mapClient;
 InspectorClient g_inspectorClient;
 practice::SeedSearch g_seedSearch;
 #ifdef SUITE_GPU_DEV
-gpu_dev::Session g_gpuDev;
+gpu_dev::Automation g_gpuDev;
 #endif
 std::string g_plannerRandomError;
 std::string g_connectionStatus = "Waiting for ItStealsHelper";
@@ -1176,8 +1176,43 @@ void SyncCommands(bool visible)
     g_gpuDev.CheckContext(g_pShared ? int(g_pShared->pid) : 0,
                           g_pShared ? g_pShared->currentSceneIndex : -1,
                           g_pShared ? int(g_pShared->sceneEpoch) : 0, g_session, restricted);
+    static int devLoad = -1, devCaptureEpoch = -1;
+    static int64_t devSuite = 0;
+    auto devIdentity = g_gpuDev.Get()->startedUtcMs;
+    if (devIdentity != devSuite) { devSuite = devIdentity; devLoad = devCaptureEpoch = -1; }
+    int devLevel = g_gpuDev.Wanted();
+    if (!g_gpuDev.Busy()) devLoad = devCaptureEpoch = -1;
+    if (devLevel >= 0 && g_pShared)
+    {
+        g_plannerOptions.level = devLevel;
+        bool inMode = g_pShared->currentSceneIndex == kMapScenes[devLevel] &&
+                      g_pShared->playerReady && g_pShared->practiceModeActive;
+        if (!inMode && devLoad != devLevel && !HasPendingRequest())
+        {
+            g_selectedSpeedrunLevel = devLevel;
+            g_commands.speedrunLevelIndex = byte(devLevel);
+            g_commands.speedrunLoadLevelCmd = 1;
+            devLoad = devLevel; devCaptureEpoch = -1;
+        }
+        else if (inMode)
+        {
+            bool offered = g_gpuDev.Offer(g_mapWorker.Get(devLevel), int(g_pShared->pid),
+                g_pShared->currentSceneIndex, int(g_pShared->sceneEpoch), g_session);
+            if (!offered && g_gpuDev.Wanted() == devLevel && devCaptureEpoch != int(g_pShared->sceneEpoch) && !HasPendingRequest())
+            {
+                g_commands.plannerRequest = 2;
+                g_commands.plannerLevel = uint32_t(devLevel);
+                g_commands.plannerSeed = g_plannerOptions.seed;
+                devCaptureEpoch = int(g_pShared->sceneEpoch);
+            }
+        }
+    }
     #endif
-    bool searchWanted = !restricted && (g_seedSearch.Busy() || (visible && g_plannerTabActive));
+    bool searchWanted = !restricted && (g_seedSearch.Busy() || (visible && g_plannerTabActive)
+#ifdef SUITE_GPU_DEV
+                                      || g_gpuDev.Busy()
+#endif
+    );
     bool plannerWanted =
         searchWanted || (visible && !restricted &&
                          (g_showMinimapWindow || g_runReviewOpen ||
@@ -1214,6 +1249,9 @@ void SyncCommands(bool visible)
                                 (g_plannerOptions.automaticLoad ? 4u : 0u) |
                                 (g_plannerOptions.calculateRoutes ? 0u : 8u) |
                                 (g_plannerOptions.portableGeneration ? 16u : 0u);
+#ifdef SUITE_GPU_DEV
+    if (g_gpuDev.Busy()) g_commands.plannerOptions = (g_commands.plannerOptions & ~8u) | 16u;
+#endif
     g_commands.inputCapture = visible && MenuInputRequested() ? 1u : 0u;
     g_commands.frameLimitMode = g_frameLimitMode;
     g_commands.gameFrameLimit = g_gameFrameLimit;
@@ -1225,6 +1263,9 @@ void SyncCommands(bool visible)
         g_commands.telemetryOptions |= kTelemetrySkipIntro;
     if (inspectorWanted)
         g_commands.telemetryOptions |= kTelemetryInspector;
+#ifdef SUITE_GPU_DEV
+    if (g_gpuDev.Busy()) g_commands.telemetryOptions |= kTelemetryPlanner | kTelemetryGeometry;
+#endif
     if (visible && suite_input::preferences.enabled && !suite_hud::active && !ClipInputRequested())
         g_commands.telemetryOptions |= kTelemetryInputs | kTelemetryLive;
     if (searchWanted || (!running && g_runReviewOpen))
@@ -2302,10 +2343,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             }
             double frameCpuMs = std::chrono::duration<double, std::milli>(Clock::now() - frameStarted).count();
             (frameWasInteractive ? g_menuFrameCost : g_hudFrameCost).Observe(frameCpuMs);
-#ifdef SUITE_GPU_DEV
-            g_gpuDev.Observe(frameCpuMs, ImGui::GetIO().DeltaTime * 1000., frameWasInteractive,
-                             g_pShared ? g_pShared->gameFps : 0);
-#endif
         }
         auto deadline =
             Clock::now() + std::chrono::milliseconds(

@@ -1,189 +1,99 @@
 #pragma once
 
-inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis> source, bool verified)
+inline void RenderGpuDevControls(std::shared_ptr<const practice::MapAnalysis>, bool)
 {
-    static bool discovered = false, reuseKey = true, gpuTiming = true, cachedCatalog = true, overlap = true;
-    static int selected = 0, profile = 1;
-    static std::string exportStatus;
-    static gpu_dev::Options running;
+    static bool discovered = false, reuseKey = true;
+    static int adapter = 0, scope = 0, profile = 1;
+    static std::string error;
     if (!discovered) { g_gpuDev.RefreshAdapters(); discovered = true; }
-    auto adapters = g_gpuDev.GetAdapters();
-    auto report = g_gpuDev.Get();
+    auto found = g_gpuDev.GetAdapters(); auto state = g_gpuDev.Get();
     bool busy = g_gpuDev.Busy();
-    ImGui::TextColored(g_accentCol, "GPU DEV 3 / shared map data / maximum throughput");
-    ImGui::TextWrapped("Compare identical frozen layouts with the CPU reference. Every route, length and pickup contact is checked. Batch order rotates between rounds; CPU/GPU execution order alternates.");
-    ImGui::Spacing();
+    ImGui::TextColored(g_accentCol, "GPU DEV 4 / automatic complete-search benchmark");
+    ImGui::TextWrapped("One start runs the entire sequence: exhaustive reference, CPU workers 1-6, GPU workers 1-6 at batches 512/1024/2048, and spawn-filter validation. Every scored route and final Top10 must match the reference.");
     ImGui::BeginDisabled(busy);
-    const char *name = selected < int(adapters->entries.size()) ? adapters->entries[selected].name.c_str() : "Select an adapter";
+    const char *name = adapter < int(found->entries.size()) ? found->entries[adapter].name.c_str() : "Select graphics adapter";
     if (ImGui::BeginCombo("Graphics adapter", name))
     {
-        for (size_t i = 0; i < adapters->entries.size(); i++)
+        for (size_t i = 0; i < found->entries.size(); i++)
         {
-            const auto &a = adapters->entries[i];
-            std::string label = a.name + (a.software ? " (software renderer)" : "");
-            if (ImGui::Selectable(label.c_str(), selected == int(i))) selected = int(i);
+            const auto &gpu = found->entries[i];
+            std::string label = gpu.name + (gpu.software ? " (software)" : "");
+            if (ImGui::Selectable(label.c_str(), adapter == int(i))) adapter = int(i);
         }
         ImGui::EndCombo();
     }
     if (suite_ui::Button("Refresh adapters")) g_gpuDev.RefreshAdapters();
-    const char *profiles[]{"Quick check / 1,024 layouts / 4 rounds / batch 256",
-                           "Batch sweep / 4,096 layouts / 6 rounds / 256, 512, 1024, 2048",
-                           "Endurance / 8,192 layouts / 12 rounds / 256, 512, 1024, 2048"};
-    ImGui::Combo("Test profile", &profile, profiles, 3);
-    auto request = gpu_dev::Preset(profile);
-    ImGui::Checkbox("GPU timing queries", &gpuTiming);
-    request.gpuTiming = gpuTiming;
-    ImGui::Checkbox("Shared map data (Dev 3)", &cachedCatalog);
-    request.cachedCatalog = cachedCatalog;
-    ImGui::Checkbox("Overlap GPU work with CPU pickup scoring", &overlap);
-    request.overlap = overlap;
-    ImGui::TextDisabled("Enabled: upload point IDs; disabled: Dev 2 matrix/sort baseline.");
-    ImGui::TextDisabled("Disable queries for a throughput control run with the same seed key.");
-    ImGui::TextDisabled("%s layouts per round | %d strict comparisons | %d s idle baseline",
-                        profile == 2 ? "8,192" : profile == 1 ? "4,096" : "1,024",
-                        gpu_dev::TotalChecks(request), request.baselineSeconds);
-    if (report) ImGui::Checkbox("Reuse previous test's seed key", &reuseKey);
+    const char *scopes[]{"Outside + Classic Bonus / automatic level loading", "Current map only"};
+    ImGui::Combo("Test maps", &scope, scopes, 2);
+    const char *profiles[]{"Quick validation / 2,048 seeds / one round", "Full comparison / 16,384 seeds / three rounds"};
+    ImGui::Combo("Test size", &profile, profiles, 2);
+    if (state->startedUtcMs) ImGui::Checkbox("Reuse previous suite's seed key", &reuseKey);
     ImGui::EndDisabled();
-    if (!adapters->error.empty()) ImGui::TextWrapped("%s", adapters->error.c_str());
-    bool supported = source && source->data && source->data->keep >= 16 && source->data->keep <= 52;
-    bool adapterReady = selected < int(adapters->entries.size()) && !adapters->entries[selected].software;
-    bool ready = verified && supported && !source->working && !(source->data->flags & 128) &&
-                 adapterReady && !g_seedSearch.Busy() && !HasPendingRequest();
+    bool physical = adapter < int(found->entries.size()) && !found->entries[adapter].software;
+    int current = g_pShared ? MapLevelIndex(g_pShared->currentSceneIndex) : -1;
+    bool supported = scope == 0 || current == 5 || current == 7;
+    bool ready = g_pShared && g_pShared->rngPatchComplete && physical && supported && !g_seedSearch.Busy() && !HasPendingRequest();
     ImGui::BeginDisabled(busy || !ready);
-    if (suite_ui::Button("Start comparison"))
+    if (suite_ui::Button("Start automatic test suite"))
     {
-        uint64_t key = 0;
-        bool generated = reuseKey && report;
-        if (generated) key = report->options.key;
-        else generated = GenerateSearchKey(key, exportStatus);
+        uint64_t key = 0; bool generated = reuseKey && state->startedUtcMs;
+        if (generated) key = state->options.key; else generated = GenerateSearchKey(key, error);
         if (generated)
         {
-            running = request;
-            running.adapter = adapters->entries[selected].index;
-            running.key = key;
-            running.recipe = g_plannerOptions.recipe;
-            gpu_dev::Observations baseline;
-            baseline.baselineGameFps = g_pShared ? g_pShared->gameFps : 0;
-            baseline.baselineMenuCpuP95 = g_menuFrameCost.P95();
-            g_gpuDev.Start(source, running, baseline);
-            exportStatus.clear();
+            gpu_dev::SuiteOptions options;
+            options.adapter = found->entries[adapter].index; options.key = key;
+            options.recipe = g_plannerOptions.recipe;
+            options.count = profile ? 16384 : 2048; options.rounds = profile ? 3 : 1;
+            if (scope) options.levels = {current};
+            try
+            {
+                g_speedrunMode = g_practiceMode = true; g_seededPractice = g_rawPracticeSpawn = false;
+                g_gpuDev.Start(options, int(g_pShared->pid), g_session); error.clear();
+            }
+            catch (const std::exception &e) { error = e.what(); }
         }
     }
     ImGui::EndDisabled();
-    if (busy && g_gpuDev.Status() != gpu_dev::Phase::Detecting)
-    {
-        ImGui::SameLine();
-        if (suite_ui::Button("Stop test")) g_gpuDev.Stop();
-    }
-    if (!verified) ImGui::TextDisabled("Load a verified live map in Practice to begin.");
-    else if (!supported) ImGui::TextDisabled("This prototype supports heuristic routing for 16-52 crystals.");
-    else if (!adapterReady) ImGui::TextDisabled("Select a physical graphics adapter.");
-    else if (source->working || (source->data->flags & 128)) ImGui::TextDisabled("Waiting for navigation capture.");
-    ImGui::TextWrapped("Start with Batch sweep, then Endurance. Keep the same scene loaded. The menu may be closed during the test. JSON checkpoints are saved after each paired pass, and again on completion, stop or error.");
+    if (busy) { ImGui::SameLine(); if (suite_ui::Button("Stop suite")) g_gpuDev.Stop(); }
+    if (!found->error.empty()) ImGui::TextWrapped("%s", found->error.c_str());
+    if (!error.empty()) ImGui::TextWrapped("%s", error.c_str());
+    ImGui::TextWrapped("The suite loads the selected maps in Practice and captures their verified geometry automatically. The menu may be closed. Share the single Dev4-Summary.json file after completion; individually named reports are also saved after every test.");
+    ImGui::Separator();
+    ImGui::TextColored(g_accentCol, "%s / %d of %d tests", state->status.c_str(), state->completedTests, state->totalTests);
+    ImGui::TextWrapped("%s", state->active.c_str());
     if (busy)
     {
-        suite_ui::Busy(gpu_dev::PhaseName(g_gpuDev.Status()));
-        if (g_gpuDev.Status() != gpu_dev::Phase::Detecting)
-        {
-            int total = 2 * gpu_dev::TotalChecks(running);
-            ImGui::ProgressBar(total ? float(g_gpuDev.Checked()) / total : 0, ImVec2(-1, 0));
-            ImGui::TextDisabled("%d / %d CPU/GPU layout scores | round %d / %d | batch %d",
-                                g_gpuDev.Checked(), total, g_gpuDev.Pair(), running.pairs, g_gpuDev.Batch());
-        }
+        suite_ui::Busy("Automatic benchmark running");
+        ImGui::ProgressBar(state->totalTests ? float(state->completedTests) / state->totalTests : 0, ImVec2(-1, 0));
+        ImGui::TextDisabled("Current search: %llu seeds evaluated", static_cast<unsigned long long>(g_gpuDev.Checked()));
     }
-    if (report)
+    if (!state->error.empty()) ImGui::TextWrapped("%s", state->error.c_str());
+    if (!state->runs.empty() && ImGui::BeginTable("Dev4Results", 6,
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp, ImVec2(0, 280)))
     {
-        ImGui::Separator();
-        ImGui::TextColored(report->phase == gpu_dev::Phase::Completed && !report->mismatches
-                              ? ImVec4(.38f, .85f, .62f, 1) : g_accentCol,
-                          "%s | %d checked | %d mismatches", gpu_dev::PhaseName(report->phase),
-                          report->checked, report->mismatches);
-        ImGui::TextWrapped("%s | %s", report->adapter.name.c_str(), report->model.c_str());
-        ImGui::TextDisabled("Input: %s | %llu bytes/layout | fixed catalog: %llu bytes",
-                            report->options.cachedCatalog ? "shared catalog IDs" : "layout matrices",
-                            static_cast<unsigned long long>(report->inputBytesPerLayout),
-                            static_cast<unsigned long long>(report->catalogBytes));
-        if (ImGui::BeginTable("GpuDevSummary", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        for (const char *label : {"Mode", "Test", "Seeds/s", "Scored / pruned", "Audited", "Top10"}) ImGui::TableSetupColumn(label);
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableHeadersRow();
+        ImGuiListClipper clipper;
+        clipper.Begin(int(state->runs.size()));
+        while (clipper.Step()) for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; index++)
         {
-            for (const char *column : {"Batch", "Passes", "CPU layouts/s", "Hybrid layouts/s", "CPU / hybrid"})
-                ImGui::TableSetupColumn(column);
-            ImGui::TableHeadersRow();
-            for (int batch : gpu_dev::Batches(report->options))
-            {
-                double cpu = 0, gpu = 0; int count = 0, passes = 0;
-                for (const auto &p : report->timings)
-                    if (p.batch == batch && p.complete) { cpu += p.cpuMs; gpu += p.gpuMs; count += p.checked; passes++; }
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn(); ImGui::Text("%d", batch);
-                ImGui::TableNextColumn(); ImGui::Text("%d", passes);
-                ImGui::TableNextColumn(); ImGui::Text("%.0f", cpu > 0 ? count * 1000. / cpu : 0);
-                ImGui::TableNextColumn(); ImGui::Text("%.0f", gpu > 0 ? count * 1000. / gpu : 0);
-                ImGui::TableNextColumn(); ImGui::Text("%.2fx", gpu > 0 ? cpu / gpu : 0);
-            }
-            ImGui::EndTable();
+            const auto &run = state->runs[size_t(index)];
+            const auto &s = run.state;
+            ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::TextUnformatted(gpu_dev::ModeName(s.request.scene));
+            ImGui::TableNextColumn(); ImGui::Text("%s w%d / b%d / r%d", run.experiment.reference ? "Reference" : run.experiment.gpu ? "GPU" : "CPU",
+                run.experiment.workers, run.experiment.gpu ? run.experiment.batch : 64, run.experiment.round);
+            ImGui::TableNextColumn(); ImGui::Text("%.0f", s.elapsed > 0 ? s.evaluated / s.elapsed : 0);
+            ImGui::TableNextColumn(); ImGui::Text("%llu / %llu", static_cast<unsigned long long>(s.scored), static_cast<unsigned long long>(s.pruned));
+            ImGui::TableNextColumn(); ImGui::Text("%llu", static_cast<unsigned long long>(run.audited));
+            ImGui::TableNextColumn(); ImGui::TextUnformatted(run.topMatch ? "PASS" : s.phase == practice::SearchPhase::Completed ? "FAIL" : gpu_dev::SearchStatus(s.phase));
         }
-        ImGui::TextDisabled("One CPU worker. Scoring only; ratios above 1.00x favor the hybrid. Partial passes are excluded.");
-        if (ImGui::CollapsingHeader("Per-pass timings") &&
-            ImGui::BeginTable("GpuDevPairs", 7, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp, ImVec2(0, 230)))
-        {
-            for (const char *column : {"Round / batch", "CPU ms", "Hybrid ms", "GPU kernel ms", "Readback host ms", "Timestamp batches", "Errors"})
-                ImGui::TableSetupColumn(column);
-            ImGui::TableHeadersRow();
-            for (const auto &p : report->timings)
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn(); ImGui::Text("%d / %d%s", p.pair, p.batch, p.complete ? "" : " (partial)");
-                ImGui::TableNextColumn(); ImGui::Text("%.2f", p.cpuMs);
-                ImGui::TableNextColumn(); ImGui::Text("%.2f", p.gpuMs);
-                ImGui::TableNextColumn();
-                if (p.timestampBatches && !p.timestampInvalid) ImGui::Text("%.2f", p.gpuKernelMs);
-                else ImGui::TextDisabled(p.timestampBatches ? "partial; see JSON" : "unavailable");
-                ImGui::TableNextColumn(); ImGui::Text("%.2f", p.hostReadbackMs);
-                ImGui::TableNextColumn(); ImGui::Text("%d valid / %d invalid", p.timestampBatches, p.timestampInvalid);
-                ImGui::TableNextColumn(); ImGui::Text("%d", p.mismatches);
-            }
-            ImGui::EndTable();
-        }
-        if (ImGui::CollapsingHeader("Frame observations by load phase") &&
-            ImGui::BeginTable("GpuDevFrames", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
-        {
-            for (const char *column : {"Phase / batch", "Frames", "Interval p95 ms", "Interval p99 ms", "Game FPS snapshots"})
-                ImGui::TableSetupColumn(column);
-            ImGui::TableHeadersRow();
-            for (const auto &p : report->observations.phases)
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn(); ImGui::Text("%s / %d", gpu_dev::PhaseName(p.phase), p.batch);
-                ImGui::TableNextColumn(); ImGui::Text("%llu", static_cast<unsigned long long>(p.intervals.count));
-                ImGui::TableNextColumn(); ImGui::Text("%.1f", p.intervals.P95());
-                ImGui::TableNextColumn(); ImGui::Text("%.1f", p.intervals.Quantile(.99));
-                ImGui::TableNextColumn(); ImGui::Text("%.1f", p.gameSamples ? p.gameFpsSum / p.gameSamples : 0);
-            }
-            ImGui::EndTable();
-        }
-        if (!report->error.empty()) ImGui::TextWrapped("%s", report->error.c_str());
-        if (!report->exportError.empty()) ImGui::TextWrapped("JSON export: %s", report->exportError.c_str());
-        if (suite_ui::Button("Export JSON"))
-        {
-            try
-            {
-                auto path = g_gpuDev.directory / ("gpu-dev-export-" + std::to_string(gpu_dev::UtcMs()) + ".json");
-                gpu_dev::Save(path, *report);
-                exportStatus = "JSON exported. Open the report folder to share it.";
-            }
-            catch (const std::exception &e) { exportStatus = e.what(); }
-        }
-        ImGui::SameLine();
-        if (suite_ui::Button("Open reports"))
-        {
-            std::error_code ec;
-            std::filesystem::create_directories(g_gpuDev.directory, ec);
-            if (!ec) ShellExecuteW(nullptr, L"open", g_gpuDev.directory.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
-            else exportStatus = ec.message();
-        }
-        if (!report->savedPath.empty()) ImGui::TextDisabled("JSON checkpoint saved automatically. Successful examples are sampled; all layouts are checked.");
+        ImGui::EndTable();
     }
-    if (!exportStatus.empty()) ImGui::TextWrapped("%s", exportStatus.c_str());
-    ImGui::Spacing();
-    Help("The normal seed search stays on CPU. Device preparation, warmup, idle baseline, comparisons and JSON writes are excluded from scoring timings. Hybrid time includes packing, transfers, GPU execution, readback, CPU pickup scoring and timing collection. GPU timestamps follow the device timeline and can include game contention. Frame histograms cover the whole run; game FPS are shared snapshots, not a controlled OBS benchmark.");
+    if (!state->directory.empty() && suite_ui::Button("Open results / Dev4-Summary.json"))
+    {
+        auto path = std::filesystem::path(state->directory);
+        ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    }
+    ImGui::TextDisabled("Prepared geometry is shared. Timed searches include generation, filtering, bounds, scoring, audits and Top10 ranking.");
 }

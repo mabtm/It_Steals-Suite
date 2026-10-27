@@ -271,6 +271,9 @@ struct SeedSearchRequest
     uint32_t serial = 0, session = 0;
     std::string hash;
     bool fast = false, live = true, layoutOnly = false, allowPortable = true;
+#ifdef SUITE_GPU_DEV
+    bool exhaustive = false;
+#endif
     SearchCriteria criteria;
 };
 
@@ -434,6 +437,9 @@ class SeedSearch
         bool inputComplete = false, failed = false;
         uint64_t received = 0, token = 0;
         Clock::time_point started = Clock::now();
+#ifdef SUITE_GPU_DEV
+        std::function<void(uint64_t, const Selection &, const RouteResult &)> audit;
+#endif
     };
 
     std::shared_ptr<const SeedSearchState> current = std::make_shared<SeedSearchState>();
@@ -643,7 +649,11 @@ class SeedSearch
                             if (!cached)
                                 estimated += workspace.estimated;
                             if (criteria.objective == SearchObjective::ShortestRoute &&
-                                std::isfinite(boundCutoff))
+                                std::isfinite(boundCutoff)
+#ifdef SUITE_GPU_DEV
+                                && !job->state.request.exhaustive
+#endif
+                            )
                             {
                                 lower = cached ? entry.lower
                                                : MstRouteLowerBound(workspace.matrix.data(), count, canceled);
@@ -690,6 +700,9 @@ class SeedSearch
                             scored++;
                             if (!score.complete)
                                 throw std::runtime_error("Route solver failed for a finite distance matrix");
+#ifdef SUITE_GPU_DEV
+                            if (job->audit) job->audit(batch->offset + i, selection, score);
+#endif
                             {
                                 matched++;
                                 uint64_t index = batch->offset + i;
@@ -942,6 +955,65 @@ class SeedSearch
     }
 
   public:
+#ifdef SUITE_GPU_DEV
+    // Benchmark the production worker without IPC or preview rendering. Map
+    // preparation is shared by all configurations and reported separately.
+    static SeedSearchState RunFrozen(std::shared_ptr<const MapAnalysis> source,
+        const SearchDistances &distances, SeedSearchRequest request, const Cancel &canceled,
+        const std::function<void(uint64_t)> &progress = {},
+        const std::function<void(uint64_t, const Selection &, const RouteResult &)> &audit = {})
+    {
+        SeedSearch engine;
+        auto job = std::make_shared<Job>();
+        job->state.request = request;
+        job->state.source = std::move(source);
+        job->state.portable = true;
+        job->state.phase = SearchPhase::Searching;
+        job->state.navigationModel = distances.ModelName();
+        job->audit = audit;
+        std::vector<std::thread> workers;
+        std::atomic<int> done{0};
+        try
+        {
+            if (!job->state.source || !job->state.source->data || !request.count ||
+                request.count > SeedSpace || request.workers < 1 || request.workers > 6 || !request.criteria.Valid())
+                throw std::runtime_error("Invalid frozen search request");
+            if (!job->state.source->data->Verified() || job->state.source->data->rngStatus != 2 ||
+                job->state.source->data->rngProbes != 4160) throw std::runtime_error("Frozen search RNG is not verified");
+            auto error = request.criteria.CheckCatalog(*job->state.source->data, true);
+            if (!error.empty()) throw std::runtime_error(error);
+            for (int i = 0; i < request.workers; i++)
+                workers.emplace_back([&] {
+                    engine.RouteWorker(job, &distances);
+                    done.fetch_add(1);
+                    job->changed.notify_all();
+                });
+            while (done.load() < request.workers)
+            {
+                if (canceled()) job->canceled = true;
+                if (progress) progress(engine.Snapshot(job).evaluated);
+                std::unique_lock lock(job->gate);
+                job->changed.wait_for(lock, std::chrono::milliseconds(20), [&] {
+                    return done.load() == request.workers;
+                });
+            }
+        }
+        catch (const std::exception &e)
+        {
+            job->canceled = true;
+            job->changed.notify_all();
+            std::lock_guard lock(job->gate);
+            job->failed = true;
+            job->state.error = e.what();
+        }
+        for (auto &worker : workers) if (worker.joinable()) worker.join();
+        auto result = engine.Snapshot(job);
+        result.phase = job->failed ? SearchPhase::Failed : canceled() ? SearchPhase::Stopped
+            : result.evaluated == request.count ? SearchPhase::Completed : SearchPhase::Failed;
+        if (progress) progress(result.evaluated);
+        return result;
+    }
+#endif
     SeedSearch() = default;
     SeedSearch(const SeedSearch &) = delete;
 

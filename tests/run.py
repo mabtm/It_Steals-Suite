@@ -86,6 +86,7 @@ def arguments(name, work, fixtures):
         "settings_tests": [work],
         "game_launch_tests": [work],
         "gpu_dev_report_tests": [work],
+        "gpu_dev_search_tests": [fixtures, work],
         "startup_logos_tests": [work],
         "update_tests": [work],
         "clip_camera_tests": [work],

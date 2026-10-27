@@ -1,85 +1,94 @@
-# PracticeSuite 7.19.0 — GPU Dev 3
+# PracticeSuite 7.19.0 — GPU Dev 4
 
-Dev 3 targets maximum scoring throughput. It reuses fixed map data on the GPU,
-transmits selected point IDs, and submits the next batch before CPU pickup
-scoring of the preceding results. It uses the existing 7.19.0 mod and protocol.
+Dev 4 runs the complete benchmark sequence automatically. Select the physical
+GPU, leave **Outside + Classic Bonus** and **Full comparison** selected, and
+press **Start automatic test suite** in **Practice → Seed Map → GPU Dev**.
+The suite loads each map in Practice, waits for a fresh verified capture, runs
+all configurations, saves the reports and advances to the next map. The menu
+may be closed. No individual worker/batch toggles or manual map changes are
+needed. Existing 7.19.0 mod/protocol installations remain compatible.
 
-1. Exit the running suite completely. Extract the dev ZIP into its own folder,
-   start `ItStealsTrainer.exe`, and check that its title says **GPU DEV 3**.
-2. Load **Practice**, open **Seed Map → GPU Dev**, and select the physical GPU.
-3. Leave **Shared map data (Dev 3)** and **Overlap GPU work with CPU pickup
-   scoring** enabled. Run **Batch sweep**, followed by **Endurance**, for Hide
-   and Seek Outside and Classic Bonus. Keep the same scene loaded.
-4. For a direct input/preparation control, repeat a profile with **Shared map
-   data** and **Overlap** disabled, leaving **Reuse previous test's seed key**
-   enabled. This uses the Dev 2 matrix/sort path at the same batch sizes.
-5. Share the JSON files through **Open reports**. They are saved automatically
-   after each paired pass and at completion, stop or error. There is no upload.
+Exit the previous suite completely before starting this dev portable build in
+its own folder. Its title says **GPU DEV 4**. This is a separate prerelease;
+the stable updater remains on 7.19.0.
 
-| Profile | Layouts | Rounds | Batch sizes | Paired checks |
-|---|---:|---:|---|---:|
-| Quick check | 1,024 | 4 | 256 | 4,096 |
-| Batch sweep | 4,096 | 6 | 256, 512, 1,024, 2,048 | 98,304 |
-| Endurance | 8,192 | 12 | 256, 512, 1,024, 2,048 | 393,216 |
+| Profile | Seeds per search | Repetitions | Tests for both maps |
+|---|---:|---:|---:|
+| Quick validation | 2,048 | 1 | 56 |
+| Full comparison (default) | 16,384 | 3 | 152 |
 
-All configurations use the same frozen selections. Full batches are warmed;
-batch order rotates by round and full CPU/GPU pass order alternates. One CPU
-worker supplies the reference. GPU work is not paced to preserve game FPS.
-Closing the menu permits the test to continue. Scene/process changes and clean
-speedruns stop it. Stop may wait for an already submitted batch to finish.
+For each map, the sequence is:
 
-Previously, each layout needed a CPU matrix fill, neighbor sorts and 33,292
-bytes of dynamic GPU input. Dev 3 flattens and uploads the fixed map distances
-and global neighbor order once. Each layout then needs only 53 padded node IDs
-and a count: **216 bytes**, approximately **154 times less dynamic input**.
-Output buffers and the one-time catalog are separate and exported in the JSON.
-The GPU gathers the FP64 matrix and filters global neighbors with a selected
-point bitmask and population-count ranks. Local neighbor indices are packed
-as pairs of 16-bit integers, keeping shared memory below the shader limit;
-route distances and calculations remain double precision. Equal-distance ties
-preserve the CPU's local-index order. Noncanonical/duplicate/out-of-range point
-selections are rejected before dispatch. Verified portable RNG produces the
-required distinct descending catalog IDs, with catalogs up to 1,024 points.
+1. Exhaustive production CPU reference, one worker, no Top10 pruning.
+2. Production CPU searches with 1, 2, 3, 4, 5 and 6 workers.
+3. GPU searches with 1–6 CPU preparation/pickup workers at each batch size:
+   512, 1,024 and 2,048. There is one GPU owner/context, not six GPUs.
+4. Spawn-filter validation: exhaustive reference, six-worker CPU and six-worker
+   GPU, using the first 1,024 seeds (spawn #1 in the UI / index 0 in JSON).
 
-After a result is copied to host-owned vectors, the next batch can be submitted
-before pickup scoring begins. Ordered GPU commands reuse the same buffers;
-there is one pending batch and no extra staging ring. This overlaps GPU work
-with CPU pickup scoring. Disabling Overlap restores serial submission/scoring.
-The worker now runs at normal CPU priority. Game rendering and normal search
-settings are not changed by this experiment.
+The CPU/GPU configuration order rotates between repetitions. All runs within
+a map use the same capture, search key, recipe and shortest-route objective.
+The normal search settings and any user spawn filter are not copied into the
+benchmark: its primary scenario explicitly tests all spawns, followed by its
+separate fixed spawn-filter check. Other maps are not part of this sequence.
 
-Reports use schema `practice-suite.gpu-dev.v3` and live at
-`%LOCALAPPDATA%/ItStealsPracticeSuite/Diagnostics/GpuDev`. They include source
-build, input mode, overlap setting, per-layout input bytes, fixed catalog bytes,
-catalog setup cost, paired CPU/hybrid wall time, worker CPU time, packing,
-host submission/readback, CPU pickup and GPU timeline measurements. GPU kernel
-time now includes the on-GPU catalog gathering/filtering. GPU/CPU timelines may
-overlap and must not be added as if they were serial costs. Hybrid wall time
-includes the complete measured host path and query collection. Preparation,
-warmup, verification, checkpoints and exports remain outside scoring rates.
-Use **GPU timing queries** off for an instrumentation control with the same key.
-Unsupported/disjoint GPU timestamps are null, with explicit validity counts.
+Reports are stored in a timestamped folder under
+`%LOCALAPPDATA%/ItStealsPracticeSuite/Diagnostics/GpuDev/Dev4-<timestamp>`.
+Each completed or interrupted test receives a descriptive file name, for example
+`hide-seek-outside_gpu-w6-b1024-r2-all-spawns-n16384.json`. One cumulative
+**Dev4-Summary.json** contains every result and the shared map/hardware/setup
+metadata. It is atomically replaced after each test and saved on completion,
+stop or error. Use **Open results / Dev4-Summary.json** and share that one file.
+There is no upload. A timeout, route mismatch or Top10 mismatch stops the queue
+and retains earlier results and the error; it never proceeds as if validation
+passed. Map capture has a three-minute timeout. Stop may wait for a submitted
+GPU dispatch or worker packet. Returning to Clean mode or disconnecting stops
+the suite. Captured geometry remains frozen during each map's experiments.
 
-Every layout is strictly compared: visit order, final length, pickup contacts,
-completion/exact/estimate flags and raw center length. Reports retain bounded
-successful examples, first failures, reproducer matrices and per-pass digests.
-A zero mismatch count covers every checked layout, including omitted examples.
-The normal multi-worker seed search still uses its CPU backend. This build is
-a scoring-path experiment; its rates are not complete seed-search throughput.
+These are **complete searches from a prepared frozen map**, including verified
+portable RNG, spawn filtering, safe MST/refined route bounds, route solving,
+pickup scoring, duplicate-layout ranking, strict audits and Top10 selection.
+CPU runs reuse the actual production RouteWorker implementation and its caches;
+a dev-only synchronous entry bypasses IPC/preview rendering and allows an
+exhaustive reference. GPU workers generate/filter/bound candidates in bounded
+packets; the GPU owner returns visit orders, while CPU workers finish pickup
+scoring and rank results in parallel. GPU packets have no per-worker route
+cache; cache-hit and pruning counts can legitimately differ from CPU runs.
+A real 64-candidate bootstrap establishes the GPU pruning cutoff; the exhaustive
+reference's winners are never supplied to the pruning algorithm.
 
-The five physical Dev 2 reports (Ryzen 5 3600 / RX 5700 XT) had zero mismatches
-in 1,081,344 timed comparisons. Endurance batch 256 reached 4,720 layouts/s
-Outside (3.10x one CPU worker) and 8,438/s Classic Bonus (2.34x). CPU packing
-accounted for 51–53% of hybrid wall time; GPU output copy intervals were below
-0.1%. The no-query control had similar scoring rates. These results motivate
-Dev 3; they do not predict its performance. The new physical-GPU reports decide
-whether moving preparation to the GPU and larger batches improve total time.
+Every scored CPU/GPU result is checked against the exhaustive CPU result for
+that seed index, including the selected layout, route order, final double length, pickup contacts,
+completion/exact/estimate flags. GPU raw center lengths are also checked before
+pickup scoring. Every completed search must produce the same ordered Top10 as
+its exhaustive reference. Filter validation has its own reference. Bounds may
+skip scoring candidates proven outside Top10; all candidates are still counted
+as evaluated, filtered or pruned. Original frozen-score equality and ranking
+rules remain unchanged. Parallel scheduling may change how much work is pruned.
 
-The Windows probe checks both embedded shader variants, full/tail batches,
-1,024-point masks, tied/directed inputs, strict route scores, legacy/catalog
-parity, overlapping submission, cancellation and atomic JSON checkpoints.
-Functional CI may use Microsoft's software adapter and is not a physical-GPU
-performance result.
+Per-run JSON (`practice-suite.gpu-search.v4`) reports the source build, capture
+catalog key, mode, worker/batch/round/filter settings, evaluated/generated/
+scored/pruned/filtered/cache-hit/audited counts, elapsed time, seeds/s, exact
+Top10, GPU timing coverage and errors. Shared map reports include game/RNG/GPU/
+driver identity, geometry preparation, shader/device/catalog setup and warmup.
+The summary schema is `practice-suite.gpu-suite.v4`; `plan` records the complete
+request even if map acquisition fails. Buffer resizing and timing collection
+are included in GPU search time; geometry/device/catalog setup and warmup are
+shared and reported separately. Repetitions therefore measure warm searches.
+GPU query intervals can overlap CPU work and must not be added to wall time.
+Live Unity generation, game scene-loading time and preview rendering are not
+part of the per-search rate. CPU worker priority follows production behavior.
 
-This is a separate GitHub prerelease. The stable updater remains on 7.19.0.
-Close Dev 3 and launch the normal installation to return to the stable suite.
+This benchmark still lives in the dev test tab; the normal search's selectable
+backend is unchanged. The full-search results determine whether and how to
+adopt the GPU pipeline. Dev 3 scoring rates (16,822/s Outside and 30,031/s Classic
+Bonus on RX 5700 XT) were not full-search rates; Dev 4 provides that missing
+comparison with the production CPU worker counts.
+
+Automated checks cover real production CPU workers 1–6, strict exhaustive score
+and Top10 parity, spawn filtering, alternate objective correctness, bad GPU
+outputs, cancellation and bounded queues. Windows additionally exercises the
+actual embedded shaders and the automatic two-map orchestration with fixture
+captures, stale-capture rejection, named reports and one summary. Software
+adapters are allowed only by explicit test parameters; CI functional results
+are not physical-GPU performance measurements or a live Unity navigation test.
