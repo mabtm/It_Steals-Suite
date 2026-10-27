@@ -30,7 +30,10 @@ function Build-Benchmark([string]$Target, [string]$Options) {
 function Run-Benchmark([string]$Binary, [string]$Fixture, [int]$Crystals, [int]$Count, [string]$Radius) {
     $map = Join-Path $root ('tests/fixtures/' + $Fixture + '.routefixture')
     $text = @(& $Binary $map $Count $Crystals 1 search $Radius)
-    if ($LASTEXITCODE -ne 0) { throw 'Search benchmark execution failed.' }
+    if ($LASTEXITCODE -ne 0) {
+        $text | Write-Output
+        throw "Search benchmark failed: $Binary, $Fixture, radius=$Radius, exit=$LASTEXITCODE"
+    }
     $line = $text | Where-Object { $_ -like 'search,*' } | Select-Object -Last 1
     if (-not $line) { throw 'Benchmark result is missing.' }
     return [string]$line
@@ -47,10 +50,12 @@ $runtime = Get-ChildItem (Join-Path $studio 'VC/Tools/MSVC') -Filter pgort140.dl
     Where-Object { $_.DirectoryName -match 'bin\\Hostx64\\x64$' } |
     Sort-Object FullName -Descending | Select-Object -First 1
 if ($runtime) { Copy-Item $runtime.FullName $out }
-Run-Benchmark $trained 'hide-seek-outside-boxes' 52 1500 '1.35' | Out-File (Join-Path $out 'training.log')
-Run-Benchmark $trained 'hide-seek-outside-boxes' 52 1000 '0.5' | Out-File (Join-Path $out 'training.log') -Append
-Run-Benchmark $trained 'hide-seek-outside-boxes' 52 1000 '0' | Out-File (Join-Path $out 'training.log') -Append
-Run-Benchmark $trained 'hide-seek-boxes' 22 1000 '1.35' | Out-File (Join-Path $out 'training.log') -Append
+# Atomic instrumentation is intentionally much slower. These representative
+# layouts already exercise millions of inner-loop branches without timing out.
+Run-Benchmark $trained 'hide-seek-outside-boxes' 52 128 '1.35' | Out-File (Join-Path $out 'training.log')
+Run-Benchmark $trained 'hide-seek-outside-boxes' 52 128 '0.5' | Out-File (Join-Path $out 'training.log') -Append
+Run-Benchmark $trained 'hide-seek-outside-boxes' 52 256 '0' | Out-File (Join-Path $out 'training.log') -Append
+Run-Benchmark $trained 'hide-seek-boxes' 22 256 '1.35' | Out-File (Join-Path $out 'training.log') -Append
 if (-not (Test-Path $pgoDatabase)) { throw 'PGO training database was not produced.' }
 Build-Benchmark $trained ('/USEPROFILE:PGD="' + $pgoDatabase + '"')
 

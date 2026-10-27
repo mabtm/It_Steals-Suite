@@ -26,8 +26,7 @@ class ContactBoundLab
 
   public:
     template <class Cost>
-    ContactBoundLab(std::span<const size_t> contacts, const Cost &read,
-                    const std::function<bool()> &canceled)
+    ContactBoundLab(std::span<const size_t> contacts, const Cost &read, const std::function<bool()> &canceled)
         : count(contacts.size())
     {
         if (count > 256)
@@ -94,7 +93,9 @@ class ContactBoundLab
             if (i == 0)
                 sum = one;
             else if (nodes.size() == 2)
-                return std::isfinite(one) ? std::max(0., one * (1 - 64 * std::numeric_limits<double>::epsilon())) : 0;
+                return std::isfinite(one)
+                           ? std::max(0., one * (1 - 64 * std::numeric_limits<double>::epsilon()))
+                           : 0;
             else
             {
                 sum += two;
@@ -104,8 +105,8 @@ class ContactBoundLab
         double value = .5 * (sum + endpoint);
         // Conservative rounding allowance, including cancellation in the
         // unknown endpoint correction. Nonfinite relaxation safely does no pruning.
-        double error = std::numeric_limits<double>::epsilon() *
-                       (std::abs(sum) + std::abs(endpoint)) * (8 * nodes.size() + 32);
+        double error = std::numeric_limits<double>::epsilon() * (std::abs(sum) + std::abs(endpoint)) *
+                       (8 * nodes.size() + 32);
         return std::isfinite(value) && std::isfinite(error) ? std::max(0., value - error) : 0;
     }
 
@@ -147,14 +148,29 @@ class ContactBoundLab
                         {
                             double cost = row[w] + penalty[w];
                             if (cost < a)
-                            { b = a; bi = ai; a = cost; ai = w; }
+                            {
+                                b = a;
+                                bi = ai;
+                                a = cost;
+                                ai = w;
+                            }
                             else if (cost < b)
-                            { b = cost; bi = w; }
+                            {
+                                b = cost;
+                                bi = w;
+                            }
                         }
                     if (a + penalty[v] < one[v])
-                    { one[v] = a + penalty[v]; single[v] = ai; }
+                    {
+                        one[v] = a + penalty[v];
+                        single[v] = ai;
+                    }
                     if (a + b + 2 * penalty[v] < two[v])
-                    { two[v] = a + b + 2 * penalty[v]; left[v] = ai; right[v] = bi; }
+                    {
+                        two[v] = a + b + 2 * penalty[v];
+                        left[v] = ai;
+                        right[v] = bi;
+                    }
                 }
                 magnitude = std::max(magnitude, std::abs(penalty[v]));
                 if (i == 0)
@@ -165,7 +181,10 @@ class ContactBoundLab
                     penaltySum += penalty[v];
                     double delta = one[v] - two[v] + 2 * penalty[v];
                     if (delta < correction)
-                    { correction = delta; endpoint = v; }
+                    {
+                        correction = delta;
+                        endpoint = v;
+                    }
                 }
             }
             double value = .5 * (sum + correction) - penalty[nodes[0]] - 2 * penaltySum;
@@ -181,9 +200,16 @@ class ContactBoundLab
             {
                 int v = nodes[i];
                 if (i == 0 || v == endpoint)
-                { gradient[v] -= .5; gradient[single[v]] += .5; }
+                {
+                    gradient[v] -= .5;
+                    gradient[single[v]] += .5;
+                }
                 else
-                { gradient[v] -= 1; gradient[left[v]] += .5; gradient[right[v]] += .5; }
+                {
+                    gradient[v] -= 1;
+                    gradient[left[v]] += .5;
+                    gradient[right[v]] += .5;
+                }
             }
             double norm = 0;
             for (int v : nodes)

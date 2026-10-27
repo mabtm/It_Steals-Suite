@@ -19,9 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Exhaustive contact-bound checks
-        run: python3 tests/run.py --only contact_bound_tests route_bound_tests physical_seed_tests --jobs 2 --output build/research-checks
+        run: python3 tests/run.py --only contact_bound_tests gpu_order_kernel_tests route_bound_tests physical_seed_tests --jobs 2 --output build/research-checks
       - name: Contact-bound memory and undefined-behavior checks
-        run: python3 tests/run.py --sanitize --only contact_bound_tests --jobs 1 --output build/research-sanitizers
+        run: python3 tests/run.py --sanitize --only contact_bound_tests gpu_order_kernel_tests --jobs 1 --output build/research-sanitizers
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -44,4 +44,19 @@ jobs:
         with:
           name: msvc-seed-research
           path: build/algorithm-windows-lab
+          retention-days: 14
+
+  gpu-kernel:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Compile FP64 shader and validate when a capable device exists
+        shell: powershell
+        run: .\tests\gpu_order_windows_lab.ps1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: gpu-order-research
+          path: build/gpu-order-lab
           retention-days: 14
