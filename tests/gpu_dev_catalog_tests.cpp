@@ -19,6 +19,9 @@ int main()
                 practice::Selection selection; selection.spawn = 2;
                 for (int i = 0; i < n; i++) selection.crystals.push_back((points - 1) * (n - 1 - i) / std::max(1, n - 1));
                 uint32_t ids[53]{}; catalog.Pack(selection, ids);
+                std::vector<double> triangle(size_t(n + 1) * (n + 2) / 2);
+                for (int a = 0; a <= n; a++) for (int b = 0; b <= a; b++)
+                    triangle[TriangleIndex(a, b)] = catalog.edges[size_t(ids[a]) * catalog.side + ids[b]];
                 uint32_t mask[32]{};
                 for (int id : selection.crystals) mask[id / 32] |= uint32_t{1} << (id & 31);
                 for (int from = 0; from <= n; from++)
@@ -27,6 +30,7 @@ int main()
                         int a = int(ids[std::min(from, to)]), b = int(ids[std::max(from, to)]);
                         double expected = from == to ? 0. : edge(a, b);
                         assert(catalog.edges[size_t(ids[from]) * catalog.side + ids[to]] == expected);
+                        assert(std::bit_cast<uint64_t>(triangle[TriangleIndex(from, to)]) == std::bit_cast<uint64_t>(expected));
                     }
                 for (int from = 0; from < n; from++)
                 {
@@ -46,6 +50,13 @@ int main()
                         actual.push_back(above + std::popcount(mask[word] & (0xfffffffeu << bit)));
                     }
                     assert(actual == expected);
+                    for (int bits : {8, 16})
+                    {
+                        std::array<uint32_t, 26> packed{};
+                        int perWord = 32 / bits;
+                        for (int i = 0; i < n; i++) packed[i / perWord] |= uint32_t(actual[i]) << ((i % perWord) * bits);
+                        for (int i = 0; i < n; i++) assert(((packed[i / perWord] >> ((i % perWord) * bits)) & ((1u << bits) - 1)) == uint32_t(expected[i]));
+                    }
                     checked++;
                 }
                 auto rejects = [&](practice::Selection bad) {
@@ -58,5 +69,10 @@ int main()
                     bad = selection; std::swap(bad.crystals[0], bad.crystals[1]); assert(rejects(bad)); }
             }
         }
+    assert(ShapeFor(ShaderKind::Generic).SharedBytes() == 29112);
+    assert(ShapeFor(ShaderKind::Triangle).SharedBytes() == 18088);
+    assert(ShapeFor(ShaderKind::Compact).SharedBytes() == 15384);
+    assert(ShapeFor(ShaderKind::CompactFixed, 22).SharedBytes() == 3464);
+    assert(ShapeFor(ShaderKind::CompactFixed, 40).SharedBytes() == 9672);
     std::cout << checked << " catalog neighbor rows: directed table orientation, ties, sparse/1024-point masks, highest bits and invalid selections: PASS\n";
 }

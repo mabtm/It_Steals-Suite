@@ -232,13 +232,13 @@ inline void Number(std::ostream &out, double value)
         out << "null";
 }
 
-template <class T> inline void Array(std::ostream &out, const std::vector<T> &values)
+template <class Range> inline void Array(std::ostream &out, const Range &values)
 {
     out << '[';
     for (size_t i = 0; i < values.size(); i++)
     {
         if (i) out << ',';
-        if constexpr (std::is_floating_point_v<T>) Number(out, values[i]);
+        if constexpr (std::is_floating_point_v<typename Range::value_type>) Number(out, values[i]);
         else out << values[i];
     }
     out << ']';
@@ -271,9 +271,9 @@ inline std::string Json(const Report &r)
     std::ostringstream out;
     out.imbue(std::locale::classic());
     out << std::boolalpha << std::setprecision(17);
-    out << "{\n\"schema\":\"practice-suite.gpu-dev.v5\",\n\"version\":";
+    out << "{\n\"schema\":\"practice-suite.gpu-dev.v6\",\n\"version\":";
     Quote(out, suite_brand::Version);
-    out << ",\"channel\":\"GPU Dev 5\",\"sourceCommit\":";
+    out << ",\"channel\":\"GPU Dev 6\",\"sourceCommit\":";
 #ifdef SUITE_DEV_SOURCE_COMMIT
     Quote(out, SUITE_DEV_SOURCE_COMMIT);
 #else

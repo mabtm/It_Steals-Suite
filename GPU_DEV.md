@@ -1,115 +1,140 @@
-# PracticeSuite 7.19.0 — GPU Dev 5
+# PracticeSuite 7.19.0 — GPU Dev 6
 
-Dev 5 compares the Dev 4 GPU kernel with a shader specialized for the captured
-crystal count. It also measures bounds enabled, disabled and adaptive. No winner
-is assumed in advance; each candidate must retain the exhaustive CPU results.
-This remains a separate prerelease. The normal search backend and stable updater
-remain on the released CPU version.
+Dev 6 tests lossless shader-memory compression and a larger search pipeline.
+It first screens all shader variants, then compares the Dev 5 winner with the
+fastest compressed candidate using longer searches and different search keys.
+Every scored route and every final Top10 must match the exhaustive CPU reference.
+This is a separate prerelease; the normal search backend is unchanged.
 
-Close the previous suite completely, extract this portable build into its own
-folder and start it. The title says **GPU DEV 5**. The existing 7.19.0 mod/protocol
-is compatible. Open **Practice → Seed Map → GPU Dev**, select the physical GPU,
-leave the three-map/full-comparison defaults selected and press
-**Start automatic test suite** once. The suite loads Outside, Classic Bonus and
-Hide & Seek, waits for verified captures, runs the plan and exports automatically.
-The menu can be closed during the run.
+Close the previous suite, extract this portable build into its own folder and
+start it. Its title says **GPU DEV 6**. The 7.19.0 mod/protocol remains compatible.
+Open **Practice → Seed Map → GPU Dev**, select the physical graphics adapter,
+leave the three-map **Intensive research** defaults selected, and press
+**Start automatic test suite** once. Maps, captures, comparisons and export are
+automatic. The menu may be closed. The full run is substantially longer than
+Dev 5; there is no game-FPS throttle.
 
-| Profile | Seeds per search | Search keys | Repetitions | Tests for three maps |
-|---|---:|---:|---:|---:|
-| Quick validation | 2,048 | 1 | 1 | 69 |
-| Full comparison (default) | 16,384 | 3 | 3 | 549 |
+| Profile | Screening seeds | Stress seeds: Outside / Classic Bonus | Stress seeds: Hide & Seek | Keys per stage | Rounds | Total tests |
+|---|---:|---:|---:|---:|---:|---:|
+| Quick validation | 2,048 | 2,048 | 2,048 | 1 | 1 | 138 |
+| Intensive research | 16,384 | 65,536 | 262,144 | 3 | 3 | 1,116 |
 
-Full comparison is a larger test than Dev 4. The map scope can also be limited
-to Outside + Classic Bonus, or the current supported map. Maps with 15 or fewer
-crystals require a separate exact GPU algorithm and are not enabled here.
+Totals assume all three maps. Outside + Classic Bonus or the current supported
+map can also be selected. Maps with 15 or fewer crystals still require a
+separate exact GPU search algorithm and are not enabled in this suite.
 
-## What is measured
+## Shader variants
 
-For every map and search key:
+All variants retain FP64 distances, the same route algorithm, tie-breaking,
+pickup scoring and strict equality checks. Global catalog IDs remain 32-bit.
+Only local neighbor indices, which are at most 51, are packed into 8-bit fields.
+The triangular variants store the already-symmetric captured distance matrix
+once, including its diagonal, rather than duplicating its two halves. They are
+explicitly rejected for directed legacy matrix inputs.
 
-1. Exhaustive production CPU reference, one worker, no Top10 pruning.
-2. The production six-worker CPU search as the practical baseline.
-3. GPU searches with two CPU preparation/pickup helpers, generic and specialized
-   shaders, each at batches 512, 1,024 and 2,048 and all three bounds policies.
-4. Separate spawn-filter checks: exhaustive reference, production CPU, and
-   specialized GPU/adaptive bounds, using the first 1,024 seeds or fewer.
+| Variant | Distance tile | Local neighbor bits | Crystal count |
+|---|---|---:|---|
+| generic | full | 16 | dynamic, capacity 52 |
+| fixed | full | 16 | captured count fixed at compilation |
+| triangle | triangular | 16 | dynamic, capacity 52 |
+| compact | triangular | 8 | dynamic, capacity 52 |
+| compact-fixed | triangular | 8 | captured count fixed at compilation |
 
-The CPU baseline and 18 GPU configurations rotate between rounds and keys.
-Dev 4 already compared helper counts 1–6; Dev 5 concentrates on its measured
-near-optimal two-helper setup instead of repeating that sweep. The three 64-bit
-search keys are deterministic offsets of the base key; the actual keys are
-stored as decimal strings. All configurations for a map/key use the same
-capture, seed sequence, recipe and shortest-route objective. The usual search's
-spawn filter and other search settings are not copied into these comparisons.
+At 52 crystals the generic shader declares 29,112 shared bytes, triangle 18,088,
+and compact 15,384. Compact-fixed declares 9,672 bytes at 40 crystals and 3,464
+at 22. These are source-declared group-local allocations, not measured GPU
+utilization, VRAM totals or guaranteed speedups. Fixed variants use 32 threads
+up to 32 crystals, 64 above; dynamic variants retain 64. All five shaders are
+compiled and warmed before search timings. Compilation costs are reported
+separately; generic compilation is included in shared device setup time.
 
-The generic shader retains 64 threads and capacity for 52 crystals. Specialized
-shaders use the exact captured count as a compile-time constant, smaller local
-arrays, and 32 threads up to 32 crystals / 64 above that. The algorithm, FP64
-precision, tie-breaking, route refinement and pickup scoring stay the same.
+## Automatic plan
 
-| Crystal count | Generic declared shared bytes | Specialized declared shared bytes |
-|---|---:|---:|
-| 22 (Hide & Seek) | 29,112 | 5,928 |
-| 40 (Classic Bonus) | 29,112 | 17,832 |
-| 52 (Outside) | 29,112 | 29,112 |
+For each map, **screening** uses three keys and three rounds. Each key starts
+with an exhaustive one-worker CPU reference. The comparisons cover six-worker
+CPU bounds on/off; all five GPU variants with two CPU helpers, batch 2,048 and
+bounds off; and the Dev 5 winner with bounds on and count-adaptive bounds.
+There are 84 screening tests per map in the intensive profile.
 
-These are source-declared group-local allocations, not measured speedups or
-VRAM consumption. Outside's specialization fixes loop bounds but does not
-reduce those arrays. Actual full-search rates decide whether a variant wins.
-The device and both shaders are prepared and warmed before timed comparisons;
-specialization compilation time is reported separately under `shaderPreparation`.
-Generic shader compilation is included in the shared device setup time.
-The GPU timestamp pool also includes the initial 64-seed bootstrap dispatch,
-so the final partial batch is covered even at the smallest batch size.
+The long stage always retains the Dev 5 winner: generic for Outside, fixed for
+Classic Bonus and Hide & Seek. It selects one compressed candidate from triangle,
+compact and compact-fixed by median complete GPU kernel time. This avoids
+hiding a faster kernel behind CPU preparation/pickup bottlenecks. If any screening
+off-bounds run has incomplete, invalid or unavailable GPU timestamps, every
+candidate is compared using full search wall time instead. The chosen variant,
+metric, sample count and baseline/candidate medians are exported under
+`calibration`. A separate screening bounds recommendation compares actual full
+wall times for on/off/adaptive; it is not inferred from rejection counts.
+Neither recommendation silently changes the production search backend.
 
-Bounds **on** reproduces the existing GPU MST/refinement policy. **Off** fully
-scores every unfiltered candidate. **Adaptive** evaluates 64 bounds per worker;
-when fewer than two reject, it skips bounds for 512 subsequent eligible
-candidates, fully scoring them, then samples again. Skipping a bound never drops
-a seed. Bounds checks/skips and scored/pruned/filtered counts are exported so
-both the cost and usefulness can be evaluated. The CPU baseline is unchanged.
-The first 64 real candidates establish the GPU cutoff; reference winners are
-never fed into the search's pruning decisions.
+**Stress** uses three additional search keys that were not used for selection.
+Each starts with its own exhaustive reference at the full stress count. The
+comparisons are:
+
+- Production six-worker CPU with bounds on and off.
+- Baseline and selected compressed GPU: 2, 4 and 6 CPU helpers, each at batches
+  1,024, 2,048, 4,096 and 8,192, with bounds off.
+- Both GPU variants additionally at two helpers / batch 2,048 with bounds on
+  and count-adaptive bounds, to check whether larger searches change their value.
+- Spawn #1 / JSON index 0 at up to 65,536 seed candidates: exhaustive CPU
+  reference, six-worker CPU, baseline GPU (2 helpers / 2,048), compressed GPU
+  (6 helpers / 4,096) with bounds off and on.
+
+These are 288 stress/filter tests per map, 372 total per map. Configuration order
+rotates and reverses between rounds and shifts between keys. All comparisons
+within a map/stage/key share the capture, seed sequence, recipe and objective.
+The six actual 64-bit keys are exported as decimal strings. They are distinct
+permutation keys, not a guarantee that no individual seed overlaps across keys.
+
+Bounds off scores every unfiltered candidate. GPU count-adaptive bounds retain
+the Dev 5 rule (64 checks; skip 512 eligible bounds if fewer than two reject) as
+a control. The new timing-based recommendation is reported separately. CPU
+bounds-off uses the existing dev exhaustive flag to disable pruning, while
+retaining the production worker, scoring and caches. No reference winners are
+provided to GPU pruning; its first 64 real candidates establish its own cutoff.
+The reference score/layout arrays are held in RAM for the current map and
+reused between keys; work packets remain bounded to one per CPU helper.
 
 ## One complete export
 
-Each run folder contains exactly one **Dev5-Summary.json**, under:
+Each run folder contains exactly one **Dev6-Summary.json**:
 
-`%LOCALAPPDATA%/ItStealsPracticeSuite/Diagnostics/GpuDev/Dev5-<timestamp>`
+`%LOCALAPPDATA%/ItStealsPracticeSuite/Diagnostics/GpuDev/Dev6-<timestamp>`
 
-Use **Open results / Dev5-Summary.json** and share that one file. It contains
-all individual run results, full Top10 seed/layout/route data, actual keys,
-mode, shader/thread/shared-memory settings, bounds policy/counters, elapsed
-time, seeds/s, GPU timestamp coverage, hardware/driver/game/RNG identity and
-shared preparation metadata. No individual per-test JSON files are produced by
-the automatic suite. The summary is atomically replaced after checkpoints and
-saved on completion, cancellation or error. There is no automatic upload.
-Schemas are `practice-suite.gpu-suite.v5` and `practice-suite.gpu-search.v5`.
-The nested map reports are preparation metadata, not additional search results.
+Use **Open results / Dev6-Summary.json** and share that one file. No individual
+per-test JSON files are produced by the automatic suite. The summary contains
+all results, full Top10 seed/layout/route data, stage and actual key, shader
+shape/packing/shared bytes, helper/batch/bounds settings, calibration decisions,
+evaluated/scored/pruned/filtered/cache/audit counts, wall time, seeds/s, GPU timing
+coverage, and shared game/RNG/hardware/driver/preparation metadata. GPU bounds
+counters and CPU generation time are null where not instrumented, rather than
+presented as measured zero. Schemas are `practice-suite.gpu-suite.v6` and
+`practice-suite.gpu-search.v6`. Nested map reports contain preparation metadata.
 
-All scored results are strictly audited against the exhaustive CPU result for
-the same seed index, including selection, visit order, final double length,
-pickup contacts and result flags. Every completed configuration must produce the
-same ordered Top10 as its reference. References are rebuilt for each key and
-spawn-filter validation has its own Top10 reference. Mismatches stop the queue
-and preserve the results/error. A capture timeout is three minutes. Stop, Clean
-mode or disconnection cancels; an already submitted GPU dispatch may finish.
+The file is atomically checkpointed before/after searches and saved on completion,
+stop or error. There is no automatic upload. A timeout, selection/route mismatch
+or Top10 mismatch stops the queue and retains the results/error. Capture timeout
+is three minutes. Stop, Clean mode or process/session disconnection cancels; an
+already submitted GPU batch may finish first. Captured geometry stays frozen
+through both stages. Each stage/key rebuilds its exhaustive reference; filtered
+Top10 has a separate reference and uses the same key's full score/layout data.
 
-These are complete searches from a prepared frozen map: generation, filtering,
-bounds, scoring, audits, ranking, worker startup/join and GPU buffer setup/query
-collection are timed. Shared geometry/device/shader preparation and warmup are
-reported outside search time. Unity generation, scene loading and preview
-rendering are excluded. CPU priority follows production behavior; GPU helpers
-have normal priority. GPU intervals can overlap CPU work and must not be added
-to wall time. Host readback time includes waiting for GPU work and is not a
-standalone PCIe-transfer benchmark. Game FPS and OBS performance are not measured.
+Search times include generation, filtering, bounds, route/pickup scoring, strict
+audits, Top10 ranking, worker startup/join, GPU buffer resizing and timestamp
+collection. Geometry/device/shader preparation and warmup are shared outside
+search time. Unity generation, scene loading and preview rendering are excluded.
+CPU priority follows production; GPU helpers have normal priority. GPU intervals
+can overlap CPU work and must not be added to wall time. Host readback includes
+waiting for GPU work and is not a PCIe-only transfer measurement. No controlled
+OBS or game-FPS benchmark is included.
 
-Checks exercise production CPU workers 1–6, all bounds modes, strict score and
-Top10 parity, filtering, alternate objectives, bad outputs and cancellation.
-Windows additionally compiles the actual embedded shaders for small, odd,
-32-bit-mask-boundary and large counts; compares generic/specialized results;
-rejects wrong-sized inputs and pending shader switches; and runs a three-map,
-two-key automatic fixture plan with single-file Unicode-path exports and
-immediate Clean-mode cancellation. Software adapters are permitted only by
-explicit test parameters. CI checks correctness, not physical-GPU performance
-or navigation through a live Unity process.
+Tests cover bit-preserving triangular round trips, 8/16-bit local-index packing,
+1024-point catalogs and tie order; production CPU workers 1–6 and complete search
+parity; larger packet limits; distinct stage keys, plan counts and calibration
+including timestamp fallback. Windows tests the actual embedded shaders at small,
+odd, mask-boundary and large counts, rejects compression for directed legacy
+inputs, checks full/partial 8,192-layout batches and output guards, and runs the
+automatic three-map/two-key-per-stage fixture plan with Unicode paths, one-file
+exports and immediate Clean-mode cancellation. Software adapters are permitted
+only through explicit test parameters. CI establishes correctness, not physical
+GPU throughput or live Unity navigation behavior.

@@ -3,6 +3,45 @@
 
 namespace gpu_dev
 {
+enum class ShaderKind { Generic, Fixed, Triangle, Compact, CompactFixed };
+inline constexpr std::array<ShaderKind, 5> ShaderKinds{
+    ShaderKind::Generic, ShaderKind::Fixed, ShaderKind::Triangle, ShaderKind::Compact, ShaderKind::CompactFixed};
+inline const char *ShaderName(ShaderKind kind)
+{
+    constexpr const char *names[]{"generic", "fixed", "triangle", "compact", "compact-fixed"};
+    return names[int(kind)];
+}
+struct ShaderShape
+{
+    int capacity = 52, threads = 64, neighborBits = 16;
+    bool triangular = false, fixed = false;
+    int SharedBytes(bool catalog = true) const
+    {
+        int side = capacity + 1, perWord = 32 / neighborBits;
+        int tile = triangular ? side * (side + 1) / 2 : side * side;
+        return tile * 8 + threads * 12 + capacity * 4 +
+            (catalog ? 256 + 4 * capacity * ((capacity + perWord - 1) / perWord) : 0);
+    }
+};
+inline ShaderShape ShapeFor(ShaderKind kind, int crystals = 0)
+{
+    if (int(kind) < 0 || int(kind) >= int(ShaderKinds.size())) throw std::runtime_error("Invalid GPU shader variant");
+    ShaderShape shape;
+    shape.fixed = kind == ShaderKind::Fixed || kind == ShaderKind::CompactFixed;
+    if (shape.fixed)
+    {
+        if (crystals < 1 || crystals > 52) throw std::runtime_error("Invalid shader crystal count");
+        shape.capacity = crystals; shape.threads = crystals <= 32 ? 32 : 64;
+    }
+    shape.triangular = kind == ShaderKind::Triangle || kind == ShaderKind::Compact || kind == ShaderKind::CompactFixed;
+    shape.neighborBits = kind == ShaderKind::Compact || kind == ShaderKind::CompactFixed ? 8 : 16;
+    return shape;
+}
+inline size_t TriangleIndex(size_t a, size_t b)
+{
+    if (a < b) std::swap(a, b);
+    return a * (a + 1) / 2 + b;
+}
 // Portable RNG selections use descending catalog IDs. This permits one fixed
 // tie order and a GPU bitmask/rank lookup instead of per-layout CPU sorting.
 struct Catalog

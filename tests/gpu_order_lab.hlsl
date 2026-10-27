@@ -5,7 +5,14 @@
 #ifndef GPU_THREADS
 #define GPU_THREADS 64
 #endif
-#define GPU_NEAREST_WORDS ((GPU_MAX_CRYSTALS + 1) / 2)
+#ifndef GPU_NEAREST_BITS
+#define GPU_NEAREST_BITS 16
+#endif
+#define GPU_IDS_PER_WORD (32 / GPU_NEAREST_BITS)
+#define GPU_NEAREST_WORDS ((GPU_MAX_CRYSTALS + GPU_IDS_PER_WORD - 1) / GPU_IDS_PER_WORD)
+#if defined(GPU_TRIANGULAR_TILE) && !defined(GPU_CATALOG_INPUT)
+#error Triangular tiles require the symmetric captured catalog
+#endif
 StructuredBuffer<double> matrices : register(t0);
 StructuredBuffer<uint> nearest : register(t1);
 StructuredBuffer<uint> sizes : register(t2);
@@ -18,16 +25,29 @@ groupshared uint localNearest[GPU_MAX_CRYSTALS * GPU_NEAREST_WORDS];
 #endif
 RWStructuredBuffer<uint> outputOrders : register(u0);
 RWStructuredBuffer<double> outputLengths : register(u1);
+#ifdef GPU_TRIANGULAR_TILE
+groupshared double tile[(GPU_MAX_CRYSTALS + 1) * (GPU_MAX_CRYSTALS + 2) / 2];
+#else
 groupshared double tile[(GPU_MAX_CRYSTALS + 1) * (GPU_MAX_CRYSTALS + 1)];
+#endif
 groupshared double starts[GPU_THREADS];
 groupshared uint indices[GPU_THREADS];
 groupshared uint winner[GPU_MAX_CRYSTALS];
 
-double GpuEdge(uint from, uint to, uint side) { return tile[from * side + to]; }
+double GpuEdge(uint from, uint to, uint side)
+{
+#ifdef GPU_TRIANGULAR_TILE
+    uint row = max(from, to), column = min(from, to);
+    return tile[row * (row + 1) / 2 + column];
+#else
+    return tile[from * side + to];
+#endif
+}
 #ifdef GPU_CATALOG_INPUT
 uint GpuNearest(uint testId, uint from, uint rank)
 {
-    return (localNearest[from * GPU_NEAREST_WORDS + rank / 2] >> ((rank & 1) * 16)) & 0xffffu;
+    return (localNearest[from * GPU_NEAREST_WORDS + rank / GPU_IDS_PER_WORD] >>
+        ((rank % GPU_IDS_PER_WORD) * GPU_NEAREST_BITS)) & ((1u << GPU_NEAREST_BITS) - 1);
 }
 #else
 uint GpuNearest(uint testId, uint from, uint rank) { return nearest[testId * 52 * 52 + from * 52 + rank]; }
@@ -61,9 +81,15 @@ void Main(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     }
     for (uint loadIndex = lane; loadIndex < side * side; loadIndex += GPU_THREADS)
     {
-        uint a = selectedIds[testId * 53 + loadIndex / side];
-        uint b = selectedIds[testId * 53 + loadIndex % side];
-        tile[loadIndex] = matrices[a * catalogSide + b];
+        uint row = loadIndex / side, column = loadIndex % side;
+#ifdef GPU_TRIANGULAR_TILE
+        if (column > row) continue;
+        uint target = row * (row + 1) / 2 + column;
+#else
+        uint target = loadIndex;
+#endif
+        uint a = selectedIds[testId * 53 + row], b = selectedIds[testId * 53 + column];
+        tile[target] = matrices[a * catalogSide + b];
     }
     GroupMemoryBarrierWithGroupSync();
     if (lane < n)
@@ -75,11 +101,25 @@ void Main(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
             uint id = nearest[from * pointCount + rank], word = id / 32, bit = id & 31;
             if ((selectedMask[word] & (1u << bit)) == 0) continue;
             uint local = aboveWords[word] + countbits(selectedMask[word] & (0xfffffffeu << bit));
+#if GPU_NEAREST_BITS == 16
             if (found & 1) localNearest[lane * GPU_NEAREST_WORDS + found / 2] = packed | (local << 16);
             else packed = local;
             found++;
+#else
+            packed |= local << ((found % GPU_IDS_PER_WORD) * GPU_NEAREST_BITS);
+            found++;
+            if (found % GPU_IDS_PER_WORD == 0)
+            {
+                localNearest[lane * GPU_NEAREST_WORDS + (found - 1) / GPU_IDS_PER_WORD] = packed;
+                packed = 0;
+            }
+#endif
         }
+#if GPU_NEAREST_BITS == 16
         if (found & 1) localNearest[lane * GPU_NEAREST_WORDS + found / 2] = packed;
+#else
+        if (found % GPU_IDS_PER_WORD) localNearest[lane * GPU_NEAREST_WORDS + (found - 1) / GPU_IDS_PER_WORD] = packed;
+#endif
     }
 #else
     for (uint loadIndex = lane; loadIndex < side * side; loadIndex += GPU_THREADS)

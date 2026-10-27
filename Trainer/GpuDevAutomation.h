@@ -10,7 +10,8 @@ inline practice::SeedSearchRequest RequestFor(const practice::MapAnalysis &sourc
     const auto &d = *source.data;
     r.pid = d.pid; r.scene = d.scene; r.epoch = d.epoch; r.session = source.session; r.hash = d.hash;
     r.count = e.count; r.key = SearchKey(options, e.keyIndex); r.recipe = options.recipe; r.workers = e.workers;
-    r.criteria.spawn = e.spawn; r.criteria.catalog = practice::CatalogKey(d); r.exhaustive = e.reference;
+    r.criteria.spawn = e.spawn; r.criteria.catalog = practice::CatalogKey(d);
+    r.exhaustive = e.reference || (!e.gpu && e.bounds == BoundsMode::Disabled);
     return r;
 }
 
@@ -27,8 +28,9 @@ inline void RunMap(SuiteState &suite, std::shared_ptr<const practice::MapAnalysi
     const auto &data = *source->data;
     Report metadata;
     metadata.source = source->data; metadata.liveCapture = source->live;
-    metadata.options.adapter = suite.options.adapter; metadata.options.seeds = suite.options.count;
-    metadata.options.batch = 512; metadata.options.key = suite.options.key; metadata.options.fixture = !source->live;
+    int level = MapLevelIndex(data.scene), maximumCount = std::max(suite.options.screenCount, StressCount(suite.options, level));
+    metadata.options.adapter = suite.options.adapter; metadata.options.seeds = maximumCount;
+    metadata.options.batch = 1024; metadata.options.key = suite.options.key; metadata.options.fixture = !source->live;
     metadata.options.recipe = suite.options.recipe;
     metadata.options.pairs = suite.options.rounds;
     metadata.logicalCpus = std::thread::hardware_concurrency();
@@ -50,12 +52,15 @@ inline void RunMap(SuiteState &suite, std::shared_ptr<const practice::MapAnalysi
     auto catalog = std::make_shared<Catalog>(int(data.spawns.size()), int(data.points.size()),
         [&](int from, int to) { return distances.CenterDistance(from, to); });
     device.SetCatalog(std::move(catalog), metadata); metadata.catalogSetupMs = Ms(at);
-    double compileMs = device.PrepareKernel(data.keep);
-    device.SelectKernel(data.keep);
-    suite.shaders.push_back({data.scene, data.keep, device.KernelThreads(), device.KernelSharedBytes(), compileMs});
+    for (auto kind : ShaderKinds)
+    {
+        check();
+        double compileMs = device.PrepareShader(kind, data.keep);
+        suite.shaders.push_back({data.scene, data.keep, kind, ShapeFor(kind, data.keep), compileMs});
+    }
     // Warm both scorers and validate a short real batch before timing searches.
     at = Clock::now();
-    int warmCount = std::min(64, suite.options.count);
+    int warmCount = std::min(64, suite.options.screenCount);
     practice::PortableSelectionGenerator generator(data); practice::RandomSeedOrder seedOrder(suite.options.key);
     std::vector<practice::Selection> warm(warmCount);
     std::vector<practice::RouteResult> cpuWarm(warmCount);
@@ -64,9 +69,9 @@ inline void RunMap(SuiteState &suite, std::shared_ptr<const practice::MapAnalysi
         check(); generator.Generate(seedOrder.SeedAt(uint32_t(i)), suite.options.recipe, warm[i]);
         cpuWarm[i] = distances.Score(warm[i], false, canceled);
     }
-    for (bool specialized : {false, true})
+    for (auto kind : ShaderKinds)
     {
-        device.SelectKernel(specialized ? data.keep : 0);
+        device.SelectShader(kind, data.keep);
         for (int i = 0; i < warmCount; i++) device.PackSelection(i, warm[i]);
         auto routes = device.Execute(warmCount);
         for (int i = 0; i < warmCount; i++)
@@ -76,66 +81,74 @@ inline void RunMap(SuiteState &suite, std::shared_ptr<const practice::MapAnalysi
             if (!SameScore(cpuWarm[i], gpu)) throw std::runtime_error("GPU shader warmup differs from CPU reference");
         }
     }
-    metadata.warmupMs = Ms(at); metadata.warmupChecked = 2 * warmCount; metadata.phase = Phase::Completed;
-    suite.warmupChecked += 2 * warmCount; suite.maps.back() = metadata;
-    std::vector<practice::RouteResult> referenceScores(size_t(suite.options.count));
-    std::vector<practice::Selection> referenceLayouts(size_t(suite.options.count));
+    metadata.warmupMs = Ms(at); metadata.warmupChecked = int(ShaderKinds.size()) * warmCount; metadata.phase = Phase::Completed;
+    suite.warmupChecked += metadata.warmupChecked; suite.maps.back() = metadata;
+    std::vector<practice::RouteResult> referenceScores(static_cast<size_t>(maximumCount));
+    std::vector<practice::Selection> referenceLayouts(static_cast<size_t>(maximumCount));
     std::vector<practice::SeedResult> referenceTop, filteredTop;
-    for (const auto &e : Experiments(suite.options))
+    for (auto stage : {Stage::Screen, Stage::Stress})
     {
-        check();
-        suite.active = std::string(ModeName(data.scene)) + " / " + e.Name();
-        checkpoint(suite); progress(0);
-        SearchRun run; run.experiment = e;
-        auto request = RequestFor(*source, suite.options, e);
-        practice::RandomSeedOrder runOrder(request.key);
-        std::atomic<uint64_t> audited{0};
-        bool collecting = e.reference && e.spawn < 0;
-        auto audit = [&](uint64_t index, const practice::Selection &selection, const practice::RouteResult &route) {
-            if (index >= referenceScores.size()) throw std::runtime_error("Audit index exceeds reference set");
-            if (collecting) { referenceScores[size_t(index)] = route; referenceLayouts[size_t(index)] = selection; }
-            else if (!practice::SameLayout(referenceLayouts[size_t(index)], selection) || !SameScore(referenceScores[size_t(index)], route))
-                throw std::runtime_error("Score audit mismatch at seed " + std::to_string(runOrder.SeedAt(uint32_t(index))));
-            audited.fetch_add(1, std::memory_order_relaxed);
-        };
-        if (e.gpu)
+        ShaderKind selected = ShaderKind::Compact;
+        if (stage == Stage::Stress)
         {
-            auto setting = Clock::now();
-            device.SelectKernel(e.specialized ? data.keep : 0);
-            run.shaderCrystals = e.specialized ? data.keep : 0;
-            run.shaderThreads = device.KernelThreads(); run.shaderSharedBytes = device.KernelSharedBytes();
-            device.Resize(e.batch, metadata);
-            device.BeginPass();
-            run.bufferSetupMs = Ms(setting);
-            run.state = SearchGpu(source, distances, request, e.batch, [&](std::span<const practice::SeedLayout> layouts) {
-                check();
-                for (size_t i = 0; i < layouts.size(); i++) device.PackSelection(int(i), layouts[i].selection);
-                return device.Execute(int(layouts.size()), &run.gpu);
-            }, canceled, progress, audit, e.bounds, &run.bounds);
-            auto finishing = Clock::now();
-            try { device.EndPass(run.gpu, canceled); }
-            catch (const std::exception &error) { run.state.phase = practice::SearchPhase::Failed; run.state.error = error.what(); }
-            run.state.elapsed += (run.bufferSetupMs + Ms(finishing)) / 1000.;
+            check();
+            auto choice = Calibrate(suite, data.scene); selected = choice.shader;
+            suite.calibration.push_back(choice); checkpoint(suite);
         }
-        else run.state = practice::SeedSearch::RunFrozen(source, distances, request, canceled, progress, audit);
-        run.audited = audited.load();
-        if (run.state.phase == practice::SearchPhase::Completed)
+        for (const auto &e : Experiments(suite.options, level, stage, selected))
         {
-            if (e.reference)
+            check();
+            suite.active = std::string(ModeName(data.scene)) + " / " + e.Name();
+            checkpoint(suite); progress(0);
+            SearchRun run; run.experiment = e;
+            auto request = RequestFor(*source, suite.options, e);
+            practice::RandomSeedOrder runOrder(request.key);
+            std::atomic<uint64_t> audited{0};
+            bool collecting = e.reference && e.spawn < 0;
+            auto audit = [&](uint64_t index, const practice::Selection &selection, const practice::RouteResult &route) {
+                if (index >= referenceScores.size()) throw std::runtime_error("Audit index exceeds reference set");
+                if (collecting) { referenceScores[size_t(index)] = route; referenceLayouts[size_t(index)] = selection; }
+                else if (!practice::SameLayout(referenceLayouts[size_t(index)], selection) || !SameScore(referenceScores[size_t(index)], route))
+                    throw std::runtime_error("Score audit mismatch at seed " + std::to_string(runOrder.SeedAt(uint32_t(index))));
+                audited.fetch_add(1, std::memory_order_relaxed);
+            };
+            if (e.gpu)
             {
-                if (collecting) referenceTop = run.state.top;
-                else filteredTop = run.state.top;
-                run.topMatch = run.state.pruned == 0 && run.audited == run.state.scored;
+                auto setting = Clock::now();
+                device.SelectShader(e.shader, data.keep); run.shape = ShapeFor(e.shader, data.keep);
+                device.Resize(e.batch, metadata);
+                device.BeginPass();
+                run.bufferSetupMs = Ms(setting);
+                run.state = SearchGpu(source, distances, request, e.batch, [&](std::span<const practice::SeedLayout> layouts) {
+                    check();
+                    for (size_t i = 0; i < layouts.size(); i++) device.PackSelection(int(i), layouts[i].selection);
+                    return device.Execute(int(layouts.size()), &run.gpu);
+                }, canceled, progress, audit, e.bounds, &run.bounds);
+                auto finishing = Clock::now();
+                try { device.EndPass(run.gpu, canceled); }
+                catch (const std::exception &error) { run.state.phase = practice::SearchPhase::Failed; run.state.error = error.what(); }
+                run.state.elapsed += (run.bufferSetupMs + Ms(finishing)) / 1000.;
             }
-            else run.topMatch = SameTop(e.spawn < 0 ? referenceTop : filteredTop, run.state.top) && run.audited == run.state.scored;
+            else run.state = practice::SeedSearch::RunFrozen(source, distances, request, canceled, progress, audit);
+            run.audited = audited.load();
+            if (run.state.phase == practice::SearchPhase::Completed)
+            {
+                if (e.reference)
+                {
+                    if (collecting) referenceTop = run.state.top;
+                    else filteredTop = run.state.top;
+                    run.topMatch = run.state.pruned == 0 && run.audited == run.state.scored;
+                }
+                else run.topMatch = SameTop(e.spawn < 0 ? referenceTop : filteredTop, run.state.top) && run.audited == run.state.scored;
+            }
+            suite.runs.push_back(std::move(run)); suite.completedTests++;
+            suite.maps.back() = metadata;
+            checkpoint(suite);
+            const auto &last = suite.runs.back();
+            if (last.state.phase != practice::SearchPhase::Completed)
+                throw std::runtime_error(last.state.error.empty() ? "Search did not complete" : last.state.error);
+            if (!last.topMatch) throw std::runtime_error("Top10 differs from the exhaustive CPU reference");
         }
-        suite.runs.push_back(std::move(run)); suite.completedTests++;
-        suite.maps.back() = metadata;
-        checkpoint(suite);
-        const auto &last = suite.runs.back();
-        if (last.state.phase != practice::SearchPhase::Completed)
-            throw std::runtime_error(last.state.error.empty() ? "Search did not complete" : last.state.error);
-        if (!last.topMatch) throw std::runtime_error("Top10 differs from the exhaustive CPU reference");
     }
     suite.completedMaps++;
     }
@@ -209,7 +222,7 @@ class Automation
     void Start(SuiteOptions options, int pid, uint32_t identity, bool fixturesForTesting = false)
     {
         if (Busy()) return;
-        Experiments(options);
+        SuiteTestCount(options);
         if (worker.joinable()) worker.join();
         process = pid; session = identity;
         fixtureOffers = fixturesForTesting;
@@ -220,10 +233,10 @@ class Automation
         {
         worker = std::jthread([this, options, root, fixturesForTesting](std::stop_token token) {
             SuiteState state; state.options = options; state.status = "Running";
-            state.startedUtcMs = UtcMs(); state.totalTests = int(Experiments(options).size() * options.levels.size());
-            auto folder = root / ("Dev5-" + std::to_string(state.startedUtcMs)); state.directory = folder;
+            state.startedUtcMs = UtcMs(); state.totalTests = SuiteTestCount(options);
+            auto folder = root / ("Dev6-" + std::to_string(state.startedUtcMs)); state.directory = folder;
             auto publish = [&](const SuiteState &s) {
-                SaveJson(folder / "Dev5-Summary.json", SuiteJson(s));
+                SaveJson(folder / "Dev6-Summary.json", SuiteJson(s));
                 std::atomic_store(&current, std::shared_ptr<const SuiteState>(std::make_shared<SuiteState>(s)));
             };
             try

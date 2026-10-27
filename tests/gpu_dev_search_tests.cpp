@@ -79,23 +79,51 @@ int main(int argc, char **argv)
         return score(layouts);
     }, [&] { return stopped.load(); });
     assert(canceled.phase == SearchPhase::Stopped && canceled.evaluated < r.count);
+    for (int batch : {1024, 4096, 8192})
+    {
+        auto large = SearchGpu(source, distances, r, batch, score, [] { return false; }, {}, audit, BoundsMode::Disabled);
+        assert(large.phase == SearchPhase::Completed && SameTop(reference.top, large.top));
+    }
     SuiteOptions options;
-    auto plan = Experiments(options); assert(plan.size() == 183 && options.levels.size() == 3);
-    std::set<std::string> names; for (auto e : plan) names.insert(e.Name()); assert(names.size() == plan.size());
-    assert(plan.front().reference && !plan.front().gpu && plan.back().gpu && plan.back().spawn == 0);
+    assert(SuiteTestCount(options) == 1116 && options.levels.size() == 3);
+    auto screen = Experiments(options, 7, Stage::Screen);
+    auto stress = Experiments(options, 7, Stage::Stress);
+    assert(screen.size() == 84 && stress.size() == 288);
+    std::set<std::string> names;
+    for (auto e : screen) { names.insert(e.Name()); assert(e.keyIndex < options.keys && e.count == 16384); }
+    for (auto e : stress) { names.insert(e.Name()); assert(e.keyIndex >= options.keys); }
+    assert(names.size() == screen.size() + stress.size());
+    assert(stress.front().reference && stress.back().gpu && stress.back().spawn == 0);
     std::set<uint64_t> keys;
-    for (int i = 0; i < options.keys; i++) keys.insert(SearchKey(options, i));
-    assert(keys.size() == 3 && SearchKey(options, 0) == options.key);
+    for (int i = 0; i < 2 * options.keys; i++) keys.insert(SearchKey(options, i));
+    assert(keys.size() == 6 && SearchKey(options, 0) == options.key);
     auto quick = options; quick.keys = quick.rounds = 1;
-    assert(Experiments(quick).size() == 23);
+    quick.screenCount = quick.count = quick.hideSeekCount = 2048; quick.filterCount = 1024;
+    assert(SuiteTestCount(quick) == 138);
     auto bad = options; bad.levels = {7, 5, 7};
-    bool rejected = false; try { Experiments(bad); } catch (const std::runtime_error &) { rejected = true; }
+    bool rejected = false; try { SuiteTestCount(bad); } catch (const std::runtime_error &) { rejected = true; }
     assert(rejected && std::string(ModeName(5)) == "Hide & Seek");
+    SuiteState calibration; calibration.options = quick;
+    for (auto e : Experiments(quick, 2, Stage::Screen)) if (e.gpu)
+    {
+        SearchRun test; test.experiment = e; test.topMatch = true;
+        test.state.phase = SearchPhase::Completed; test.state.request.scene = 5; test.state.request.count = e.count;
+        test.gpu.timestampBatches = 2;
+        test.gpu.gpuKernelMs = 5 - int(e.shader);
+        test.state.elapsed = e.shader == ShaderKind::Triangle ? .001 : .005;
+        if (e.bounds != BoundsMode::Disabled) test.state.elapsed = .02;
+        calibration.runs.push_back(test);
+    }
+    auto selected = Calibrate(calibration, 5);
+    assert(selected.gpuTime && selected.shader == ShaderKind::CompactFixed && selected.bounds == BoundsMode::Disabled);
+    calibration.runs.front().gpu.timestampInvalid = 1;
+    selected = Calibrate(calibration, 5);
+    assert(!selected.gpuTime && selected.shader == ShaderKind::Triangle);
     SuiteState suite; suite.options = options; suite.status = "Completed";
     SearchRun run; run.state = gpuFilter; run.topMatch = true; run.audited = gpuFilter.scored;
     suite.runs.push_back(run);
     auto text = SuiteJson(suite);
-    assert(text.find("practice-suite.gpu-suite.v5") != std::string::npos && text.find("\"top10Match\":true") != std::string::npos);
-    SaveJson(std::filesystem::path(argv[2]) / "Dev5-Summary.json", text);
+    assert(text.find("practice-suite.gpu-suite.v6") != std::string::npos && text.find("\"top10Match\":true") != std::string::npos);
+    SaveJson(std::filesystem::path(argv[2]) / "Dev6-Summary.json", text);
     std::cout << "Full production CPU workers 1-6 / bounded GPU pipeline: exhaustive score audits, identical Top10, pruning, spawn filters, longest objective, errors, cancellation and automatic plan/JSON: PASS\n";
 }

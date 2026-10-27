@@ -172,7 +172,7 @@ inline practice::SeedSearchState SearchGpu(std::shared_ptr<const practice::MapAn
     };
     try
     {
-        if (!state.source || !state.source->data || batch < 1 || batch > 2048 || request.workers < 1 || request.workers > 6 ||
+        if (!state.source || !state.source->data || batch < 1 || batch > 8192 || request.workers < 1 || request.workers > 6 ||
             !request.count || !request.criteria.Valid() || int(bounds) < 0 || int(bounds) > 2)
             throw std::runtime_error("Invalid GPU search request");
         auto error = request.criteria.CheckCatalog(*state.source->data, true);

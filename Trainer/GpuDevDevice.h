@@ -88,6 +88,7 @@ class Device
     std::map<int, ComPtr<ID3D11ComputeShader>> kernels;
     std::string source;
     int fixedCrystals = 0;
+    ShaderShape activeShape;
     Buffer matrices, neighbors, sizes, orders, lengths;
     Buffer selected, catalogEdges, catalogNearest;
     ComPtr<ID3D11Buffer> catalogInfo;
@@ -109,13 +110,13 @@ class Device
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     }
 
-    ComPtr<ID3D11ComputeShader> Compile(int crystals)
+    ComPtr<ID3D11ComputeShader> Compile(const ShaderShape &shape)
     {
-        std::string count = std::to_string(crystals ? crystals : 52);
-        std::string threads = std::to_string(crystals && crystals <= 32 ? 32 : 64);
-        std::vector<D3D_SHADER_MACRO> macros{{"GPU_MAX_CRYSTALS", count.c_str()}, {"GPU_THREADS", threads.c_str()}};
+        std::string count = std::to_string(shape.capacity), threads = std::to_string(shape.threads), bits = std::to_string(shape.neighborBits);
+        std::vector<D3D_SHADER_MACRO> macros{{"GPU_MAX_CRYSTALS", count.c_str()}, {"GPU_THREADS", threads.c_str()}, {"GPU_NEAREST_BITS", bits.c_str()}};
         if (compact) macros.push_back({"GPU_CATALOG_INPUT", "1"});
-        if (crystals) macros.push_back({"GPU_FIXED_CRYSTALS", "1"});
+        if (shape.fixed) macros.push_back({"GPU_FIXED_CRYSTALS", "1"});
+        if (shape.triangular) macros.push_back({"GPU_TRIANGULAR_TILE", "1"});
         macros.push_back({nullptr, nullptr});
         ComPtr<ID3DBlob> code, errors;
         HRESULT compiled = D3DCompile(source.data(), source.size(), "gpu_dev", macros.data(), nullptr,
@@ -198,7 +199,7 @@ class Device
         auto at = source.find(include);
         if (at == std::string::npos) throw std::runtime_error("Embedded shader include is invalid");
         source.replace(at, include.size(), kernel);
-        shader = kernels[0] = Compile(0);
+        shader = kernels[0] = Compile(activeShape);
         if (!compact) Resize(capacity, report);
         // Allocate once outside all scoring timings. One disjoint interval spans
         // a complete GPU pass, rather than beginning/ending one per batch/frame.
@@ -217,29 +218,28 @@ class Device
         }
     }
 
-    double PrepareKernel(int crystals)
+    double PrepareShader(ShaderKind kind, int crystals = 0)
     {
-        if (crystals < 1 || crystals > 52 || pending || recording) throw std::runtime_error("Invalid shader specialization");
-        if (kernels.contains(crystals)) return 0;
+        auto shape = ShapeFor(kind, crystals);
+        if (pending || recording || (shape.triangular && !compact)) throw std::runtime_error("Invalid shader specialization or catalog mode");
+        int key = int(kind) * 64 + (shape.fixed ? crystals : 0);
+        if (kernels.contains(key)) return 0;
         auto start = std::chrono::steady_clock::now();
-        kernels[crystals] = Compile(crystals);
+        kernels[key] = Compile(shape);
         return Elapsed(start);
     }
 
-    void SelectKernel(int crystals)
+    void SelectShader(ShaderKind kind, int crystals = 0)
     {
-        auto found = kernels.find(crystals);
+        auto shape = ShapeFor(kind, crystals);
+        auto found = kernels.find(int(kind) * 64 + (shape.fixed ? crystals : 0));
         if (pending || recording || found == kernels.end()) throw std::runtime_error("GPU shader was not prepared");
-        fixedCrystals = crystals; shader = found->second;
+        activeShape = shape; fixedCrystals = shape.fixed ? crystals : 0; shader = found->second;
         context->CSSetShader(shader.Get(), nullptr, 0);
     }
 
-    int KernelThreads() const { return fixedCrystals && fixedCrystals <= 32 ? 32 : 64; }
-    int KernelSharedBytes() const
-    {
-        int n = fixedCrystals ? fixedCrystals : 52;
-        return 8 * (n + 1) * (n + 1) + 12 * KernelThreads() + 4 * n + (compact ? 256 + 4 * n * ((n + 1) / 2) : 0);
-    }
+    int KernelThreads() const { return activeShape.threads; }
+    int KernelSharedBytes() const { return activeShape.SharedBytes(compact); }
 
     void SetCatalog(std::shared_ptr<const Catalog> value, Report &report)
     {
@@ -261,7 +261,7 @@ class Device
     void Resize(int count, Report &report)
     {
         if (pending) throw std::runtime_error("Cannot resize GPU buffers while a batch is pending");
-        if (count < 1 || count > 2048) throw std::runtime_error("Invalid GPU buffer capacity");
+        if (count < 1 || count > 8192) throw std::runtime_error("Invalid GPU buffer capacity");
         capacity = count;
         if (compact)
         {
