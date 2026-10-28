@@ -42,6 +42,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "PracticeMapClient.h"
 #include "InspectorClient.h"
 #include "SeedSearch.h"
+#include "SeedGpu.h"
 #include "MovementTelemetry.h"
 #include "PerformanceTiming.h"
 #include "SuiteExperience.h"
@@ -125,7 +126,10 @@ PlannerPreferences g_plannerOptions;
 practice::MapWorker g_mapWorker;
 PracticeMapClient g_mapClient;
 InspectorClient g_inspectorClient;
-practice::SeedSearch g_seedSearch;
+seed_gpu::Engine g_seedGpu;
+practice::SeedSearch g_seedSearch{[](auto &state, const auto &distances, const auto &canceled, const auto &progress) {
+    return g_seedGpu.Run(state, distances, canceled, progress);
+}};
 std::string g_plannerRandomError;
 std::string g_connectionStatus = "Waiting for ItStealsHelper";
 

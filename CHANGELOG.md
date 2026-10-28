@@ -2,6 +2,13 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.20.0 Changelog
+
+- Improved regular seed search with the lossless FP64 GPU scorer validated in GPU Dev 6: Automatic compares CPU and GPU on verified Outside and Classic Bonus maps, keeps CPU bounds for long Hide & Seek searches, and preserves exact CPU solving for small tours.
+- Improved search controls with Automatic / CPU / GPU selection, the active GPU/backend and calibration details, session-local geometry/settings profiles, and the measured 4096-candidate batches with bounded CPU helpers.
+- Improved GPU reliability with CPU-verified startup layouts, changing per-batch samples and every published Top 10, cancellable GPU completion, and a complete same-key CPU restart after a GPU error; preview, filters, goals, pinning and exports remain available.
+- Improved release verification with actual Windows production-shader comparisons, full and partial batches, both recipes/goals/accuracy modes, native coordinator and injected mid-search GPU-failure recovery tests, plus portable and sanitizer parity checks. The game mod remains 7.19.0.
+
 ### v7.19.0 Changelog
 
 - Improved the Speedrun page with a responsive eight-mode dashboard, clean personal bests, attempts, finishes and time played. Mode details show completion rates, resets, deaths, average finishes and recent attempts; All, Clean and Practice filters keep the overview focused.

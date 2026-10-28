@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.19.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.19.0)**
+**[v7.20.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.20.0)**
 
-- Improved the Speedrun page with a responsive eight-mode dashboard, clean personal bests, attempts, finishes and time played. Mode details show completion rates, resets, deaths, average finishes and recent attempts; All, Clean and Practice filters keep the overview focused.
-- Improved statistics persistence with bounded per-mode counters and active playtime, recorded from this update onward. Earlier personal bests and lifetime counters remain intact; menus, loading, pauses, replay playback and unfocused intervals do not add playtime. Resetting statistics preserves personal bests and saved replays.
-- Improved mode selection with safe browsing, draft practice/seed settings and an explicit Start action. Short entry, hover and personal-best animations respect reduced motion, formatted statistics are cached, and the Inspector now has its own magnifying-glass icon.
+- Improved regular seed search with the lossless FP64 GPU scorer validated in GPU Dev 6: Automatic compares CPU and GPU on verified Outside and Classic Bonus maps, keeps CPU bounds for long Hide & Seek searches, and preserves exact CPU solving for small tours.
+- Improved search controls with Automatic / CPU / GPU selection, the active GPU/backend and calibration details, session-local geometry/settings profiles, and the measured 4096-candidate batches with bounded CPU helpers.
+- Improved GPU reliability with CPU-verified startup layouts, changing per-batch samples and every published Top 10, cancellable GPU completion, and a complete same-key CPU restart after a GPU error; preview, filters, goals, pinning and exports remain available.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -99,6 +99,7 @@ While the repository is private, open **Updates → Connect private releases** a
 **Seeds & routes**
 
 - **Seed search:** Search in the background and rank layouts using spawn filters and complete routes.
+- **Automatic CPU/GPU search:** Outside and Classic Bonus compare both backends once per map/settings in the session. Hide & Seek keeps CPU bounds. **Practice → Seed Map → Search settings → Search backend** also offers CPU or GPU selection; unsupported maps/hardware use CPU automatically.
 - **Route planning:** Find walkable crystal paths using player clearance and crystal pickup areas.
 - **Time estimates:** Learn from recorded movement to account for straights, turns, starts, and slopes.
 - **Seed preview:** View spawns and full routes, then use the selected seed in practice.

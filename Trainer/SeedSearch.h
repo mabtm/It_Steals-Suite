@@ -112,6 +112,8 @@ class SearchDistances
                           : static_cast<int>(data.spawns.size()) + selection.crystals.at(index - 1);
     }
 
+    double CenterDistance(int from, int to) const { return table->lengths.at(from).at(to); }
+
     int FillMatrix(const Selection &selection, RouteWorkspace &work, bool bound = false) const
     {
         int count = static_cast<int>(selection.crystals.size()) + 1;
@@ -169,6 +171,12 @@ class SearchDistances
             prepared = &neighbors;
         }
         auto result = SolveOrderFlat(work.matrix.data(), count, work, canceled, !fast, prepared);
+        return FinishOrder(selection, std::move(result), canceled);
+    }
+
+    RouteResult FinishOrder(const Selection &selection, RouteResult result, const Cancel &canceled) const
+    {
+        int count = static_cast<int>(selection.crystals.size()) + 1;
         if (pickups->Active())
         {
             std::array<int, 65> nodes;
@@ -262,7 +270,8 @@ struct SeedSearchRequest
     uint64_t count = 100, key = 0;
     uint32_t serial = 0, session = 0;
     std::string hash;
-    bool fast = false, live = true, layoutOnly = false, allowPortable = true;
+    bool fast = false, live = true, layoutOnly = false, allowPortable = true, prune = true;
+    SearchBackend backend = SearchBackend::Automatic;
     SearchCriteria criteria;
 };
 
@@ -278,6 +287,9 @@ struct SeedSearchState
     int projectedSpawns = 0, projectedPoints = 0;
     int estimatedPairs = 0, recoveredPairs = 0, repairQueries = 0;
     std::string navigationModel;
+    std::string accelerator, backendNote;
+    bool gpu = false;
+    double calibrationMs = 0;
     bool portable = false, distanceCacheReused = false;
     double preparationMs = 0;
     double elapsed = 0, recentGenerated = 0, recentChecked = 0,
@@ -306,12 +318,14 @@ inline std::string SeedResultsText(const SeedSearchState &state)
         << " | scene: " << r.scene << " | game hash: " << r.hash << "\n# Search key: " << std::hex << r.key
         << std::dec << " | requested: " << r.count << " | checked: " << state.evaluated
         << " | spawn filtered: " << state.filtered << " | proven outside Top 10: " << state.pruned
-        << "\n# Search performance: backend: " << (state.portable ? "verified CPU" : "Unity game thread")
+        << "\n# Search performance: backend: " << (state.gpu ? "GPU + CPU pickup" : state.portable ? "verified CPU" : "Unity game thread")
         << " | workers: " << r.workers << " | generated: " << state.generated << " | scored: " << state.scored
         << " | cache hits: " << state.cacheHits
         << "\n# Timing: elapsed_s (including preparation): " << state.elapsed
         << " | average_checked_per_s: " << (state.elapsed > 0 ? state.evaluated / state.elapsed : 0)
-        << " | preparation_ms: " << state.preparationMs << "\n# Navigation: " << state.navigationModel
+        << " | preparation_ms: " << state.preparationMs << " | calibration_ms: " << state.calibrationMs
+        << "\n# Backend detail: " << state.accelerator << " | " << state.backendNote
+        << "\n# Navigation: " << state.navigationModel
         << "\n# Navigation details: " << (state.source ? state.source->data->navigationNote : std::string())
         << "\n# Layouts with center navigation gaps: " << state.estimated
         << " | missing center pairs: " << state.estimatedPairs << "\n# Player spawn filter: "
@@ -411,6 +425,8 @@ inline std::shared_ptr<const MapAnalysis> SearchPreview(const MapAnalysis &sourc
 
 // One coordinator and a configurable, sleeping worker pool. Only eight small
 // batches can be queued; acknowledging input pauses the game sampler naturally.
+using SeedAcceleration = std::function<bool(SeedSearchState &, const SearchDistances &, const Cancel &,
+                                           const std::function<void(SeedSearchState)> &)>;
 class SeedSearch
 {
     using Clock = std::chrono::steady_clock;
@@ -426,6 +442,7 @@ class SeedSearch
         bool inputComplete = false, failed = false;
         uint64_t received = 0, token = 0;
         Clock::time_point started = Clock::now();
+        std::function<void(uint64_t, const Selection &, const RouteResult &)> audit;
     };
 
     std::shared_ptr<const SeedSearchState> current = std::make_shared<SeedSearchState>();
@@ -444,6 +461,7 @@ class SeedSearch
     };
 
     std::deque<Prepared> preparedCatalogs;
+    SeedAcceleration accelerate;
 
     bool Obsolete(uint64_t token) const
     {
@@ -635,7 +653,7 @@ class SeedSearch
                             if (!cached)
                                 estimated += workspace.estimated;
                             if (criteria.objective == SearchObjective::ShortestRoute &&
-                                std::isfinite(boundCutoff))
+                                job->state.request.prune && std::isfinite(boundCutoff))
                             {
                                 lower = cached ? entry.lower
                                                : MstRouteLowerBound(workspace.matrix.data(), count, canceled);
@@ -682,6 +700,8 @@ class SeedSearch
                             scored++;
                             if (!score.complete)
                                 throw std::runtime_error("Route solver failed for a finite distance matrix");
+                            if (job->audit)
+                                job->audit(batch->offset + i, selection, score);
                             {
                                 matched++;
                                 uint64_t index = batch->offset + i;
@@ -797,18 +817,22 @@ class SeedSearch
                     job->state.navigationModel = distances->ModelName();
                 }
             }
-            workers.reserve(job->state.request.workers);
-            for (int i = 0; i < job->state.request.workers && !canceled(); i++)
-                workers.emplace_back([this, job, distances, graph] { RouteWorker(job, distances.get()); });
             std::map<uint64_t, RouteResult> drawn;
             std::shared_ptr<const MapAnalysis> preview;
             uint64_t previewIndex = SeedSpace;
             double previousElapsed = 0;
             uint64_t previousGenerated = 0, previousChecked = 0;
             SearchTiming timing;
-            while (!canceled())
-            {
-                auto state = Snapshot(job);
+            bool wasGpu = false;
+            auto present = [&](SeedSearchState state) {
+                if (canceled()) return;
+                if (state.gpu != wasGpu || state.evaluated < previousChecked)
+                {
+                    drawn.clear(); preview.reset(); previewIndex = SeedSpace;
+                    previousElapsed = 0; previousGenerated = previousChecked = 0; timing = {};
+                }
+                wasGpu = state.gpu;
+                state.elapsed = std::chrono::duration<double>(Clock::now() - job->started).count();
                 double interval = state.elapsed - previousElapsed;
                 if (interval > 0)
                 {
@@ -837,6 +861,22 @@ class SeedSearch
                     previewIndex = state.top.front().index;
                 }
                 state.preview = preview;
+                Publish(std::move(state), job->token);
+            };
+            if (accelerate && job->state.portable && distances)
+            {
+                auto accelerated = Snapshot(job);
+                bool handled = accelerate(accelerated, *distances, canceled, present);
+                if (canceled()) return;
+                { std::lock_guard lock(job->gate); job->state = std::move(accelerated); }
+                if (handled) { present(Snapshot(job)); return; }
+            }
+            workers.reserve(job->state.request.workers);
+            for (int i = 0; i < job->state.request.workers && !canceled(); i++)
+                workers.emplace_back([this, job, distances, graph] { RouteWorker(job, distances.get()); });
+            while (!canceled())
+            {
+                auto state = Snapshot(job);
                 bool finished = false;
                 {
                     std::lock_guard<std::mutex> lock(job->gate);
@@ -844,7 +884,7 @@ class SeedSearch
                 }
                 if (finished)
                     state.phase = SearchPhase::Completed;
-                Publish(std::move(state), job->token);
+                present(std::move(state));
                 if (finished)
                     break;
                 std::unique_lock<std::mutex> lock(job->gate);
@@ -934,7 +974,64 @@ class SeedSearch
     }
 
   public:
-    SeedSearch() = default;
+    // Run the same production workers against prepared immutable distances.
+    // Used for backend calibration and independent scorer verification.
+    static SeedSearchState RunFrozen(std::shared_ptr<const MapAnalysis> source,
+        const SearchDistances &distances, SeedSearchRequest request, const Cancel &canceled,
+        const std::function<void(uint64_t)> &progress = {},
+        const std::function<void(uint64_t, const Selection &, const RouteResult &)> &audit = {})
+    {
+        SeedSearch engine;
+        auto job = std::make_shared<Job>();
+        job->state.request = request;
+        job->state.source = std::move(source);
+        job->state.portable = true;
+        job->state.phase = SearchPhase::Searching;
+        job->state.navigationModel = distances.ModelName();
+        job->audit = audit;
+        std::vector<std::thread> workers;
+        std::atomic<int> done{0};
+        try
+        {
+            if (!job->state.source || !job->state.source->data || !request.count ||
+                request.count > SeedSpace || request.workers < 1 || request.workers > 32 || !request.criteria.Valid())
+                throw std::runtime_error("Invalid frozen search request");
+            if (!job->state.source->data->Verified() || job->state.source->data->rngStatus != 2 ||
+                job->state.source->data->rngProbes != 4160) throw std::runtime_error("Frozen search RNG is not verified");
+            auto error = request.criteria.CheckCatalog(*job->state.source->data, true);
+            if (!error.empty()) throw std::runtime_error(error);
+            for (int i = 0; i < request.workers; i++)
+                workers.emplace_back([&] {
+                    engine.RouteWorker(job, &distances);
+                    done.fetch_add(1);
+                    job->changed.notify_all();
+                });
+            while (done.load() < request.workers)
+            {
+                if (canceled()) job->canceled = true;
+                if (progress) progress(engine.Snapshot(job).evaluated);
+                std::unique_lock lock(job->gate);
+                job->changed.wait_for(lock, std::chrono::milliseconds(20), [&] {
+                    return done.load() == request.workers;
+                });
+            }
+        }
+        catch (const std::exception &e)
+        {
+            job->canceled = true;
+            job->changed.notify_all();
+            std::lock_guard lock(job->gate);
+            job->failed = true;
+            job->state.error = e.what();
+        }
+        for (auto &worker : workers) if (worker.joinable()) worker.join();
+        auto result = engine.Snapshot(job);
+        result.phase = job->failed ? SearchPhase::Failed : canceled() ? SearchPhase::Stopped
+            : result.evaluated == request.count ? SearchPhase::Completed : SearchPhase::Failed;
+        if (progress) progress(result.evaluated);
+        return result;
+    }
+    explicit SeedSearch(SeedAcceleration runner = {}) : accelerate(std::move(runner)) {}
     SeedSearch(const SeedSearch &) = delete;
 
     ~SeedSearch()
@@ -970,7 +1067,7 @@ class SeedSearch
             state->phase = SearchPhase::Failed;
             state->error = "Choose between 1 and 4294967296 distinct 32-bit seeds";
         }
-        else if (!state->request.criteria.Valid())
+        else if (!state->request.criteria.Valid() || int(state->request.backend) < 0 || int(state->request.backend) > 2)
         {
             state->phase = SearchPhase::Failed;
             state->error = "Invalid search criteria; check the goal and player spawn.";

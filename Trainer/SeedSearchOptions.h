@@ -18,6 +18,8 @@ enum class SearchObjective
     LongestRoute
 };
 
+enum class SearchBackend { Automatic, Cpu, Gpu };
+
 inline const char *ObjectiveName(SearchObjective value)
 {
     return value == SearchObjective::LongestRoute ? "Longest route (practice)" : "Shortest complete route";
@@ -136,7 +138,7 @@ struct PlannerPreferences
     bool automaticLoad = true, calculateRoutes = true;
     bool portableGeneration = true;
     bool searchFast = false;
-    int searchObjective = 0;
+    int searchObjective = 0, searchBackend = 0;
     std::array<practice::SearchMapFilter, kMapLevelCount> filters;
     bool candidates = true, minimapRoute = false;
 
@@ -148,6 +150,7 @@ struct PlannerPreferences
         searchWorkers = std::clamp(searchWorkers, 1, SeedWorkerLimit());
         generationMs = std::isfinite(generationMs) ? std::clamp(generationMs, .25f, 8.f) : 2.f;
         searchObjective = std::clamp(searchObjective, 0, 1);
+        searchBackend = std::clamp(searchBackend, 0, 2);
     }
 
     practice::SearchCriteria Criteria() const
@@ -166,7 +169,8 @@ struct PlannerPreferences
             << "\nplanner.candidates=" << candidates << "\nplanner.minimapRoute=" << minimapRoute
             << "\nplanner.searchCount=" << searchCount << "\nplanner.searchFast=" << searchFast
             << "\nplanner.searchWorkers=" << searchWorkers << "\nplanner.generationMs=" << generationMs
-            << "\nplanner.searchGoal=" << searchObjective << "\nplanner.automaticLoad=" << automaticLoad
+            << "\nplanner.searchGoal=" << searchObjective << "\nplanner.searchBackend=" << searchBackend
+            << "\nplanner.automaticLoad=" << automaticLoad
             << "\nplanner.calculateRoutes=" << calculateRoutes
             << "\nplanner.portableGeneration=" << portableGeneration << '\n';
         for (int i = 0; i < kMapLevelCount; i++)
@@ -194,6 +198,8 @@ struct PlannerPreferences
             searchObjective = n == 2 ? 1 : 0;
         else if (key == "searchGoal")
             searchObjective = n;
+        else if (key == "searchBackend")
+            searchBackend = n;
         else if (key == "calculateRoutes" && (value == 0 || value == 1))
             calculateRoutes = value == 1;
         else if (key == "portableGeneration" && (value == 0 || value == 1))

@@ -84,6 +84,7 @@ def arguments(name, work, fixtures):
         ],
         "portable_search_tests": [fixtures],
         "settings_tests": [work],
+        "seed_gpu_tests": [fixtures],
         "game_launch_tests": [work],
         "startup_logos_tests": [work],
         "update_tests": [work],
@@ -273,6 +274,7 @@ def main():
     native = {p.stem for p in (root / "tests").glob("*_tests.cpp")}
     if not args.ui:
         native.discard("ui_tests")
+    native.discard("seed_gpu_windows_tests")
     selected = [(name, False) for name in sorted(native)]
     if args.managed:
         selected += [(name, True) for name in MANAGED]

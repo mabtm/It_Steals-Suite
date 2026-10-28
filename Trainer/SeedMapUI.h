@@ -164,6 +164,7 @@ inline bool BeginPlannerSearch(const practice::MapAnalysis &source)
     request.count = practice::SeedSpace;
     request.fast = g_plannerOptions.searchFast;
     request.workers = g_plannerOptions.searchWorkers;
+    request.backend = static_cast<practice::SearchBackend>(g_plannerOptions.searchBackend);
     request.serial = g_sentSerial + 1u;
     g_seedSearch.Begin(request);
     PlannerRequest(3);
@@ -236,6 +237,9 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
         ImGui::SliderInt("CPU workers", &g_plannerOptions.searchWorkers, 1, SeedWorkerLimit());
         Help(
             "Verified CPU mode generates layouts and evaluates routes in these workers, below normal thread priority. Leave CPU capacity for the game. The original Unity fallback can be limited by game-thread generation, regardless of worker count.");
+        const char *backends[] = {"Automatic (recommended)", "CPU", "GPU"};
+        ImGui::Combo("Search backend", &g_plannerOptions.searchBackend, backends, 3);
+        Help("Automatic compares CPU and GPU speed for verified Outside and Classic Bonus maps and reuses the decision. Hide & Seek and exact small tours use CPU. GPU uses up to two CPU helpers, or four for manually selected Hide & Seek, within the worker limit above. Unsupported hardware or a GPU error falls back to CPU.");
         suite_ui::Checkbox("Verified CPU generation", &g_plannerOptions.portableGeneration);
         Help(
             "Recommended. Runs generation outside the game only after this Unity runtime passes RNG and complete-layout comparisons. Otherwise the original Unity generator is used automatically.");
@@ -336,7 +340,7 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
     if (metricColumns > 1)
         ImGui::SameLine();
     suite_ui::Metric("Rate", "CURRENT RATE", rate,
-                     state->portable ? "Verified CPU workers" : "Original Unity generator", cell);
+                     state->gpu ? "GPU + CPU pickup" : state->portable ? "Verified CPU workers" : "Original Unity generator", cell);
     if (metricColumns == 3)
         ImGui::SameLine();
     suite_ui::Metric("Best", "BEST ROUTE", best,
@@ -346,13 +350,25 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
                      cell);
     if (state->phase == practice::SearchPhase::Preparing || state->phase == practice::SearchPhase::Generating)
     {
-        char progress[80];
-        snprintf(progress, sizeof(progress), "Preparing navigation: %d / %d", state->prepared,
-                 state->prepareTotal);
-        suite_ui::Busy(progress);
+        if (!state->backendNote.empty())
+            ImGui::TextWrapped("%s", state->backendNote.c_str());
+        else
+        {
+            char progress[80];
+            snprintf(progress, sizeof(progress), "Preparing navigation: %d / %d", state->prepared,
+                     state->prepareTotal);
+            suite_ui::Busy(progress);
+        }
     }
     if (!state->error.empty())
         ImGui::TextWrapped("%s", state->error.c_str());
+    if (!state->accelerator.empty())
+        ImGui::TextDisabled("%s", state->accelerator.c_str());
+    if (!state->backendNote.empty())
+    {
+        ImGui::TextDisabled("Backend: %s", state->gpu ? "GPU + CPU" : state->portable ? "CPU" : "Unity");
+        Help(state->backendNote.c_str());
+    }
     bool sameCatalog = source && state->source && source->session == state->source->session &&
                        source->data->pid == state->source->data->pid &&
                        source->data->scene == state->source->data->scene &&

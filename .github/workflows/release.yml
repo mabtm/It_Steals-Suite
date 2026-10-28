@@ -44,12 +44,16 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends mono-mcs mono-runtime
       - name: Test production logic, UI, and managed contracts
         run: python3 tests/run.py --ui --managed --jobs 2 --output build/verification
+      - name: Check GPU search memory and undefined behavior
+        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests --sanitize --jobs 2 --output build/gpu-sanitizers
       - name: Retain verification logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: production-verification
           path: |
+            build/gpu-sanitizers/summary.json
+            build/gpu-sanitizers/**/*.log
             build/verification/summary.json
             build/verification/**/*.log
             build/verification/replay_experience_tests/work/clock-arguments.json
@@ -60,7 +64,7 @@ jobs:
     name: Windows build, installer, and release
     needs: verify
     runs-on: windows-2022
-    timeout-minutes: 25
+    timeout-minutes: 35
     permissions:
       contents: write
       actions: read
@@ -87,6 +91,10 @@ jobs:
         run: |
           & .\Installer\Release.ps1 -PlatformToolset v143 -SourceCommit $env:GITHUB_SHA
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Release packaging failed.' }
+      - name: Verify actual production GPU shaders, coordinator, calibration and CPU fault recovery
+        run: |
+          & .\tests\seed_gpu_windows_tests.ps1
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Production GPU integration checks failed.' }
       - name: Verify 1080p60/120 and sustained AVI timing with the shipped encoder
         env:
           GH_TOKEN: ${{ github.token }}
@@ -114,6 +122,7 @@ jobs:
           name: windows-distribution
           path: |
             build/release/*
+            build/windows-seed-gpu/*.log
             build/installer-tests/summary.json
             build/windows-launcher-tests/summary.json
             build/updater-tests/summary.json
