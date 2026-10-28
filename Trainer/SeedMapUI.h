@@ -270,13 +270,8 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
     if (busy)
     {
         SameLineIfFits("Stop seed search");
-        ImGui::BeginDisabled(HasPendingRequest());
         if (suite_ui::Button("Stop seed search"))
-        {
-            PlannerRequest(4);
             g_seedSearch.Stop();
-        }
-        ImGui::EndDisabled();
     }
     if (source && source->data)
     {

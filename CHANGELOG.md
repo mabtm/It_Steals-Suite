@@ -2,6 +2,12 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.20.2 Changelog
+
+- Fixed a bug caused by the Stop seed search button being disabled while a game command awaits acknowledgement. Cancellation now stops native preparation/workers immediately, while the game stop waits for the existing command to be acknowledged.
+- Fixed a bug caused by duplicate game stop commands from the UI and command loop. One search lifecycle check now sends the deferred stop exactly once and discards an older pending stop when a newer search starts.
+- Improved regression coverage with the actual Stop button under pending/ready commands, both viewport sizes and DPI scales, plus cold-preparation cancellation, CPU completion, completed Unity streams, context changes and restart-before-acknowledgement. The game mod remains 7.19.0.
+
 ### v7.20.1 Changelog
 
 - Fixed a bug caused by live seed searches also preparing a full preview route on the map worker, duplicating navigation work before the first scored seeds. Live search captures now publish their map/floor promptly and let the existing search coordinator prepare distances once.

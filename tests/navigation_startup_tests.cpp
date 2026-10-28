@@ -34,9 +34,56 @@ static bool TopEqual(const SeedSearchState &a,const SeedSearchState &b)
         a.top[i].route.order!=b.top[i].route.order||a.top[i].route.contacts!=b.top[i].route.contacts)return false;
     return true;
 }
+static void GameStopCases()
+{
+    auto fixture = SeedFixture();
+    auto choices = fixture.samples;
+    auto source = StreamingSource(fixture);
+    auto request = StreamingRequest(*source, 32);
+    SeedSearch search;
+    assert(!search.TakeGameStop(false));
+    search.Begin(request);
+    assert(!search.TakeGameStop(true));
+    search.Stop();
+    assert(!search.Busy());
+    for (int i = 0; i < 3; i++) assert(!search.TakeGameStop(true));
+    assert(search.TakeGameStop(false) && !search.TakeGameStop(false));
+
+    // A new request retires an older, unsent stop.
+    search.Begin(request);
+    assert(!search.TakeGameStop(false));
+    search.Stop();
+    assert(!search.TakeGameStop(true));
+    auto newer = request;
+    newer.serial++;
+    search.Begin(newer);
+    assert(!search.TakeGameStop(true) && !search.TakeGameStop(false));
+    search.Stop();
+    assert(search.TakeGameStop(false) && !search.TakeGameStop(false));
+
+    // Losing the map context uses the same deferred cancellation.
+    search.Begin(request);
+    assert(!search.TakeGameStop(false));
+    auto changed = std::make_shared<MapAnalysis>(*source);
+    changed->session++;
+    search.Update(changed);
+    assert(!search.Busy() && !search.TakeGameStop(true));
+    assert(search.TakeGameStop(false) && !search.TakeGameStop(false));
+
+    // A finished Unity stream has already stopped its own sampler.
+    search.Begin(request);
+    assert(!search.TakeGameStop(false));
+    search.Update(source);
+    FeedStreaming(search, request, choices);
+    auto result = AwaitStreaming(search);
+    assert(result->phase == SearchPhase::Completed && !result->portable);
+    assert(!search.TakeGameStop(false) && !search.TakeGameStop(false));
+    std::cout << "Immediate local cancellation, delayed/one-time game stop, restart/context change and completed Unity stream: PASS\n";
+}
 int main(int argc,char **argv)
 {
     assert(argc==2);std::filesystem::path fixtures(argv[1]);
+    GameStopCases();
     for(int scene:kMapScenes)
     {
         auto data=LoadRouteBenchmarkFixture((fixtures/(scene==5?"hide-seek-boxes.routefixture":"hide-seek-outside-boxes.routefixture")).string().c_str(),scene==5?22:20,1.35f);
@@ -51,7 +98,7 @@ int main(int argc,char **argv)
         assert(!source->route.complete); // no duplicate full preview preparation during a live search
         auto request=StreamingRequest(*source,96,2);request.backend=SearchBackend::Cpu;
         SeedSearch search;
-        search.Begin(request);search.Update(source);
+        search.Begin(request);assert(!search.TakeGameStop(false));search.Update(source);
         until=std::chrono::steady_clock::now()+std::chrono::seconds(15);
         bool preparing=false;
         while(std::chrono::steady_clock::now()<until)
@@ -62,13 +109,17 @@ int main(int argc,char **argv)
         }
         assert(preparing); // cancel the expensive cold preparation, not only a warm search
         search.Stop();assert(!search.Busy());
+        assert(!search.TakeGameStop(true));
+        assert(search.TakeGameStop(false)&&!search.TakeGameStop(false));
         for(int round=0;round<2;round++)
         {
-            search.Begin(request);search.Update(source);
+            search.Begin(request);assert(!search.TakeGameStop(false));search.Update(source);
             auto result=AwaitStreaming(search);
             assert(result->phase==SearchPhase::Completed&&result->evaluated==request.count&&result->generated==request.count);
             assert(result->scored+result->pruned+result->filtered==request.count&&result->preview&&result->top.size()==10);
             assert(result->distanceCacheReused==(round!=0));
+            assert(!search.TakeGameStop(true));
+            assert(search.TakeGameStop(false)&&!search.TakeGameStop(false));
             NavGraph nav(*source->data);int last=0,total=0;std::vector<std::string> stages;
             SearchDistances distances(*source->data,nav,[]{return false;},[&](int done,int count){assert(done>=last&&done<=count);last=done;total=count;},[&](const char *stage){stages.emplace_back(stage);});
             assert(last==total&&total>int(source->data->spawns.size()+source->data->points.size())*2&&stages.size()==3);

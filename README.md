@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.20.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.20.1)**
+**[v7.20.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.20.2)**
 
-- Fixed a bug caused by live seed searches also preparing a full preview route on the map worker, duplicating navigation work before the first scored seeds. Live search captures now publish their map/floor promptly and let the existing search coordinator prepare distances once.
-- Fixed a bug caused by preparation progress covering only navigation rows: expensive physical repairs and pickup tables could leave an old counter such as 1/160 on screen. Preparation now publishes activity throughout, reports navigation/contact stages, and completes its full work counter.
-- Improved cold navigation preparation with a bounded, thread-safe cache of exact physical segment checks, early acceptance of fully covered floor segments, and removal of repeated obstacle checks during repairs. Route geometry, clearance and pickup scoring retain their existing checks.
+- Fixed a bug caused by the Stop seed search button being disabled while a game command awaits acknowledgement. Cancellation now stops native preparation/workers immediately, while the game stop waits for the existing command to be acknowledged.
+- Fixed a bug caused by duplicate game stop commands from the UI and command loop. One search lifecycle check now sends the deferred stop exactly once and discards an older pending stop when a newer search starts.
+- Improved regression coverage with the actual Stop button under pending/ready commands, both viewport sizes and DPI scales, plus cold-preparation cancellation, CPU completion, completed Unity streams, context changes and restart-before-acknowledgement. The game mod remains 7.19.0.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

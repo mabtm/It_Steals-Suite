@@ -1953,6 +1953,60 @@ void ShortcutUICases(const std::string &output)
         << "Actual shortcut buttons, assignment/conflict modal, cancel/default restoration and small-screen popup bounds: PASS\n";
 }
 
+static void SeedSearchStopUICases()
+{
+    auto savedCommands = g_commands;
+    auto savedOptions = g_plannerOptions;
+    bool savedPending = pendingRequest;
+    auto source = StreamingSource();
+    auto request = StreamingRequest(*source, practice::SeedSpace);
+    auto &io = ImGui::GetIO();
+    for (ImVec2 viewport : {ImVec2(480, 700), ImVec2(1280, 900)})
+        for (float dpi : {1.f, 1.5f})
+            for (bool pending : {false, true})
+            {
+                io.DisplaySize = viewport;
+                ApplyTheme(dpi);
+                io.Fonts->Build();
+                io.Fonts->SetTexID(1);
+                io.AddMousePosEvent(-1000, -1000);
+                pendingRequest = pending;
+                g_commands = {};
+                g_commands.plannerRequest = pending ? 3 : 0;
+                const auto command = g_commands;
+                g_plannerOptions.level = MapLevelIndex(source->data->scene);
+                g_seedSearch.Begin(request);
+                assert(!g_seedSearch.TakeGameStop(pending));
+                auto frame = [&] {
+                    ImGui::NewFrame();
+                    ImGui::SetNextWindowPos({10, 10});
+                    ImGui::SetNextWindowSize({viewport.x - 20, viewport.y - 20});
+                    ImGui::Begin("Seed search cancellation QA");
+                    RenderSeedSearchControls(source, true, false);
+                    ImGui::End();
+                    ImGui::Render();
+                };
+                for (int i = 0; i < 3; i++) frame();
+                auto *window = ImGui::FindWindowByName("Seed search cancellation QA");
+                assert(window && g_seedSearch.Busy());
+                ImGui::ActivateItemByID(window->GetID("Stop seed search"));
+                frame();
+                frame();
+                assert(!g_seedSearch.Busy() && g_seedSearch.Get()->phase == practice::SearchPhase::Stopped);
+                assert(std::memcmp(&g_commands, &command, sizeof(command)) == 0);
+                if (pending) assert(!g_seedSearch.TakeGameStop(true));
+                assert(g_seedSearch.TakeGameStop(false) && !g_seedSearch.TakeGameStop(false));
+            }
+    pendingRequest = savedPending;
+    g_commands = savedCommands;
+    g_plannerOptions = savedOptions;
+    io.DisplaySize = {1280, 720};
+    ApplyTheme(1);
+    io.Fonts->Build();
+    io.Fonts->SetTexID(1);
+    std::cout << "Actual Stop button with/without pending game acknowledgement, unchanged commands, one-time deferred stop, small/large viewports and DPI: PASS\n";
+}
+
 int main(int argc, char **argv)
 {
     std::cout.setf(std::ios::unitbuf);
@@ -1961,6 +2015,12 @@ int main(int argc, char **argv)
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.DeltaTime = 1.f / 60;
+    if (argc > 2 && std::string(argv[2]) == "--seed-stop-only")
+    {
+        SeedSearchStopUICases();
+        ImGui::DestroyContext();
+        return 0;
+    }
     if (argc > 2 && std::string(argv[2]) == "--mode-statistics-only")
     {
         RunStatisticsCases(argv[1]);
@@ -2655,6 +2715,7 @@ int main(int argc, char **argv)
     }
     std::cout << "Actual Random Seed / Search request actions and result/progress/stop UI: PASS ("
               << searchViews << " states)\n";
+    SeedSearchStopUICases();
     g_seedSearch.Stop();
     g_plannerOptions.level = 0;
     BindPlannerFilters(*source);

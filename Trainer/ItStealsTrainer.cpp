@@ -1186,21 +1186,8 @@ void SyncCommands(bool visible)
     if (search->Busy())
         g_seedSearch.Update(g_mapWorker.Get(MapLevelIndex(search->request.scene)));
     search = g_seedSearch.Get();
-    static bool wasSearchBusy = false;
-    static uint32_t lastSearchSerial = 0;
-    static bool stopPending = false;
-    if (wasSearchBusy && !search->Busy() &&
-        (search->phase != practice::SearchPhase::Completed || search->portable))
-        stopPending = true;
-    if (search->Busy() && search->request.serial != lastSearchSerial)
-        stopPending = false;
-    if (stopPending && !HasPendingRequest())
-    {
+    if (g_seedSearch.TakeGameStop(HasPendingRequest()))
         g_commands.plannerRequest = 4;
-        stopPending = false;
-    }
-    wasSearchBusy = search->Busy();
-    lastSearchSerial = search->request.serial;
     g_commands.plannerSearchCount = g_plannerOptions.searchCount;
     g_commands.plannerBudgetMicros = static_cast<uint32_t>(g_plannerOptions.generationMs * 1000);
     g_commands.plannerOptions = (g_plannerOptions.recipe == 1 ? 1u : 0u) | (g_rawPracticeSpawn ? 2u : 0u) |

@@ -480,6 +480,8 @@ class SeedSearch
 
     std::deque<Prepared> preparedCatalogs;
     SeedAcceleration accelerate;
+    bool gameWasBusy = false, gameStopPending = false;
+    uint32_t gameSerial = 0;
 
     bool Obsolete(uint64_t token) const
     {
@@ -1081,6 +1083,23 @@ class SeedSearch
     bool Busy() const
     {
         return Get()->Busy();
+    }
+
+    // Called by the command thread: retain a stop until the preceding game
+    // command is acknowledged, and consume it exactly once.
+    bool TakeGameStop(bool commandPending)
+    {
+        auto state = Get();
+        bool busy = state->Busy();
+        if (gameWasBusy && !busy && (state->phase != SearchPhase::Completed || state->portable))
+            gameStopPending = true;
+        if (busy && state->request.serial != gameSerial)
+            gameStopPending = false;
+        gameWasBusy = busy;
+        gameSerial = state->request.serial;
+        if (commandPending || !gameStopPending) return false;
+        gameStopPending = false;
+        return true;
     }
 
     void Begin(SeedSearchRequest request)
