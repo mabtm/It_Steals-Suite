@@ -37,7 +37,7 @@ class PickupRouting
   public:
     PickupRouting(
         const MapData &data, const NavGraph &nav, const std::vector<int> &ids,
-        const Cancel &canceled = [] { return false; })
+        const Cancel &canceled = [] { return false; }, const std::function<void(int, int)> &progress = {})
         : graph(nav)
     {
         const int spawns = int(data.spawns.size());
@@ -49,6 +49,7 @@ class PickupRouting
         {
             if (canceled())
                 throw std::runtime_error("Canceled");
+            if (progress) progress(int(i), int(ids.size()));
             int id = ids[i], point = id - spawns;
             Vec3 original = id < spawns ? data.spawns[id] : data.points[point];
             auto p = graph.CatalogProject(id, original);
@@ -114,6 +115,7 @@ class PickupRouting
                 active = true;
             }
         }
+        if (progress) progress(int(ids.size()), int(ids.size()));
         size_t total = 0;
         for (const auto &points : contacts)
             total += points.size();

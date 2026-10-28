@@ -1,6 +1,8 @@
 #pragma once
 #include "PracticeMapData.h"
+#include <bit>
 #include <functional>
+#include <mutex>
 #include <numeric>
 #include <queue>
 #include <set>
@@ -129,6 +131,34 @@ class PhysicalNavigation
     std::vector<std::array<Vec3, 3>> triangles;
     bool enabled = false;
     double radius = 0;
+    // Geometry is immutable. Repeated corridor repairs and pickup tables ask
+    // about the same segments; retain exact endpoint bits in a bounded cache.
+    struct Segment
+    {
+        std::array<uint32_t, 6> endpoints{};
+        uint8_t flags = 0; // valid, capsule clear, floor covered
+    };
+    mutable std::mutex segmentGate;
+    mutable std::vector<Segment> segments;
+
+    uint8_t CheckSegment(Vec3 a, Vec3 b) const
+    {
+        std::array<uint32_t, 6> key{std::bit_cast<uint32_t>(a.x), std::bit_cast<uint32_t>(a.y),
+            std::bit_cast<uint32_t>(a.z), std::bit_cast<uint32_t>(b.x), std::bit_cast<uint32_t>(b.y), std::bit_cast<uint32_t>(b.z)};
+        uint64_t hash = 14695981039346656037ULL;
+        for (auto bits : key) { hash ^= bits; hash *= 1099511628211ULL; }
+        size_t slot = size_t(hash ^ (hash >> 32)) & 65535;
+        {
+            std::lock_guard lock(segmentGate);
+            if (segments.empty()) segments.resize(65536);
+            const auto &entry = segments[slot];
+            if (entry.flags && entry.endpoints == key) return entry.flags;
+        }
+        bool clear = Clear(a, b);
+        uint8_t flags = 1 | (clear ? 2 : 0) | (clear && OnFloor(a, b) ? 4 : 0);
+        { std::lock_guard lock(segmentGate); segments[slot] = {key, flags}; }
+        return flags;
+    }
 
     static double Cross(Vec3 a, Vec3 b, Vec3 p)
     {
@@ -305,6 +335,7 @@ class PhysicalNavigation
     bool OnFloor(Vec3 a, Vec3 b) const
     {
         std::vector<std::pair<double, double>> spans;
+        bool covered = false;
         floors.Query(a, b, .0001, [&](int id) {
             const auto &t = triangles[id];
             double area = Cross(t[0], t[1], t[2]), sign = area < 0 ? -1 : 1, lo = 0, hi = 1;
@@ -331,9 +362,13 @@ class PhysicalNavigation
             double u = Cross(t[1], t[2], probe) / area, v = Cross(t[2], t[0], probe) / area,
                    y = u * t[0].y + v * t[1].y + (1 - u - v) * t[2].y;
             if (std::abs(y - probe.y) < .3)
+            {
+                if (lo <= 0 && hi >= 1) { covered = true; return false; }
                 spans.emplace_back(std::max(lo, 0.), std::min(hi, 1.));
+            }
             return true;
         });
+        if (covered) return true;
         std::sort(spans.begin(), spans.end());
         double end = 0;
         for (auto s : spans)
@@ -349,7 +384,7 @@ class PhysicalNavigation
 
     bool Visible(Vec3 a, Vec3 b) const
     {
-        return Clear(a, b) && OnFloor(a, b);
+        return (CheckSegment(a, b) & 4) != 0;
     }
 
     // Small local visibility repairs around physical obstacles, on the same
@@ -363,7 +398,7 @@ class PhysicalNavigation
         std::set<int> added, pending;
         auto collect = [&](Vec3 x, Vec3 y) {
             solids.Query(x, y, radius, [&](int id) {
-                if (Blocked(id, x, y) && !added.contains(id))
+                if (!added.contains(id) && !pending.contains(id) && Blocked(id, x, y))
                     pending.insert(id);
                 return true;
             });
@@ -444,8 +479,9 @@ class PhysicalNavigation
                 {
                     if ((j & 31) == 0 && canceled())
                         throw std::runtime_error("Canceled");
-                    bool clear = Clear(nodes[i], nodes[j]);
-                    edges[i][j] = edges[j][i] = clear && OnFloor(nodes[i], nodes[j])
+                    auto segment = CheckSegment(nodes[i], nodes[j]);
+                    bool clear = (segment & 2) != 0;
+                    edges[i][j] = edges[j][i] = (segment & 4) != 0
                                                     ? Distance(nodes[i], nodes[j])
                                                     : std::numeric_limits<double>::infinity();
                     if (!clear)

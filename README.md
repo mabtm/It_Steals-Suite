@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.20.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.20.0)**
+**[v7.20.1](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.20.1)**
 
-- Improved regular seed search with the lossless FP64 GPU scorer validated in GPU Dev 6: Automatic compares CPU and GPU on verified Outside and Classic Bonus maps, keeps CPU bounds for long Hide & Seek searches, and preserves exact CPU solving for small tours.
-- Improved search controls with Automatic / CPU / GPU selection, the active GPU/backend and calibration details, session-local geometry/settings profiles, and the measured 4096-candidate batches with bounded CPU helpers.
-- Improved GPU reliability with CPU-verified startup layouts, changing per-batch samples and every published Top 10, cancellable GPU completion, and a complete same-key CPU restart after a GPU error; preview, filters, goals, pinning and exports remain available.
+- Fixed a bug caused by live seed searches also preparing a full preview route on the map worker, duplicating navigation work before the first scored seeds. Live search captures now publish their map/floor promptly and let the existing search coordinator prepare distances once.
+- Fixed a bug caused by preparation progress covering only navigation rows: expensive physical repairs and pickup tables could leave an old counter such as 1/160 on screen. Preparation now publishes activity throughout, reports navigation/contact stages, and completes its full work counter.
+- Improved cold navigation preparation with a bounded, thread-safe cache of exact physical segment checks, early acceptance of fully covered floor segments, and removal of repeated obstacle checks during repairs. Route geometry, clearance and pickup scoring retain their existing checks.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->

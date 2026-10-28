@@ -31,10 +31,17 @@ class SearchDistances
 
   public:
     SearchDistances(const MapData &catalog, const NavGraph &nav, const Cancel &canceled,
-                    const std::function<void(int, int)> &progress)
+                    const std::function<void(int, int)> &progress,
+                    const std::function<void(const char *)> &step = {})
         : data(catalog), graph(nav)
     {
-        table = graph.Routes(canceled, progress);
+        int nodes = int(data.spawns.size() + data.points.size());
+        int pairs = int(data.spawns.size() * data.points.size() + data.points.size() * (data.points.size() - 1) / 2);
+        int total = nodes * 4 + pairs;
+        auto report = [&](int done) { if (progress) progress(done, total); };
+        if (step) step("navigation paths");
+        report(0);
+        table = graph.Routes(canceled, [&](int done, int) { report(done); });
         int count = table->count;
         // Seed layouts retain descending catalog IDs. Equal-distance ties in
         // this shared order therefore match the solver's local-index ties.
@@ -53,8 +60,10 @@ class SearchDistances
                     double x = table->lengths[from][a], y = table->lengths[from][b];
                     return x < y || (x == y && a > b);
                 });
+                report(2 * nodes + from + 1);
             }
         }
+        report(3 * nodes);
         const auto &estimates = table->estimates;
         estimatedPairs = 0;
         for (int a = 0; a < count; a++)
@@ -62,11 +71,19 @@ class SearchDistances
                 estimatedPairs += estimates[a][b] != 0;
         std::vector<int> ids(count);
         std::iota(ids.begin(), ids.end(), 0);
-        pickups = std::make_unique<PickupRouting>(data, graph, ids, canceled);
+        if (step) step("pickup contacts");
+        pickups = std::make_unique<PickupRouting>(data, graph, ids, canceled,
+            [&](int done, int) { report(3 * nodes + done); });
+        if (step) step("pickup distances");
+        int prepared = 4 * nodes;
         if (pickups->Active())
             for (int from = 0; from < count; from++)
                 for (int to = std::max(from + 1, int(data.spawns.size())); to < count; to++)
+                {
                     pickups->SetLeg(from, to, table->Between(from, to), estimates[from][to] != 0, canceled);
+                    report(++prepared);
+                }
+        report(total);
     }
 
     int ProjectedSpawns() const
@@ -288,6 +305,7 @@ struct SeedSearchState
     int estimatedPairs = 0, recoveredPairs = 0, repairQueries = 0;
     std::string navigationModel;
     std::string accelerator, backendNote;
+    std::string preparationStep = "navigation geometry";
     bool gpu = false;
     double calibrationMs = 0;
     bool portable = false, distanceCacheReused = false;
@@ -757,6 +775,15 @@ class SeedSearch
             std::shared_ptr<NavGraph> graph;
             std::shared_ptr<SearchDistances> distances;
             auto nextProgress = Clock::now();
+            auto prepareCancel = [&] {
+                if (canceled()) return true;
+                if (Clock::now() >= nextProgress)
+                {
+                    Publish(Snapshot(job), job->token);
+                    nextProgress = Clock::now() + std::chrono::milliseconds(200);
+                }
+                return false;
+            };
             if (!job->state.request.layoutOnly)
             {
                 auto started = Clock::now();
@@ -774,19 +801,22 @@ class SeedSearch
                     }
                 if (!reused)
                 {
-                    graph = std::make_shared<NavGraph>(data, canceled);
+                    graph = std::make_shared<NavGraph>(data, prepareCancel);
                     distances =
-                        std::make_shared<SearchDistances>(data, *graph, canceled, [&](int done, int total) {
+                        std::make_shared<SearchDistances>(data, *graph, prepareCancel, [&](int done, int total) {
                             {
                                 std::lock_guard<std::mutex> lock(job->gate);
                                 job->state.prepared = done;
                                 job->state.prepareTotal = total;
                             }
-                            if (Clock::now() >= nextProgress)
+                            if (done == total || Clock::now() >= nextProgress)
                             {
                                 Publish(Snapshot(job), job->token);
                                 nextProgress = Clock::now() + std::chrono::milliseconds(200);
                             }
+                        }, [&](const char *step) {
+                            { std::lock_guard lock(job->gate); job->state.preparationStep = step; }
+                            Publish(Snapshot(job), job->token);
                         });
                     if (canceled())
                         return;

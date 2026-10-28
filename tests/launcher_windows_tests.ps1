@@ -65,7 +65,7 @@ try {
     $msbuild=& $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
     if (-not $msbuild) { throw 'MSBuild is required for the native checks.' }
     $nativeIncludes=[Security.SecurityElement]::Escape((Join-Path $repo 'Trainer'))
-    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','seed_neighbor_tests','hotkey_tests','replay_library_tests','run_statistics_tests')) {
+    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','seed_neighbor_tests','hotkey_tests','replay_library_tests','run_statistics_tests','navigation_visibility_tests','navigation_startup_tests')) {
         $nativeSource=[Security.SecurityElement]::Escape((Join-Path $repo ('tests/'+$nativeTest+'.cpp')))
         $nativeOutput=[Security.SecurityElement]::Escape((Join-Path $work 'native'))
         $nativeProject=Join-Path $work 'startup-tests.vcxproj'
@@ -77,14 +77,15 @@ try {
   <PropertyGroup Label="Configuration"><ConfigurationType>Application</ConfigurationType><PlatformToolset>v143</PlatformToolset></PropertyGroup>
   <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup><OutDir>$nativeOutput\</OutDir><IntDir>$nativeOutput\obj\</IntDir><TargetName>$nativeTest</TargetName></PropertyGroup>
-  <ItemDefinitionGroup><ClCompile><LanguageStandard>stdcpp20</LanguageStandard><AdditionalIncludeDirectories>$nativeIncludes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><PreprocessorDefinitions>NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions><AdditionalOptions>/utf-8 /UNDEBUG %(AdditionalOptions)</AdditionalOptions><RuntimeLibrary>MultiThreaded</RuntimeLibrary></ClCompile><Link><SubSystem>Console</SubSystem></Link></ItemDefinitionGroup>
+  <ItemDefinitionGroup><ClCompile><LanguageStandard>stdcpp20</LanguageStandard><Optimization>MaxSpeed</Optimization><FloatingPointModel>Strict</FloatingPointModel><AdditionalIncludeDirectories>$nativeIncludes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><PreprocessorDefinitions>NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions><AdditionalOptions>/utf-8 /UNDEBUG %(AdditionalOptions)</AdditionalOptions><RuntimeLibrary>MultiThreaded</RuntimeLibrary></ClCompile><Link><SubSystem>Console</SubSystem></Link></ItemDefinitionGroup>
   <ItemGroup><ClCompile Include="$nativeSource" /></ItemGroup>
   <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
 "@)
         & $msbuild $nativeProject /p:Configuration=Release /p:Platform=x64 /nologo /verbosity:minimal
         if ($LASTEXITCODE -ne 0) { throw "Native check compilation failed: $nativeTest" }
-        & (Join-Path $work ('native/'+$nativeTest+'.exe')) $work
+        $nativeArgument = if ($nativeTest -eq 'navigation_startup_tests') { Join-Path $repo 'tests/fixtures' } else { $work }
+        & (Join-Path $work ('native/'+$nativeTest+'.exe')) $nativeArgument
         if ($LASTEXITCODE -ne 0) { throw "Native contract failed: $nativeTest" }
     }
     $game=Join-Path $work ('Game & caf' + [char]0xe9 + ' ' + [char]0x6e2c + [char]0x8a66)

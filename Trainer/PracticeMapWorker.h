@@ -202,6 +202,22 @@ class MapWorker
                     }
                     if (reusable)
                         initial->route = previous->route;
+                    // The search coordinator builds the complete shared distance
+                    // table. Preparing a second full preview here duplicates that
+                    // expensive work and delays the first usable search catalog.
+                    if (live && data->stage == 2)
+                    {
+                        if (!initial->floor || !initial->outline)
+                        {
+                            NavGraph floor(*data, canceled, true);
+                            initial->floor = std::make_shared<const std::vector<std::array<Vec3, 3>>>(floor.Floor());
+                            initial->outline = std::make_shared<const std::vector<std::pair<Vec3, Vec3>>>(floor.Boundary());
+                        }
+                        initial->working = false;
+                        if (!reusable) initial->route.message = "Seed search is preparing routes. Results will appear automatically.";
+                        if (!canceled()) std::atomic_store(&results[level], std::shared_ptr<const MapAnalysis>(initial));
+                        continue;
+                    }
                     if (!canceled())
                         std::atomic_store(&results[level], std::shared_ptr<const MapAnalysis>(initial));
                     if (!graphData || !SameNavigationCatalog(*graphData, *data))

@@ -44,8 +44,8 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends mono-mcs mono-runtime
       - name: Test production logic, UI, and managed contracts
         run: python3 tests/run.py --ui --managed --jobs 2 --output build/verification
-      - name: Check GPU search memory and undefined behavior
-        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests --sanitize --jobs 2 --output build/gpu-sanitizers
+      - name: Check search memory and undefined behavior
+        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests navigation_visibility_tests navigation_startup_tests --sanitize --jobs 2 --output build/gpu-sanitizers
       - name: Retain verification logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

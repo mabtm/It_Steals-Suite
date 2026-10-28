@@ -355,8 +355,12 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
         else
         {
             char progress[80];
-            snprintf(progress, sizeof(progress), "Preparing navigation: %d / %d", state->prepared,
-                     state->prepareTotal);
+            const char *step = state->phase == practice::SearchPhase::Generating
+                ? "game navigation" : state->preparationStep.c_str();
+            if (state->prepareTotal > 0)
+                snprintf(progress, sizeof(progress), "Preparing %s: %d / %d", step, state->prepared, state->prepareTotal);
+            else
+                snprintf(progress, sizeof(progress), "Preparing %s", step);
             suite_ui::Busy(progress);
         }
     }

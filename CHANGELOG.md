@@ -2,6 +2,13 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.20.1 Changelog
+
+- Fixed a bug caused by live seed searches also preparing a full preview route on the map worker, duplicating navigation work before the first scored seeds. Live search captures now publish their map/floor promptly and let the existing search coordinator prepare distances once.
+- Fixed a bug caused by preparation progress covering only navigation rows: expensive physical repairs and pickup tables could leave an old counter such as 1/160 on screen. Preparation now publishes activity throughout, reports navigation/contact stages, and completes its full work counter.
+- Improved cold navigation preparation with a bounded, thread-safe cache of exact physical segment checks, early acceptance of fully covered floor segments, and removal of repeated obstacle checks during repairs. Route geometry, clearance and pickup scoring retain their existing checks.
+- Improved verification with complete live-map-to-seed-search startup, cold/warm caches, identical Top 10, preview, Stop/restart and normal map previews across all eight modes, including Timer and Hide & Seek; 80005 independent floor/segment comparisons and parallel/collision checks also run on Windows and under sanitizers. The game mod remains 7.19.0.
+
 ### v7.20.0 Changelog
 
 - Improved regular seed search with the lossless FP64 GPU scorer validated in GPU Dev 6: Automatic compares CPU and GPU on verified Outside and Classic Bonus maps, keeps CPU bounds for long Hide & Seek searches, and preserves exact CPU solving for small tours.
