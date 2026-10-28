@@ -167,6 +167,16 @@ int main(int argc, char **argv)
                 assert(state.error.empty());
                 if (handled) assert(state.phase == SearchPhase::Completed && state.gpu);
                 else assert(state.backendNote.find("CPU selected") != std::string::npos);
+                if (!handled)
+                {
+                    auto forced = request; forced.backend = SearchBackend::Gpu;
+                    state = {}; state.source = source; state.request = forced; state.portable = true;
+                    std::atomic<bool> stop{false};
+                    assert(engine.Run(state, distances, [&] { return stop.load(); }, [&](auto s) { if (s.gpu && s.evaluated >= 64) stop = true; }));
+                    assert(state.phase == SearchPhase::Stopped && state.error.empty());
+                    state = {}; state.source = source; state.request = request; state.portable = true;
+                    assert(!engine.Run(state, distances, [] { return false; }, [](auto) {}) && state.calibrationMs == 0);
+                }
             }
             else
             {

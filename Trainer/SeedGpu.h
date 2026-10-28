@@ -205,8 +205,15 @@ class Engine
         catch (const std::exception &error)
         {
             double calibrationMs = state.calibrationMs;
+            if (canceled())
+            {
+                // Stop is already visible to the UI. Briefly retire a submitted
+                // batch here so normal restarts can reuse the device/shaders.
+                // Keep measured profiles even if a slow batch must be abandoned.
+                if (device && !device->DiscardPending()) { device.reset(); uploaded.reset(); }
+                state.phase = SearchPhase::Stopped; return true;
+            }
             device.reset(); uploaded.reset(); profiles.clear();
-            if (canceled()) { state.phase = SearchPhase::Stopped; return true; }
             unavailable = std::string("GPU disabled for this session: ") + error.what() + ". CPU restarted with the same search key.";
             state = original; state.gpu = false; state.accelerator.clear();
             state.request.prune = data.scene == 5 ? r.prune : false;

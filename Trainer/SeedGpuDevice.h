@@ -198,6 +198,19 @@ class Device
         ids = Make(4, UINT(packedIds.size()), false); sizes = Make(4, UINT(packedSizes.size()), false);
         orders = Make(4, UINT(resetOrders.size()), true); lengths = Make(8, UINT(resetLengths.size()), true); Bind();
     }
+    bool DiscardPending()
+    {
+        if (!pending) return true;
+        auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
+        do
+        {
+            HRESULT status = context->GetData(complete.Get(), nullptr, 0, D3D11_ASYNC_GETDATA_DONOTFLUSH);
+            if (status == S_OK) { pending = false; return true; }
+            if (FAILED(status)) return false;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        } while (std::chrono::steady_clock::now() < until);
+        return false;
+    }
     std::vector<practice::RouteResult> Execute(std::span<const practice::SeedLayout> layouts, const practice::Cancel &canceled)
     {
         int count = int(layouts.size());
