@@ -14,6 +14,7 @@ class Engine
         std::shared_ptr<const practice::MapData> map;
         practice::SeedSearchRequest request;
         bool gpu = false;
+        uint64_t count = 1024;
         double cpuMs = 0, gpuMs = 0;
     };
     std::unique_ptr<Device> device;
@@ -30,14 +31,14 @@ class Engine
         const auto &a = *p.map; const auto &b = p.request;
         return a.keep == d.keep && a.rngInit == d.rngInit && a.rngRange == d.rngRange && a.rngAdvance == d.rngAdvance &&
             a.rngSite == d.rngSite && (a.flags & 16) == (d.flags & 16) &&
-            b.recipe == r.recipe && b.fast == r.fast && b.workers == r.workers &&
+            b.recipe == r.recipe && b.fast == r.fast && b.workers == r.workers && b.count == r.count &&
             b.criteria.spawn == r.criteria.spawn && b.criteria.objective == r.criteria.objective && practice::SameNavigationCatalog(a, d);
     }
     static std::string ProfileText(const Profile &p)
     {
         std::ostringstream note; note.imbue(std::locale::classic());
-        note << "Automatic calibration: CPU " << uint64_t(1024000. / p.cpuMs) << "/s; GPU "
-             << uint64_t(1024000. / p.gpuMs) << "/s. Cached for this map/settings.";
+        note << "Automatic calibration: CPU " << uint64_t(p.count * 1000. / p.cpuMs) << "/s; GPU "
+             << uint64_t(p.count * 1000. / p.gpuMs) << "/s. Cached for this map/settings.";
         return note.str();
     }
     void Prepare(std::shared_ptr<const practice::MapData> data, const practice::SearchDistances &distances)
@@ -85,7 +86,7 @@ class Engine
             state.backendNote = "CPU: GPU scoring requires a complete verified 16-52 crystal Outside, Classic Bonus or Hide & Seek map.";
             return false;
         }
-        if (r.backend == SearchBackend::Automatic && data.scene == 5)
+        if (r.backend == SearchBackend::Automatic && data.scene == 5 && r.criteria.objective == SearchObjective::ShortestRoute)
         {
             state.backendNote = "Automatic: CPU bounds accelerate long Hide & Seek searches."; return false;
         }
@@ -129,10 +130,11 @@ class Engine
                 {
                     preparing.backendNote = "Calibrating CPU and GPU search (two short paired trials)..."; progress(preparing);
                     Profile profile; profile.map = original.source->data; profile.request = r;
+                    profile.count = data.scene == 5 ? std::min(r.count, uint64_t{16384}) : 1024;
                     double cpuMs[2]{}, gpuMs[2]{};
                     for (int round = 0; round < 2; round++)
                     {
-                        auto trial = r; trial.count = 1024; trial.prune = false;
+                        auto trial = r; trial.count = profile.count; trial.prune = false;
                         trial.key ^= 0x9e3779b97f4a7c15ULL * uint64_t(round + 1);
                         SeedSearchState cpu, gpu;
                         auto runCpu = [&] { cpu = SeedSearch::RunFrozen(original.source, distances, trial, canceled); };

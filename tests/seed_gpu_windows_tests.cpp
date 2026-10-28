@@ -151,8 +151,18 @@ int main(int argc, char **argv)
             if (scene == 5)
             {
                 request.backend = SearchBackend::Automatic; request.criteria.spawn = -1;
+                request.criteria.objective = SearchObjective::ShortestRoute;
                 SeedSearchState state; state.source = source; state.request = request; state.portable = true;
                 assert(!engine.Run(state, distances, [] { return false; }, [](auto) {}) && state.request.prune && !state.gpu);
+                seed_gpu::Engine missing(true, 999999);
+                state.request.backend = SearchBackend::Gpu;
+                assert(!missing.Run(state, distances, [] { return false; }, [](auto) {}) && state.request.prune && !state.gpu);
+                request.criteria.objective = SearchObjective::LongestRoute; request.count = 16384;
+                state = {}; state.source = source; state.request = request; state.portable = true;
+                bool handled = engine.Run(state, distances, [] { return false; }, [](auto) {});
+                assert(state.error.empty());
+                if (handled) assert(state.phase == SearchPhase::Completed && state.gpu);
+                else assert(state.backendNote.find("CPU selected") != std::string::npos);
             }
             else
             {

@@ -239,7 +239,7 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
             "Verified CPU mode generates layouts and evaluates routes in these workers, below normal thread priority. Leave CPU capacity for the game. The original Unity fallback can be limited by game-thread generation, regardless of worker count.");
         const char *backends[] = {"Automatic (recommended)", "CPU", "GPU"};
         ImGui::Combo("Search backend", &g_plannerOptions.searchBackend, backends, 3);
-        Help("Automatic compares CPU and GPU speed for verified Outside and Classic Bonus maps and reuses the decision. Hide & Seek and exact small tours use CPU. GPU uses up to two CPU helpers, or four for manually selected Hide & Seek, within the worker limit above. Unsupported hardware or a GPU error falls back to CPU.");
+        Help("Automatic compares CPU and GPU speed for verified Outside and Classic Bonus maps and reuses the decision. Shortest-route Hide & Seek and exact small tours use CPU; longest-route Hide & Seek can also compare GPU. GPU uses up to two CPU helpers, or four for Hide & Seek, within the worker limit above. Unsupported hardware or a GPU error falls back to CPU.");
         suite_ui::Checkbox("Verified CPU generation", &g_plannerOptions.portableGeneration);
         Help(
             "Recommended. Runs generation outside the game only after this Unity runtime passes RNG and complete-layout comparisons. Otherwise the original Unity generator is used automatically.");

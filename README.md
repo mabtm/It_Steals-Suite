@@ -99,7 +99,7 @@ While the repository is private, open **Updates → Connect private releases** a
 **Seeds & routes**
 
 - **Seed search:** Search in the background and rank layouts using spawn filters and complete routes.
-- **Automatic CPU/GPU search:** Outside and Classic Bonus compare both backends once per map/settings in the session. Hide & Seek keeps CPU bounds. **Practice → Seed Map → Search settings → Search backend** also offers CPU or GPU selection; unsupported maps/hardware use CPU automatically.
+- **Automatic CPU/GPU search:** Outside and Classic Bonus compare both backends once per map/settings in the session. Shortest-route Hide & Seek keeps CPU bounds. **Practice → Seed Map → Search settings → Search backend** also offers CPU or GPU selection; unsupported maps/hardware use CPU automatically.
 - **Route planning:** Find walkable crystal paths using player clearance and crystal pickup areas.
 - **Time estimates:** Learn from recorded movement to account for straights, turns, starts, and slopes.
 - **Seed preview:** View spawns and full routes, then use the selected seed in practice.
