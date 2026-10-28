@@ -161,13 +161,14 @@ class Engine
             const auto prepared = state;
             auto request = r; request.prune = false; request.workers = Helpers(r);
             std::map<uint64_t, RouteResult> verified;
-            auto verifyTop = [&](const SeedSearchState &s) {
+            auto verifyTop = [&](SeedSearchState &s) {
                 std::map<uint64_t, RouteResult> next;
-                for (const auto &row : s.top)
+                for (auto &row : s.top)
                 {
                     check(); auto prior = verified.find(row.index);
                     auto cpu = prior == verified.end() ? distances.Score(row.selection, r.fast, canceled) : prior->second;
                     if (!SameScore(cpu, row.route)) throw std::runtime_error("GPU Top 10 differs from CPU reference");
+                    row.route.message = cpu.message;
                     next.emplace(row.index, std::move(cpu));
                 }
                 verified = std::move(next);
