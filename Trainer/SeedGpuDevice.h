@@ -81,6 +81,7 @@ class Device
     std::vector<double> resetLengths;
     int capacity = 4096, fixedCrystals = 0;
     bool pending = false;
+    std::chrono::seconds timeout{10};
 
     Buffer Make(UINT stride, UINT count, bool output, const void *initial = nullptr)
     {
@@ -133,6 +134,10 @@ class Device
         DXGI_ADAPTER_DESC1 info{}; Check(adapter->GetDesc1(&info), "Read seed GPU");
         if (!allowSoftware && ((info.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) || (info.VendorId == 0x1414 && info.DeviceId == 0x8c)))
             throw std::runtime_error("A hardware GPU is required");
+        // WARP executes the large correctness batches on CI CPUs. Production
+        // never admits it; physical adapters retain the ten-second deadline.
+        if (allowSoftware && ((info.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) || (info.VendorId == 0x1414 && info.DeviceId == 0x8c)))
+            timeout = std::chrono::seconds(120);
         D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_11_0;
         Check(D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_SINGLETHREADED,
             &level, 1, D3D11_SDK_VERSION, &device, nullptr, &context), "Create seed compute device");
@@ -222,7 +227,7 @@ class Device
             if (status == S_OK) break;
             Check(status, "Wait for seed GPU");
             if (canceled()) throw std::runtime_error("Seed search stopped");
-            if (std::chrono::steady_clock::now() - start > std::chrono::seconds(10)) throw std::runtime_error("Seed GPU timed out");
+            if (std::chrono::steady_clock::now() - start > timeout) throw std::runtime_error("Seed GPU timed out");
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         auto order = Read<uint32_t>(orders, resetOrders.size()); auto length = Read<double>(lengths, resetLengths.size());

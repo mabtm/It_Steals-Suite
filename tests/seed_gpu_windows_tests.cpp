@@ -54,10 +54,12 @@ int main(int argc, char **argv)
         assert(argc >= 2); std::filesystem::path fixtures(argv[1]);
         if (argc >= 3 && std::string(argv[2]) == "--fault") { Integration(fixtures, true); return 0; }
         auto adapters = seed_gpu::Adapters(); assert(!adapters.empty());
+        std::cout << "Actual production GPU probe: " << adapters.front().name << std::endl;
         seed_gpu::Device device(adapters.front().index, true);
         uint64_t checked = 0;
         for (int n : {1, 15, 16, 22, 31, 32, 33, 40, 52})
         {
+            std::cout << "Check all shader variants: " << n << " crystals" << std::endl;
             auto source = Source(fixtures, 13, n); const auto &d = *source->data;
             NavGraph graph(d); SearchDistances distances(d, graph, [] { return false; }, [](int, int) {});
             auto catalog = std::make_shared<seed_gpu::Catalog>(int(d.spawns.size()), int(d.points.size()),
@@ -120,6 +122,7 @@ int main(int argc, char **argv)
             PortableSelectionGenerator generator(d); RandomSeedOrder order(FixtureSearchKey ^ uint64_t(scene));
             for (int count : {4096, 4093})
             {
+                std::cout << "Check full/partial batch: scene " << scene << ", " << count << " layouts" << std::endl;
                 std::vector<SeedLayout> layouts(count);
                 for (int i = 0; i < count; i++) { layouts[i].seed = order.SeedAt(uint32_t(i)); generator.Generate(layouts[i].seed, 2, layouts[i].selection); }
                 auto result = device.Execute(layouts, [] { return false; }); RouteWorkspace work;
@@ -133,6 +136,7 @@ int main(int argc, char **argv)
         }
         for (int scene : {13, 14, 5})
         {
+            std::cout << "Check integrated engine: scene " << scene << std::endl;
             auto source = Source(fixtures, scene); NavGraph graph(*source->data);
             SearchDistances distances(*source->data, graph, [] { return false; }, [](int, int) {});
             seed_gpu::Engine engine(true);
