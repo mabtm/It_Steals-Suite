@@ -15,6 +15,10 @@
 </p>
 
 <p align="center">
+  <a href="https://discord.gg/YySbYmGG2Y"><img src="assets/discord.svg" width="310" alt="Join the It-Steals Speedrunning Discord community"></a>
+</p>
+
+<p align="center">
   <a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#downloads">Downloads</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="#about-the-project">About</a> · <a href="DEVELOPING.md">Development</a>
 </p>
 
