@@ -66,12 +66,7 @@ Open **Updates** to check for a release, see **Current / New**, or install it. T
 
 The package is downloaded and checked before anything closes. After you accept the Windows permission prompt, the updater closes the game and trainer, installs the files, and restarts both. Settings and replays stay in place. A new version shows its changelog once after the intro; the full history is also available offline.
 
-<details>
-<summary><strong>Access to private releases</strong></summary>
-
-While the repository is private, open **Updates → Connect private releases** and save a GitHub token limited to this repository with **Contents: read** access. It is stored in Windows Credential Manager for your Windows account. **Disconnect** removes it. Public releases need no token.
-
-</details>
+Releases are public. Checking for updates and downloading them requires no GitHub account or token. If you previously connected private releases, you can remove the saved credential with **Updates → Disconnect**. Private-release connection settings remain optional for private development builds.
 
 ## Features:
 
