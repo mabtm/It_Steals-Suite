@@ -184,7 +184,7 @@ inline void Settings()
             }
         }
         ImGui::TextWrapped(
-            "Setup applies when you start a mode. T restarts the running mode while the game has focus.");
+            "Setup applies when you start a mode. Configure Quick restart / reset in Settings > Shortcuts (default T).");
         ImGui::BeginDisabled(!g_pShared || !g_pShared->reviewReady || g_pShared->timerState == 1 ||
                              HasPendingRequest());
         if (suite_ui::Button("Analyze previous run"))

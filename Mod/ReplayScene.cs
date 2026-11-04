@@ -380,6 +380,7 @@ public sealed class ReplayScenePlayback
 
     private readonly List<Binding> bindings = new List<Binding>();
     private readonly List<Camera> cameras = new List<Camera>();
+    private readonly List<RawImage> sceneImages = new List<RawImage>();
     private readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
     private readonly Dictionary<string, Texture> textures = new Dictionary<string, Texture>();
     private readonly HashSet<string> missingAssets = new HashSet<string>(StringComparer.Ordinal);
@@ -419,6 +420,9 @@ public sealed class ReplayScenePlayback
                 world[ReplayVisualCapture.Path(t)] = t;
         foreach (var t in world.Values)
         {
+            var image = t.GetComponent<RawImage>();
+            if (image != null)
+                sceneImages.Add(image);
             var camera = t.GetComponent<Camera>();
             if (camera != null && camera.targetTexture != null)
                 Asset(textures, "RC|" + ReplayVisualCapture.Path(t), camera.targetTexture);
@@ -787,6 +791,18 @@ public sealed class ReplayScenePlayback
 
     public void Render(Camera main, RenderTexture target, RenderTexture scene)
     {
-        ReplayCameraPipeline.Render(main, target, scene, cameras);
+        // Keep the original texture object and every consumer intact between
+        // samples; only the captured scene's display images follow this export.
+        var images = new List<RawImage>();
+        if (scene != null)
+            foreach (var image in sceneImages)
+                if (image != null && image.texture == scene)
+                    images.Add(image);
+        ReplayCameraPipeline.Render(main, target, scene, cameras, replacement =>
+        {
+            foreach (var image in images)
+                if (image != null)
+                    image.texture = replacement;
+        });
     }
 }

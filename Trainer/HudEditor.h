@@ -240,12 +240,7 @@ inline void Render()
     if (suite_ui::CollapsingHeader("Colors / typeface"))
     {
         RenderHudColors();
-        int before = suite_ui::appearance.hudFont;
-        ImGui::TextUnformatted("HUD font");
-        ImGui::SetNextItemWidth(-1);
-        ImGui::Combo("##HUD font", &suite_ui::appearance.hudFont, kSuiteFonts, kSuiteFontCount);
-        if (before != suite_ui::appearance.hudFont)
-            ImGui::TextDisabled("Typeface applies when the layout is saved.");
+        AppearanceFont("HUD font", suite_ui::appearance.hudFont, 1);
     }
     if (suite_ui::Button("Reset selected"))
     {

@@ -78,10 +78,51 @@ public static class Time
     public static double timeSinceLevelLoadAsDouble = 99;
 }
 
+public struct RenderTextureDescriptor
+{
+    public int width, height;
+    public bool useDynamicScale;
+}
+
 public sealed class RenderTexture
 {
     public static RenderTexture active;
-    public int width = 1920, height = 1080, Value;
+    public static int Created, Released;
+    public int width = 1920, height = 1080, Value, filterMode, wrapMode;
+    public bool IsReleased;
+    public RenderTextureDescriptor descriptor
+    {
+        get { return new RenderTextureDescriptor { width = width, height = height, useDynamicScale = true }; }
+    }
+    public static RenderTexture GetTemporary(RenderTextureDescriptor descriptor)
+    {
+        if (descriptor.useDynamicScale)
+            throw new Exception("export must use exact requested resolution");
+        Created++;
+        return new RenderTexture { width = descriptor.width, height = descriptor.height };
+    }
+    public static void ReleaseTemporary(RenderTexture texture)
+    {
+        texture.IsReleased = true;
+        Released++;
+    }
+}
+
+public static class Canvas
+{
+    public static Action Update;
+    public static int Updates;
+    public static void ForceUpdateCanvases()
+    {
+        Updates++;
+        if (Update != null)
+            Update();
+    }
+}
+
+public class MonoBehaviour
+{
+    public bool enabled = true;
 }
 
 public static class Graphics
@@ -99,6 +140,11 @@ public sealed class Camera
     public bool enabled = true;
     public GameObject gameObject = new GameObject(true);
     public Action Draw;
+    public readonly List<MonoBehaviour> Effects = new List<MonoBehaviour>();
+    public T[] GetComponents<T>() where T : MonoBehaviour
+    {
+        return Effects.ConvertAll(e => (T)e).ToArray();
+    }
 
     public void Render()
     {
@@ -253,6 +299,15 @@ public sealed class Renderer
 }
 }
 
+namespace UnityEngine.Rendering.PostProcessing
+{
+public sealed class PostProcessLayer : MonoBehaviour
+{
+    public int Resets;
+    public void ResetHistory() { Resets++; }
+}
+}
+
 public static class ReplayRendererTests
 {
     private static void Check(bool value, string message)
@@ -268,53 +323,94 @@ public static class ReplayRendererTests
 
     public static int Main()
     {
-        var world = new RenderTexture();
+        var world = new RenderTexture { width = 640, height = 360, Value = 77 };
         var output = new RenderTexture();
-        var radar = new RenderTexture();
+        var radar = new RenderTexture { width = 256, height = 256 };
         var prior = new RenderTexture();
+        var presented = world;
+        RenderTexture temporary = null;
         RenderTexture.active = prior;
         var main = new Camera { targetTexture = world, depth = -1 };
         var arms = new Camera { targetTexture = world, depth = 2 };
         var ui = new Camera { depth = 1 };
         var radarCamera = new Camera { targetTexture = radar, depth = -2 };
-        var stack = new List<Camera> { arms, ui, radarCamera };
+        var effect = new UnityEngine.Rendering.PostProcessing.PostProcessLayer();
+        var disabledEffect = new UnityEngine.Rendering.PostProcessing.PostProcessLayer { enabled = false };
+        main.Effects.Add(effect);
+        ui.Effects.Add(disabledEffect);
+        var stack = new List<Camera> { arms, ui, radarCamera, arms, null };
         var discovered = ReplayCameraPipeline.Sources(main, new[] { main, arms, ui }, ui, null, radarCamera);
         Check(discovered.Count == 3 && discovered.Contains(arms) && discovered.Contains(radarCamera) &&
                   !discovered.Contains(main),
               "unassigned body-camera field still discovers the actual hand camera, without duplicates");
+        Action<RenderTexture> present = replacement => { presented = replacement; };
+        Canvas.Update = () =>
+        {
+            if (main.targetTexture != world)
+                Check(main.targetTexture == arms.targetTexture && ui.targetTexture == output &&
+                          main.targetTexture.width == output.width && main.targetTexture.height == output.height,
+                      "layout sees the complete export-size world/arms/UI rig, never mixed targets");
+        };
         int frame = 0;
-        main.Draw = () => main.targetTexture.Value = ++frame;
+        main.Draw = () =>
+        {
+            Check(main.targetTexture == arms.targetTexture && main.targetTexture == presented &&
+                      ui.targetTexture == output && main.targetTexture != world,
+                  "render callbacks see all targets and display texture bound before the first render");
+            Check(main.targetTexture.width == output.width && main.targetTexture.height == output.height &&
+                      main.aspect == arms.aspect && arms.aspect == ui.aspect,
+                  "world and arms render at exact output dimensions/aspect without upscaling the game texture");
+            Check(effect.Resets == frame * 2 + 1, "temporal history reset before every exported sample");
+            main.targetTexture.Value = ++frame;
+        };
         arms.Draw = () => arms.targetTexture.Value += 1000;
-        ui.Draw = () => ui.targetTexture.Value = world.Value + 10000;
-        radarCamera.Draw = () => radar.Value = frame;
+        ui.Draw = () => ui.targetTexture.Value = presented.Value + 10000;
+        radarCamera.Draw = () =>
+        {
+            Check(radarCamera.targetTexture == radar && radar.width == 256 && radarCamera.aspect == 1,
+                  "independent radar keeps its original dimensions");
+            radar.Value = frame;
+        };
         for (int i = 1; i <= 120; i++)
         {
-            ReplayCameraPipeline.Render(main, output, world, stack);
-            Check(output.Value == i + 11000 && world.Value == i + 1000 && radar.Value == i - 1,
-                  "world advances, then hands composite into the shared UI texture");
+            // Exercise high/low resolution and different output aspect ratios.
+            output.width = i % 2 == 0 ? 3840 : 320;
+            output.height = i % 2 == 0 ? 2160 : 240;
+            arms.depth = i % 3 == 0 ? main.depth : 2;
+            ReplayCameraPipeline.Render(main, output, world, stack, present);
+            Check(output.Value == i + 11000 && world.Value == 77 && radar.Value == i - 1,
+                  "world and hands (including equal-depth cameras) composite in order at output size without altering game-owned texture contents");
             Check(main.targetTexture == world && arms.targetTexture == world && ui.targetTexture == null &&
                       radarCamera.targetTexture == radar && main.aspect == 1 && ui.aspect == 1 &&
-                      RenderTexture.active == prior,
-                  "offscreen rendering restores every camera and active target");
+                      RenderTexture.active == prior && presented == world && effect.Resets == i * 2 &&
+                      disabledEffect.Resets == 0,
+                  "offscreen rendering restores cameras/display/layout and invalidates export history before gameplay resumes");
         }
+        Check(Canvas.Updates == 240 && RenderTexture.Created == RenderTexture.Released,
+              "every sample recalculates and restores canvas layout and releases its temporary scene target");
+        Canvas.Update = null;
         arms.enabled = ui.enabled = radarCamera.enabled = false;
+        main.Draw = () => main.targetTexture.Value = ++frame;
         ReplayCameraPipeline.Render(main, output, null, stack);
         Check(output.Value == 121, "follow/simplified camera renders directly without the recorded UI");
         arms.enabled = true;
+        ui.enabled = true;
+        present = replacement => { presented = replacement; if (replacement != world) temporary = replacement; };
         arms.Draw = () =>
         { throw new InvalidOperationException("body render failed"); };
         bool renderFailed = false;
         try
         {
-            ReplayCameraPipeline.Render(main, output, world, stack);
+            ReplayCameraPipeline.Render(main, output, world, stack, present);
         }
         catch (InvalidOperationException)
         {
             renderFailed = true;
         }
         Check(renderFailed && main.targetTexture == world && arms.targetTexture == world &&
+                  ui.targetTexture == null && presented == world && temporary.IsReleased &&
                   arms.aspect == 1 && RenderTexture.active == prior,
-              "render failure restores targets and does not strand the game camera");
+              "render failure restores all targets/consumers and releases the export scene texture");
         var asset = new Material("Eye");
         var instance = new Material("Eye (Instance)");
         var library = new ReplayMaterialLibrary(new[] { instance, asset });

@@ -116,6 +116,12 @@ public struct TrainerCommands
             return SpeedrunModeActive == 1;
         }
     }
+    // A current trainer owns restart even while typing, rebinding or unassigned.
+    // Old trainers keep the game's T fallback; losing the heartbeat restores it.
+    public bool LegacyRestartAllowed(bool trainerConnected)
+    {
+        return !trainerConnected || (TelemetryOptions & 8192u) == 0;
+    }
     public bool Practice
     {
         get {

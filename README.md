@@ -25,11 +25,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.20.2](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.20.2)**
+**[v7.21.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.21.0)**
 
-- Fixed a bug caused by the Stop seed search button being disabled while a game command awaits acknowledgement. Cancellation now stops native preparation/workers immediately, while the game stop waits for the existing command to be acknowledged.
-- Fixed a bug caused by duplicate game stop commands from the UI and command loop. One search lifecycle check now sends the deferred stop exactly once and discards an older pending stop when a newer search starts.
-- Improved regression coverage with the actual Stop button under pending/ready commands, both viewport sizes and DPI scales, plus cold-preparation cancellation, CPU completion, completed Unity streams, context changes and restart-before-acknowledgement. The game mod remains 7.19.0.
+- Fixed a bug caused by incomplete official MelonLoader installations blocking Suite Setup: missing files can now be repaired from the checksum-verified distribution while existing mods/settings remain intact. Modified or conflicting loaders are rejected before file changes, and interrupted repairs roll back.
+- Improved navigation preparation with on-demand physical detour searches that retain wall, floor and clearance validation. Timer captures distinguish the game's movable vault-door collider from the fixed bunker walls.
+- Fixed a bug caused by export cameras observing mixed game/export resolutions: world, arms and scene display now share the export-sized target before rendering, UI layout is refreshed, and temporal post-processing history is reset between export samples. Normal playback and game-owned textures are restored after capture.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -132,7 +132,7 @@ While the repository is private, open **Updates → Connect private releases** a
 
 **Settings & maintenance**
 
-- **Appearance:** Customize themes, fonts, animations, interface sounds, and the intro.
+- **Appearance:** Customize themes, animations, interface sounds, and the intro. Search supported fonts installed in Windows or add TrueType/OpenType fonts to the Suite's **Fonts/** folder.
 - **Trainer shortcuts:** Assign keys with Ctrl, Alt or Shift in Settings → Shortcuts. Conflicting or reserved combinations are explained; shortcuts pause during text entry.
 - **Display controls:** Set overlay refresh, temporary game FPS/VSync overrides, and borderless mode.
 - **Diagnostics:** Check connection and performance issues and save or copy a local report.
@@ -175,7 +175,7 @@ Plan a route, compare it with a recorded path, and inspect the objects behind it
 
 ### Shortcuts
 
-These are the defaults. Change the eight native trainer actions in **Settings → Shortcuts**; button labels and hints follow your assignments. F1, the game's T restart and replay playback controls retain their game bindings. The tray menu can reopen the trainer even when its menu shortcut is unassigned.
+These are the defaults. Change the nine native trainer actions, including **Quick restart / reset**, in **Settings → Shortcuts**; button labels and hints follow your assignments. Quick restart uses T by default and requires the matching updated mod for reassignment. F1 and replay playback retain their game bindings. The tray menu can reopen the trainer even when its menu shortcut is unassigned.
 
 | Key | Action |
 | --- | --- |

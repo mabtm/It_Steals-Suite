@@ -102,6 +102,10 @@ int main(int argc, char **argv)
     p.captureOverlay = true;
     p.hotkeys.bindings[suite_keys::Menu] = {'J', suite_keys::Control | suite_keys::Shift};
     p.skipGameIntro = false;
+    p.appearance.fontIds = {"Suite:München.ttf#0", "User:custom=face.ttc#2", "Windows:consola.ttf#0"};
+    auto customFonts = TrainerPreferences::Decode(p.Encode());
+    assert(customFonts.appearance.fontIds == p.appearance.fontIds);
+    assert(TrainerPreferences::Decode("appearance.fontId0=bad\rname\n").appearance.fontIds[0].empty());
     p.experience.volume = .34f;
     p.experience.motion = false;
     p.experience.sounds = false;

@@ -45,7 +45,7 @@ jobs:
       - name: Test production logic, UI, and managed contracts
         run: python3 tests/run.py --ui --managed --jobs 2 --output build/verification
       - name: Check search memory and undefined behavior
-        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests navigation_visibility_tests navigation_startup_tests --sanitize --jobs 2 --output build/gpu-sanitizers
+        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests navigation_visibility_tests navigation_startup_tests physical_repair_tests font_catalog_tests --sanitize --jobs 2 --output build/gpu-sanitizers
       - name: Retain verification logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -109,11 +109,11 @@ jobs:
         run: |
           & .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native launcher smoke test failed.' }
-      - name: Test native capture and the production updater against the existing private release
+      - name: Test native capture and production updater with repository visibility
         env:
           SUITE_UPDATE_TEST_TOKEN: ${{ github.token }}
         run: |
-          & .\tests\updater_windows_tests.ps1
+          & .\tests\updater_windows_tests.ps1 -PublicRelease:('${{ github.event.repository.private }}' -eq 'false')
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native updater transport test failed.' }
       - name: Retain packages and Windows verification
         if: always()

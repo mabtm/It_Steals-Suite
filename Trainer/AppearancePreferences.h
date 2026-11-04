@@ -4,8 +4,10 @@
 #include <cmath>
 #include <ostream>
 #include <string>
+#include "FontCatalog.h"
 
-// Only installed, known system fonts are used. Settings never contain paths.
+// Retain the original indices for existing settings; discovered faces use
+// stable catalog IDs so adding/removing a font cannot change a selection.
 inline constexpr const char *kSuiteFonts[] = {
     "Segoe UI", "Segoe UI Semibold", "Bahnschrift", "Arial",    "Verdana",
     "Tahoma",   "Trebuchet MS",      "Calibri",     "Consolas", "Georgia"};
@@ -39,6 +41,7 @@ struct AppearancePreferences
                                      RGB{.37f, .83f, .77f},    RGB{1, .72f, .39f}};
     bool hudFollowsTheme = true, introBlur = true;
     int menuFont = 0, hudFont = 0, timerFont = 8;
+    std::array<std::string, 3> fontIds;
 
     static float Luminance(const RGB &c)
     {
@@ -63,6 +66,9 @@ struct AppearancePreferences
                     std::isfinite(colors[c][i]) ? std::clamp(colors[c][i], 0.f, 1.f) : defaults.colors[c][i];
         for (int *f : {&menuFont, &hudFont, &timerFont})
             *f = std::clamp(*f, 0, kSuiteFontCount - 1);
+        for (auto &id : fontIds)
+            if (!suite_fonts::ValidId(id))
+                id.clear();
     }
 
     void Encode(std::ostream &out) const
@@ -70,6 +76,8 @@ struct AppearancePreferences
         out << "appearance.menuFont=" << menuFont << "\nappearance.hudFont=" << hudFont
             << "\nappearance.timerFont=" << timerFont << "\nappearance.hudFollowsTheme=" << hudFollowsTheme
             << "\nappearance.introBlur=" << introBlur << '\n';
+        for (size_t slot = 0; slot < fontIds.size(); ++slot)
+            out << "appearance.fontId" << slot << '=' << fontIds[slot] << '\n';
         for (int c = 0; c < Count; c++)
             for (int i = 0; i < 3; i++)
                 out << "appearance.color" << c << '.' << i << '=' << colors[c][i] << '\n';

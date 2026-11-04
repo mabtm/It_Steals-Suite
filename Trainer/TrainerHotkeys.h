@@ -16,6 +16,7 @@ enum Action
     Speedrun,
     Analyze,
     Picker,
+    Restart,
     Count
 };
 
@@ -28,7 +29,7 @@ enum Modifier
 
 inline constexpr const char *Actions[] = {"Toggle overlay",       "Open / close menu",     "Compact HUD",
                                           "Refresh map",          "Borderless fullscreen", "Speedrun mode",
-                                          "Analyze finished run", "Inspector picker"};
+                                          "Analyze finished run", "Inspector picker", "Quick restart / reset"};
 
 struct Binding
 {
@@ -38,7 +39,7 @@ struct Binding
 
 inline constexpr std::array<Binding, Count> Defaults = {Binding{0x71}, Binding{0x72}, Binding{0x73},
                                                         Binding{0x74}, Binding{0x75}, Binding{'T', Shift},
-                                                        Binding{0x77}, Binding{0x76}};
+                                                        Binding{0x77}, Binding{0x76}, Binding{'T'}};
 inline std::string (*nativeKeyName)(int) = nullptr;
 
 inline const char *Problem(Binding b)
@@ -51,8 +52,8 @@ inline const char *Problem(Binding b)
                (b.key >= 0xba && b.key <= 0xc0) || (b.key >= 0xdb && b.key <= 0xdf) || b.key == 0xe2;
     if (!key || b.modifiers < 0 || b.modifiers > 7)
         return "Choose a letter, number, function or navigation key.";
-    if (b.key == 0x70 || (b.key == 'T' && !(b.modifiers & Shift)))
-        return "F1 (Freecam) and T (restart) are game controls. Choose another shortcut.";
+    if (b.key == 0x70)
+        return "F1 (Freecam) is a game control. Choose another shortcut.";
     if (b.key == 0x7b || (b.key == 0x73 && (b.modifiers & Alt)) || (b.key == 9 && (b.modifiers & Alt)) ||
         (b.key == 0x2e && (b.modifiers & 3) == 3))
         return "This combination is reserved by Windows.";
@@ -239,8 +240,8 @@ inline void Offer(int key, int modifiers)
     error.clear();
 }
 
-inline bool NeedsPolling(bool allowed, unsigned registered)
+inline bool NeedsPolling(bool allowed, unsigned registered, unsigned eligible = ~0u)
 {
-    return allowed && (preferences.Enabled() & ~registered) != 0;
+    return allowed && (preferences.Enabled() & eligible & ~registered) != 0;
 }
 } // namespace suite_keys

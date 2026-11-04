@@ -84,7 +84,7 @@ void InvalidateFontTexture() {}
 
 std::string g_uiFontName = "Host QA font";
 
-ImFont *LoadUiFont(float pixels, int = 0)
+ImFont *LoadUiFont(float pixels, int = 0, const std::string & = {})
 {
     ImFontConfig font;
     font.SizePixels = pixels;
@@ -2007,6 +2007,8 @@ static void SeedSearchStopUICases()
     std::cout << "Actual Stop button with/without pending game acknowledgement, unchanged commands, one-time deferred stop, small/large viewports and DPI: PASS\n";
 }
 
+#include "font_ui_cases.inl"
+
 int main(int argc, char **argv)
 {
     std::cout.setf(std::ios::unitbuf);
@@ -2015,6 +2017,18 @@ int main(int argc, char **argv)
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.DeltaTime = 1.f / 60;
+    if (argc > 2 && std::string(argv[2]) == "--fonts-only")
+    {
+        FontSelectionCases();
+        ImGui::DestroyContext();
+        return 0;
+    }
+    if (argc > 2 && std::string(argv[2]) == "--design-only")
+    {
+        DesignInteractionCases();
+        ImGui::DestroyContext();
+        return 0;
+    }
     if (argc > 2 && std::string(argv[2]) == "--seed-stop-only")
     {
         SeedSearchStopUICases();
@@ -3243,6 +3257,7 @@ int main(int argc, char **argv)
     UpdateUICases(argc > 1 ? argv[1] : "");
     ExperienceCases(argc > 1 ? argv[1] : "");
     AppearanceCases(argc > 1 ? argv[1] : "");
+    FontSelectionCases();
     ShortcutUICases(argc > 1 ? argv[1] : "");
     FeedbackRevisionCases(argc > 1 ? argv[1] : "");
     MilestoneCases(argc > 1 ? argv[1] : "");

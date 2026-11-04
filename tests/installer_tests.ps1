@@ -17,6 +17,13 @@ function Write-TestFile([string]$Path, [string]$Text) {
     $null = [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path))
     [IO.File]::WriteAllText($Path, $Text)
 }
+function Get-TreeSnapshot([string]$Folder) {
+    return (@(Get-ChildItem -LiteralPath $Folder -Recurse -Force | ForEach-Object {
+        $relative = $_.FullName.Substring($Folder.Length + 1).Replace('\', '/')
+        if ($_.PSIsContainer) { 'directory ' + $relative }
+        else { 'file ' + $relative + ' ' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
+    } | Sort-Object) -join "`n")
+}
 function Make-Game([string]$Folder, [bool]$Loader = $true) {
     $null = [IO.Directory]::CreateDirectory((Join-Path $Folder 'It Steals_Data/Managed'))
     $bytes = New-Object byte[] 128
@@ -172,11 +179,7 @@ public static class SuiteDiscoveryIniTest {
     $image = [IO.File]::ReadAllBytes((Join-Path $invalid 'It Steals.exe')); $image[68]=0x4c; $image[69]=1
     [IO.File]::WriteAllBytes((Join-Path $invalid 'It Steals.exe'),$image)
     Assert (-not (Test-GameFolder $invalid)) 'x86 executable accepted.'
-    $conflict = Join-Path $testRoot 'conflict'
-    Make-Game $conflict $false
-    Write-TestFile (Join-Path $conflict 'version.dll') 'unknown proxy'
-    Reject { Install-Suite $conflict $application $package } 'Conflicting proxy accepted.'
-    $passed.Add('missing, x86, and conflicting installations rejected')
+    $passed.Add('missing and x86 installations rejected')
 
     foreach ($unsafe in @('../outside','a/../../outside','/absolute','C:\absolute','a:stream','\\server\share','a\..\outside')) {
         Reject { Get-ContainedPath $application $unsafe } "Unsafe path accepted: $unsafe"
@@ -208,6 +211,7 @@ public static class SuiteDiscoveryIniTest {
     $loaderFixture = Join-Path $testRoot 'loader-fixture'
     Write-TestFile (Join-Path $loaderFixture 'version.dll') 'pinned proxy fixture'
     Write-TestFile (Join-Path $loaderFixture 'MelonLoader/net35/MelonLoader.dll') 'pinned loader fixture'
+    Write-TestFile (Join-Path $loaderFixture 'MelonLoader/Dependencies/SupportModules/Mono.dll') 'pinned dependency fixture'
     $script:fixtureArchive = Join-Path $testRoot 'fixture.zip'
     [IO.Compression.ZipFile]::CreateFromDirectory($loaderFixture,$script:fixtureArchive)
     $downloadOriginal=(Get-Item Function:Receive-LoaderArchive).ScriptBlock
@@ -217,6 +221,86 @@ public static class SuiteDiscoveryIniTest {
         Make-Game $fresh $false
         Install-Suite $fresh (Join-Path $testRoot 'fresh suite') $package | Out-Null
         Assert (Test-ExistingLoader $fresh) 'First-time loader installation failed.'
+
+        foreach ($missing in @('core', 'proxy', 'empty-directory')) {
+            $repair = Join-Path $testRoot ('repair ' + $missing)
+            $repairSuite = Join-Path $testRoot ('repair suite ' + $missing)
+            Make-Game $repair $false
+            if ($missing -eq 'core') {
+                [IO.File]::Copy((Join-Path $loaderFixture 'version.dll'), (Join-Path $repair 'version.dll'))
+            } elseif ($missing -eq 'proxy') {
+                Write-TestFile (Join-Path $repair 'MelonLoader/net35/MelonLoader.dll') 'pinned loader fixture'
+            } else {
+                $null = [IO.Directory]::CreateDirectory((Join-Path $repair 'MelonLoader'))
+            }
+            Write-TestFile (Join-Path $repair 'Mods/Other.dll') 'unrelated mod'
+            Write-TestFile (Join-Path $repair 'UserData/settings.json') 'user settings'
+            if ($missing -ne 'empty-directory') {
+                Write-TestFile (Join-Path $repair 'MelonLoader/custom-settings.ini') 'keep custom loader settings'
+            }
+            Install-Suite $repair $repairSuite $package | Out-Null
+            Assert (Test-ExistingLoader $repair) "Incomplete loader was not repaired: $missing"
+            foreach ($file in Get-ChildItem -LiteralPath $loaderFixture -Recurse -File) {
+                $relative = $file.FullName.Substring($loaderFixture.Length + 1)
+                Assert ((Get-FileHash -LiteralPath (Join-Path $repair $relative)).Hash -eq (Get-FileHash -LiteralPath $file.FullName).Hash) "Repaired loader differs: $relative"
+            }
+            Assert ([IO.File]::ReadAllText((Join-Path $repair 'Mods/Other.dll')) -eq 'unrelated mod') 'Repair changed another mod.'
+            Assert ([IO.File]::ReadAllText((Join-Path $repair 'UserData/settings.json')) -eq 'user settings') 'Repair changed user settings.'
+            if ($missing -ne 'empty-directory') {
+                Assert ([IO.File]::ReadAllText((Join-Path $repair 'MelonLoader/custom-settings.ini')) -eq 'keep custom loader settings') 'Repair changed custom loader settings.'
+            }
+            $completedProxyHash = (Get-FileHash -LiteralPath (Join-Path $repair 'version.dll')).Hash
+            Install-Suite $repair $repairSuite $package | Out-Null
+            Assert ((Get-FileHash -LiteralPath (Join-Path $repair 'version.dll')).Hash -eq $completedProxyHash) 'Repeated repair changed the completed loader.'
+            Uninstall-Suite $repairSuite | Out-Null
+            Assert (Test-ExistingLoader $repair) 'Uninstall removed the repaired shared loader.'
+            Assert (Test-Path -LiteralPath (Join-Path $repair 'Mods/Other.dll')) 'Uninstall removed another mod after repair.'
+        }
+        $passed.Add('verified partial official loaders and empty directories repair without changing mods or user data')
+
+        foreach ($kind in @('foreign-proxy', 'changed-core', 'changed-dependency', 'unknown-directory', 'directory-collision', 'loader-file', 'alternate-proxy', 'BepInEx')) {
+            $conflict = Join-Path $testRoot ('conflict ' + $kind)
+            Make-Game $conflict ($kind -eq 'BepInEx')
+            switch ($kind) {
+                'foreign-proxy' { Write-TestFile (Join-Path $conflict 'version.dll') 'unknown proxy' }
+                'changed-core' { Write-TestFile (Join-Path $conflict 'MelonLoader/net35/MelonLoader.dll') 'modified loader' }
+                'changed-dependency' {
+                    [IO.File]::Copy((Join-Path $loaderFixture 'version.dll'), (Join-Path $conflict 'version.dll'))
+                    Write-TestFile (Join-Path $conflict 'MelonLoader/Dependencies/SupportModules/Mono.dll') 'modified dependency'
+                }
+                'unknown-directory' { Write-TestFile (Join-Path $conflict 'MelonLoader/foreign.dll') 'unrecognized loader files' }
+                'directory-collision' {
+                    [IO.File]::Copy((Join-Path $loaderFixture 'version.dll'), (Join-Path $conflict 'version.dll'))
+                    Write-TestFile (Join-Path $conflict 'MelonLoader/net35') 'user file occupies directory'
+                }
+                'loader-file' { Write-TestFile (Join-Path $conflict 'MelonLoader') 'user file occupies loader directory' }
+                'alternate-proxy' { Write-TestFile (Join-Path $conflict 'winhttp.dll') 'unknown proxy' }
+                'BepInEx' { Write-TestFile (Join-Path $conflict 'BepInEx/settings.ini') 'other loader' }
+            }
+            $before = Get-TreeSnapshot $conflict
+            $beforeSuite = Get-TreeSnapshot $application
+            Reject { Install-Suite $conflict $application $package } "Conflicting loader accepted: $kind"
+            Assert ((Get-TreeSnapshot $conflict) -eq $before) "Rejected repair changed game files: $kind"
+            Assert ((Get-TreeSnapshot $application) -eq $beforeSuite) "Rejected repair changed Suite files: $kind"
+        }
+        $passed.Add('foreign, modified, unsupported and conflicting loaders rejected before mutation')
+
+        $interrupted = Join-Path $testRoot 'interrupted repair'
+        Make-Game $interrupted $false
+        [IO.File]::Copy((Join-Path $loaderFixture 'version.dll'), (Join-Path $interrupted 'version.dll'))
+        Write-TestFile (Join-Path $interrupted 'MelonLoader/custom-settings.ini') 'keep custom settings'
+        Write-TestFile (Join-Path $interrupted 'Mods/Other.dll') 'keep another mod'
+        $before = Get-TreeSnapshot $interrupted
+        $beforeSuite = Get-TreeSnapshot $application
+        function Write-InstalledFile([string]$Source,[string]$Target,[string]$Recovery,$Journal) {
+            Write-TestOriginal $Source $Target $Recovery $Journal
+            if ($Target.StartsWith((Join-Path $interrupted 'MelonLoader') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Injected loader repair interruption' }
+        }
+        try { Reject { Install-Suite $interrupted $application $package } 'Interrupted loader repair was ignored.' }
+        finally { Set-Item Function:Write-InstalledFile $originalWriter }
+        Assert ((Get-TreeSnapshot $interrupted) -eq $before) 'Interrupted repair did not restore the exact existing loader and user files.'
+        Assert ((Get-TreeSnapshot $application) -eq $beforeSuite) 'Interrupted repair changed the previous Suite installation.'
+        $passed.Add('interrupted repair rolls back added loader files and directories while preserving the previous installation')
     } finally { Set-Item Function:Receive-LoaderArchive $downloadOriginal }
     $passed.Add('first-time loader and suite transaction')
 
@@ -229,6 +313,24 @@ public static class SuiteDiscoveryIniTest {
     Expand-LoaderArchive $LoaderArchive $official
     Assert (Test-ExistingLoader $official) 'Official loader layout is incompatible.'
     $passed.Add('actual official pinned archive verifies and extracts')
+
+    $officialRepair = Join-Path $testRoot 'official partial game'
+    $officialSuite = Join-Path $testRoot 'official partial suite'
+    Make-Game $officialRepair $false
+    [IO.File]::Copy((Join-Path $official 'version.dll'), (Join-Path $officialRepair 'version.dll'))
+    Write-TestFile (Join-Path $officialRepair 'Mods/Other.dll') 'keep official repair mod'
+    Write-TestFile (Join-Path $officialRepair 'UserData/settings.json') 'keep official repair settings'
+    $script:fixtureArchive = $LoaderArchive
+    function Receive-LoaderArchive([string]$Destination) { [IO.File]::Copy($script:fixtureArchive,$Destination) }
+    try { Install-Suite $officialRepair $officialSuite $package | Out-Null }
+    finally { Set-Item Function:Receive-LoaderArchive $downloadOriginal }
+    foreach ($file in Get-ChildItem -LiteralPath $official -Recurse -File) {
+        $relative = $file.FullName.Substring($official.Length + 1)
+        Assert ((Get-FileHash -LiteralPath (Join-Path $officialRepair $relative)).Hash -eq (Get-FileHash -LiteralPath $file.FullName).Hash) "Actual official repair differs: $relative"
+    }
+    Assert ([IO.File]::ReadAllText((Join-Path $officialRepair 'Mods/Other.dll')) -eq 'keep official repair mod') 'Actual official repair changed another mod.'
+    Assert ([IO.File]::ReadAllText((Join-Path $officialRepair 'UserData/settings.json')) -eq 'keep official repair settings') 'Actual official repair changed user data.'
+    $passed.Add('actual official pinned archive repairs an interrupted installation byte for byte and preserves user data')
 
     Write-TestFile (Join-Path $game 'Mods/ItStealsHelper.dll') 'user modified'
     Write-TestFile (Join-Path $application 'keep.txt') 'user data'

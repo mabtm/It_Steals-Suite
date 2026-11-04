@@ -41,29 +41,58 @@ inline bool AppearanceTable(const char *id)
 
 inline void AppearanceFont(const char *label, int &selected, int slot)
 {
-    ImGui::SetNextItemWidth(std::min(220 * g_dpiScale, ImGui::GetContentRegionAvail().x * .55f));
-    if (ImGui::BeginCombo(label, kSuiteFonts[selected]))
+    auto &id = suite_ui::appearance.fontIds[slot];
+    const auto *face = suite_fonts::catalog.Find(id);
+    std::string preview = id.empty() ? kSuiteFonts[std::clamp(selected, 0, kSuiteFontCount - 1)]
+                                    : face ? face->name : "Unavailable font (using fallback)";
+    ImGui::PushID(label);
+    ImGui::SetNextItemWidth(std::min(320 * g_dpiScale, ImGui::GetContentRegionAvail().x * .65f));
+    if (ImGui::BeginCombo(label, preview.c_str(), ImGuiComboFlags_HeightLarge))
     {
-        for (int f = 0; f < kSuiteFontCount; f++)
+        static std::array<std::array<char, 128>, 3> queries{};
+        auto &query = queries[slot];
+        ImGui::SetNextItemWidth(-1);
+        ImGui::InputTextWithHint("##FontSearch", "Search installed fonts...", query.data(), query.size());
+        ImGui::BeginChild("Font list", {0, 260 * g_dpiScale});
+        for (int f = 0; f < kSuiteFontCount; ++f)
         {
+            if (suite_fonts::Fold(kSuiteFonts[f]).find(suite_fonts::Fold(query.data())) == std::string::npos)
+                continue;
             ImGui::PushID(f);
             ImGui::BeginDisabled(!suite_ui::fontAvailable[f]);
-            if (ImGui::Selectable(kSuiteFonts[f], selected == f))
+            if (ImGui::Selectable(kSuiteFonts[f], id.empty() && selected == f))
             {
                 selected = f;
+                id.clear();
                 suite_ui::fontsDirty = true;
+                ImGui::CloseCurrentPopup();
             }
             ImGui::EndDisabled();
-            if (!suite_ui::fontAvailable[f])
-                Help("This font is not installed on this PC.");
             ImGui::PopID();
         }
+        for (const auto &entry : suite_fonts::catalog.faces)
+        {
+            if (!suite_fonts::Matches(entry, query.data()))
+                continue;
+            ImGui::PushID(entry.id.c_str());
+            auto name = entry.name + " (" + entry.source + ")";
+            if (ImGui::Selectable(name.c_str(), id == entry.id))
+            {
+                id = entry.id;
+                suite_ui::fontsDirty = true;
+                ImGui::CloseCurrentPopup();
+            }
+            Help(suite_fonts::Utf8(entry.path.filename()).c_str());
+            ImGui::PopID();
+        }
+        ImGui::EndChild();
         ImGui::EndCombo();
     }
-    std::string tip =
-        "Loaded: " + suite_ui::loadedFonts[slot] +
-        ". Fonts are loaded from Windows; unavailable selections fall back to Segoe UI, then the built-in font. Only selected font families are loaded at the sizes needed for sharp text.";
+    std::string tip = "Loaded: " + suite_ui::loadedFonts[slot] +
+        ". Windows system fonts, per-user fonts and the Fonts folder beside the trainer are available. "
+        "Unsupported files are omitted. Missing selections fall back to the original font.";
     Help(tip.c_str());
+    ImGui::PopID();
 }
 
 inline void AppearancePreview()
@@ -111,6 +140,13 @@ inline void RenderAppearanceSettings()
     AppearanceFont("Interface font", suite_ui::appearance.menuFont, 0);
     AppearanceFont("HUD font", suite_ui::appearance.hudFont, 1);
     AppearanceFont("Timer font", suite_ui::appearance.timerFont, 2);
+    if (suite_ui::SmallButton("Refresh font list"))
+    {
+        suite_fonts::RefreshInstalled();
+        suite_ui::fontsDirty = true;
+    }
+    Help("Rescan Windows fonts and the Fonts folder beside the trainer after installing or copying a font. TrueType (.ttf), OpenType (.otf) and collection (.ttc) faces are supported.");
+    ImGui::TextDisabled("%zu installed font faces", suite_fonts::catalog.faces.size());
     if (suite_ui::SmallButton("Restore original style"))
     {
         TrainerPreferences defaults;
@@ -125,6 +161,7 @@ inline void RenderAppearanceSettings()
         a.menuFont = 0;
         a.hudFont = 0;
         a.timerFont = 8;
+        a.fontIds = {};
         suite_ui::fontsDirty = true;
     }
     Help(

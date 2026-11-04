@@ -31,20 +31,24 @@ void ApplyTheme(float scale)
     ImGuiIO &io = ImGui::GetIO();
     io.Fonts->Clear();
     io.FontDefault = nullptr;
-    io.FontDefault = LoadUiFont(18 * g_dpiScale, suite_ui::appearance.menuFont);
+    io.FontDefault =
+        LoadUiFont(18 * g_dpiScale, suite_ui::appearance.menuFont, suite_ui::appearance.fontIds[0]);
     suite_ui::loadedFonts[0] = g_uiFontName;
     suite_ui::loadedHudScale =
         g_speedrunMode && !(g_practiceMode && g_compactMode) ? g_speedrunLayout.scale : g_hudLayout.scale;
-    suite_ui::hudFont = LoadUiFont(19 * g_dpiScale * suite_ui::loadedHudScale, suite_ui::appearance.hudFont);
+    suite_ui::hudFont = LoadUiFont(19 * g_dpiScale * suite_ui::loadedHudScale,
+                                 suite_ui::appearance.hudFont, suite_ui::appearance.fontIds[1]);
     suite_ui::loadedFonts[1] = g_uiFontName;
-    g_timerFont = LoadUiFont(44 * g_dpiScale * suite_ui::loadedHudScale, suite_ui::appearance.timerFont);
+    g_timerFont = LoadUiFont(44 * g_dpiScale * suite_ui::loadedHudScale,
+                             suite_ui::appearance.timerFont, suite_ui::appearance.fontIds[2]);
     suite_ui::loadedFonts[2] = g_uiFontName;
     suite_ui::labelFont =
-        LoadUiFont(16 * g_dpiScale * suite_ui::loadedHudScale, suite_ui::appearance.hudFont);
-    suite_ui::introTitleFont = LoadUiFont(32 * g_dpiScale, suite_ui::appearance.menuFont);
-    suite_ui::introBodyFont = LoadUiFont(20 * g_dpiScale, suite_ui::appearance.menuFont);
-    suite_ui::resultTimeFont = LoadUiFont(56 * g_dpiScale, suite_ui::appearance.timerFont);
-    suite_ui::resultDetailFont = LoadUiFont(16 * g_dpiScale, suite_ui::appearance.menuFont);
+        LoadUiFont(16 * g_dpiScale * suite_ui::loadedHudScale, suite_ui::appearance.hudFont,
+                   suite_ui::appearance.fontIds[1]);
+    suite_ui::introTitleFont = LoadUiFont(32 * g_dpiScale, suite_ui::appearance.menuFont, suite_ui::appearance.fontIds[0]);
+    suite_ui::introBodyFont = LoadUiFont(20 * g_dpiScale, suite_ui::appearance.menuFont, suite_ui::appearance.fontIds[0]);
+    suite_ui::resultTimeFont = LoadUiFont(56 * g_dpiScale, suite_ui::appearance.timerFont, suite_ui::appearance.fontIds[2]);
+    suite_ui::resultDetailFont = LoadUiFont(16 * g_dpiScale, suite_ui::appearance.menuFont, suite_ui::appearance.fontIds[0]);
     suite_ui::fontsDirty = false;
     InvalidateFontTexture();
 }
@@ -435,7 +439,7 @@ inline void RenderShortcutSettings()
     if (suite_ui::Button("Restore default shortcuts"))
         suite_keys::preferences = {};
     ImGui::TextWrapped(
-        "Shortcuts apply while the game or trainer has focus and pause during text entry. Custom trainer shortcuts take priority over replay keys. F1 (Freecam), T (restart) and replay playback controls remain game controls.");
+        "Shortcuts apply while the game or trainer has focus and pause during text entry. Quick restart defaults to T and can be reassigned above. Custom trainer shortcuts take priority over replay keys. F1 (Freecam) and replay playback controls remain game controls.");
     ImGui::TextDisabled("The tray menu can always reopen the trainer.");
     if (suite_keys::openRequested)
     {
@@ -631,7 +635,7 @@ void RenderMainWindow(const std::string &mode, int seed)
     }
     ImGui::Separator();
     {
-        float u = suite_ui::Unit(), rail = ImGui::GetContentRegionAvail().x >= 850 * u ? 166 * u : 52 * u;
+        float u = suite_ui::Unit(), rail = ImGui::GetContentRegionAvail().x >= 730 * u ? 184 * u : 64 * u;
         float bodyHeight = std::max(4.f, ImGui::GetContentRegionAvail().y);
         ImGui::BeginChild("Navigation", ImVec2(rail, bodyHeight));
         suite_ui::Sidebar(bodyHeight);

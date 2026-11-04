@@ -5,7 +5,7 @@
 namespace suite_update
 {
 // A friend exercises the production transport and hash pipeline against the
-// existing private release without offering a downgrade in the application UI.
+// existing release without offering a downgrade in the application UI.
 struct ServiceContract
 {
     static bool Running(Service &s)
@@ -59,17 +59,21 @@ void Finish(suite_update::Service &service)
         throw std::runtime_error(view->message);
 }
 
-int main()
+int main(int argc, char **argv)
 {
     using namespace suite_update;
+    const bool anonymous = argc == 2 && std::string_view(argv[1]) == "--anonymous";
+    const bool staleCredential = argc == 2 && std::string_view(argv[1]) == "--stale-credential";
     std::string token(TokenLimit + 1, 0);
     DWORD count = GetEnvironmentVariableA("SUITE_UPDATE_TEST_TOKEN", token.data(), DWORD(token.size()));
-    if (!count || count >= token.size())
+    if (!anonymous && !staleCredential && (!count || count >= token.size()))
     {
         std::cerr << "CI release-read token is required for the private-repository transport check.\n";
         return 1;
     }
-    token.resize(count);
+    token.resize(anonymous || staleCredential ? 0 : count);
+    if (staleCredential)
+        token = "intentionally-invalid-public-release-test-token";
     if (ServiceContract::HasCredential())
     {
         SecureZeroMemory(token.data(), token.size());
@@ -86,11 +90,14 @@ int main()
         service.Init(root);
         Require(!service.bundled.empty() && service.bundled.front().version == suite_brand::Version,
                 "The embedded current changelog is missing.");
-        if (!service.StoreCredential(token))
-            throw std::runtime_error(service.stateError);
-        SecureZeroMemory(token.data(), token.size());
-        token.clear();
-        Require(ServiceContract::HasCredential(), "The release credential was not readable.");
+        if (!anonymous)
+        {
+            if (!service.StoreCredential(token))
+                throw std::runtime_error(service.stateError);
+            SecureZeroMemory(token.data(), token.size());
+            token.clear();
+            Require(ServiceContract::HasCredential(), "The release credential was not readable.");
+        }
         Require(service.Check(), "The production release check did not start.");
         Finish(service);
         auto view = service.View();
@@ -107,10 +114,13 @@ int main()
             if (entry.path().filename() == L"package.zip")
                 package = fs::file_size(entry.path()) == release.size;
         Require(package, "The verified package was not staged.");
-        Require(service.StoreCredential({}) && !ServiceContract::HasCredential(),
-                "The CI credential was not removed.");
+        if (!anonymous)
+            Require(service.StoreCredential({}) && !ServiceContract::HasCredential(),
+                    "The CI credential was not removed.");
+        Require(!ServiceContract::HasCredential(), "Public access created an unexpected credential.");
         std::cout
-            << "Windows production WinHTTP, authenticated private releases, safe CDN redirects, streaming SHA-256, embedded changelog and Credential Manager cleanup: PASS\n";
+            << "Windows production WinHTTP, " << (anonymous ? "anonymous public releases" : staleCredential ? "public releases with a revoked credential" : "authenticated private releases")
+            << ", safe CDN redirects, streaming SHA-256, embedded changelog and Credential Manager cleanup: PASS\n";
     }
     catch (const std::exception &e)
     {

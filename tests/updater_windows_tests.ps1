@@ -1,9 +1,9 @@
 [CmdletBinding()]
-param()
+param([switch]$PublicRelease)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if(-not $env:SUITE_UPDATE_TEST_TOKEN){throw 'The private-repository transport check requires a CI token with release read access.'}
+if(-not $PublicRelease -and -not $env:SUITE_UPDATE_TEST_TOKEN){throw 'The private-repository transport check requires a CI token with release read access. Use -PublicRelease for anonymous public access.'}
 $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $visualStudio=& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if(-not $visualStudio){throw 'Visual C++ build tools are missing.'}
@@ -25,9 +25,14 @@ $lines=@(
 [IO.File]::WriteAllLines($command,$lines,[Text.Encoding]::ASCII)
 & $env:ComSpec /d /c $command
 if($LASTEXITCODE -ne 0){throw 'Native updater contract compilation failed.'}
-& (Join-Path $out 'contract.exe')
+if ($PublicRelease) {
+    & (Join-Path $out 'contract.exe') --anonymous
+    if($LASTEXITCODE -ne 0){throw 'Anonymous public release transport failed.'}
+    & (Join-Path $out 'contract.exe') --stale-credential
+}
+else { & (Join-Path $out 'contract.exe') }
 if($LASTEXITCODE -ne 0){throw 'Native updater transport contract failed.'}
 & (Join-Path $out 'capture.exe')
 if($LASTEXITCODE -ne 0){throw 'Native capture transfer contract failed.'}
-@{passed=$true;checks=@('actual private GitHub API','Credential Manager round trip and deletion','safe asset redirect','streamed package SHA-256 and length','embedded current and historical changelog');liveUacTested=$false}|
+@{passed=$true;releaseAccess=$(if($PublicRelease){'anonymous public'}else{'authenticated private'});checks=@('actual GitHub API','Credential Manager remains empty after test','safe asset redirect','streamed package SHA-256 and length','embedded current and historical changelog');liveUacTested=$false}|
     ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $out 'summary.json') -Encoding UTF8

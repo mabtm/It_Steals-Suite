@@ -207,17 +207,56 @@ function Read-PackageManifest([string]$Folder) {
 }
 
 function Test-ExistingLoader([string]$Folder) {
+    foreach ($item in @('MelonLoader', 'version.dll', 'winhttp.dll', 'dobby.dll', 'BepInEx')) {
+        Assert-NoReparsePoint (Join-Path $Folder $item)
+    }
+    if (Test-Path -LiteralPath (Join-Path $Folder 'BepInEx')) {
+        throw 'A conflicting BepInEx installation is present. Keep its files and resolve the loader conflict before running Suite Setup again.'
+    }
     $core = @('MelonLoader/net35/MelonLoader.dll', 'MelonLoader/net472/MelonLoader.dll', 'MelonLoader/MelonLoader.dll') |
         Where-Object { Test-Path -LiteralPath (Join-Path $Folder $_) -PathType Leaf }
     $proxy = @('version.dll', 'winhttp.dll', 'dobby.dll') |
         Where-Object { Test-Path -LiteralPath (Join-Path $Folder $_) -PathType Leaf }
     if ($core -and $proxy) { return $true }
-    foreach ($item in @('MelonLoader', 'version.dll', 'winhttp.dll', 'dobby.dll', 'BepInEx')) {
+    foreach ($item in @('winhttp.dll', 'dobby.dll')) {
         if (Test-Path -LiteralPath (Join-Path $Folder $item)) {
-            throw 'An incomplete or conflicting loader is present. Repair it with the official MelonLoader installer, then run Suite Setup again.'
+            throw "An unrecognized loader proxy is present: $item. Keep its files and repair the loader with the official MelonLoader installer before running Suite Setup again."
         }
     }
+    # A partial installation is checked against the verified archive before any
+    # missing files are installed. Its directory or proxy alone is not a conflict.
     return $false
+}
+
+function Assert-LoaderRepair([string]$Folder, [string]$Loader) {
+    $recognized = $false
+    $existing = $false
+    $loaderDirectory = Join-Path $Folder 'MelonLoader'
+    if (Test-Path -LiteralPath $loaderDirectory) {
+        if (-not (Test-Path -LiteralPath $loaderDirectory -PathType Container)) { throw 'A file occupies the MelonLoader directory. No loader files were changed.' }
+        $existing = @(Get-ChildItem -LiteralPath $loaderDirectory -Force).Count -gt 0
+    }
+    foreach ($file in Get-ChildItem -LiteralPath $Loader -Recurse -File) {
+        $relative = $file.FullName.Substring($Loader.Length + 1)
+        $target = Get-ContainedPath $Folder $relative
+        Assert-NoReparsePoint $target
+        $parent = [IO.Path]::GetDirectoryName($target)
+        while ($parent -and $parent.Length -gt $Folder.Length) {
+            if ((Test-Path -LiteralPath $parent) -and -not (Test-Path -LiteralPath $parent -PathType Container)) {
+                throw "A file occupies a required loader directory: $parent. No loader files were changed."
+            }
+            $parent = [IO.Path]::GetDirectoryName($parent)
+        }
+        if (-not (Test-Path -LiteralPath $target)) { continue }
+        if (-not (Test-Path -LiteralPath $target -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash) {
+            throw "The incomplete loader contains a modified or different file: $relative. No loader files were changed. Repair it with the official MelonLoader installer, then run Suite Setup again."
+        }
+        $recognized = $true
+    }
+    if ($existing -and -not $recognized) {
+        throw 'The existing MelonLoader files could not be identified as the supported official version. No loader files were changed. Repair it with the official MelonLoader installer, then run Suite Setup again.'
+    }
 }
 
 function Receive-LoaderArchive([string]$Destination) {
@@ -355,12 +394,18 @@ function Install-Suite([string]$Game, [string]$Application, [string]$Package) {
             $archive = Join-Path $work 'loader.zip'
             Receive-LoaderArchive $archive
             Expand-LoaderArchive $archive $loader
+            Assert-LoaderRepair $Game $loader
         } else { Write-Output '[2/4] Keeping the existing MelonLoader installation.' }
         Write-Output '[3/4] Installing PracticeSuite, encoder, and game mod...'
         if (-not $hasLoader) {
             foreach ($file in Get-ChildItem -LiteralPath $loader -Recurse -File) {
                 $relative = $file.FullName.Substring($loader.Length + 1)
-                Write-InstalledFile $file.FullName (Get-ContainedPath $Game $relative) $work $journal
+                $target = Get-ContainedPath $Game $relative
+                # Preflight verified every existing distribution file. Keep those
+                # and unrelated user files; only journal the missing loader files.
+                if (Test-Path -LiteralPath $target -PathType Leaf) { continue }
+                Write-InstalledFile $file.FullName $target $work $journal
+                if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash) { throw "Installed loader file failed verification: $relative" }
             }
         }
         $owned = @()

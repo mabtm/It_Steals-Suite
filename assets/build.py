@@ -118,10 +118,10 @@ def paste_rounded(canvas, source, box, radius=16):
 def repository_artwork(folder, logo):
     # Crop only empty surrounding space or focus on a real UI region; never paint over UI values.
     practice = capture(folder, "tour-01-tools", (105, 185, 1235, 595))
-    search = capture(folder, "tour-02-search-7", (285, 185, 1225, 985))
-    replay = capture(folder, "tour-03-replay-7", (425, 110, 1668, 1055))
+    search = capture(folder, "tour-02-search-7", (310, 185, 1225, 985))
+    replay = capture(folder, "tour-03-replay-7", (450, 110, 1668, 1055))
     clip = capture(folder, "751-studio-0", (5, 5, 1910, 1075))
-    inspect = capture(folder, "7115-summary-1920-dpi-100", (30, 180, 1010, 610))
+    inspect = capture(folder, "7115-summary-1920-dpi-100", (230, 180, 1010, 660))
     route = capture(folder, "seed-route-full")
     items = [
         ("Practice", "Explore layouts. Inspect the details.", practice),

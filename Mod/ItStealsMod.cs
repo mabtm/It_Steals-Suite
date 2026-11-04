@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.19.0";
+    public const string Version = "7.21.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -338,7 +338,8 @@ public sealed class ItStealsMod : MelonMod
             speedrun.Tick();
             if (!Replay3D.Reserved &&
                 (speedrun.NeedsDeathReload ||
-                 (MenuCursor.GameHotkeysAllowed && commands.Speedrun && Input.GetKeyDown(KeyCode.T) &&
+                 (commands.LegacyRestartAllowed(trainerConnected) && MenuCursor.GameHotkeysAllowed &&
+                  commands.Speedrun && Input.GetKeyDown(KeyCode.T) &&
                   !Input.GetKey(KeyCode.LeftShift) && !Input.GetKey(KeyCode.RightShift))))
             {
                 LoadSpeedrunLevel();

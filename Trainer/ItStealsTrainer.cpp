@@ -695,7 +695,7 @@ void PullSnapshot()
             {
                 g_trail.Clear();
                 g_commands = {};
-                g_commands.telemetryOptions = kTelemetryConfigured;
+                g_commands.telemetryOptions = kTelemetryConfigured | kTelemetryRestartHotkey;
                 g_commands.reportOptions = g_reportsEnabled ? 1u : 0u;
                 g_commands.replayMinSeconds = suite_ui::replayPreferences.seconds;
                 g_commands.replayMinCrystals = suite_ui::replayPreferences.mode == 1
@@ -1200,7 +1200,7 @@ void SyncCommands(bool visible)
     g_commands.vSyncMode = g_vSyncMode;
     g_commands.runHudVisible =
         visible && g_validityBadgeDrawn && GetTickCount64() - g_badgePresentedTick < 250 ? 1u : 0u;
-    g_commands.telemetryOptions = kTelemetryConfigured;
+    g_commands.telemetryOptions = kTelemetryConfigured | kTelemetryRestartHotkey;
     if (g_skipGameIntro)
         g_commands.telemetryOptions |= kTelemetrySkipIntro;
     if (inspectorWanted)
@@ -1250,29 +1250,49 @@ void InvalidateFontTexture()
         ImGui_ImplDX11_InvalidateDeviceObjects();
 }
 
-ImFont *LoadUiFont(float pixels, int choice = 0)
+#include "FontRasterizer.h"
+
+ImFont *LoadUiFont(float pixels, int choice = 0, const std::string &faceId = {})
 {
-    wchar_t directory[MAX_PATH]{};
-    UINT count = GetWindowsDirectoryW(directory, MAX_PATH);
-    if (count && count < MAX_PATH)
+    if (!suite_fonts::catalog.scanned)
+        suite_fonts::RefreshInstalled();
+    auto load = [&](const std::filesystem::path &path, int face, const std::string &name) -> ImFont * {
+        auto bytes = suite_fonts::Read(path);
+        auto offsets = suite_fonts::Offsets(bytes);
+        if (face < 0 || size_t(face) >= offsets.size())
+            return nullptr;
+        stbtt_fontinfo info{};
+        if (!stbtt_InitFont(&info, bytes.data(), int(offsets[face])))
+            return nullptr;
+        void *owned = IM_ALLOC(bytes.size());
+        if (!owned)
+            return nullptr;
+        std::memcpy(owned, bytes.data(), bytes.size());
+        ImFontConfig config;
+        config.FontNo = face;
+        if (auto *font = ImGui::GetIO().Fonts->AddFontFromMemoryTTF(owned, int(bytes.size()), pixels, &config))
+        {
+            g_uiFontName = name;
+            return font;
+        }
+        IM_FREE(owned);
+        return nullptr;
+    };
+    if (auto face = suite_fonts::catalog.Find(faceId))
+        if (auto *font = load(face->path, face->index, face->name))
+            return font;
+    wchar_t directory[32768]{};
+    UINT count = GetWindowsDirectoryW(directory, 32768);
+    if (count && count < 32768)
     {
         auto fonts = std::filesystem::path(directory) / L"Fonts";
         for (int i = 0; i < kSuiteFontCount; i++)
             suite_ui::fontAvailable[i] =
                 GetFileAttributesW((fonts / kSuiteFontFiles[i]).c_str()) != INVALID_FILE_ATTRIBUTES;
         choice = std::clamp(choice, 0, kSuiteFontCount - 1);
-        int actual = suite_ui::fontAvailable[choice] ? choice : 0;
-        auto path = fonts / kSuiteFontFiles[actual];
-        if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES)
-        {
-            auto utf8 = path.u8string();
-            std::string name(reinterpret_cast<const char *>(utf8.data()), utf8.size());
-            if (auto *font = ImGui::GetIO().Fonts->AddFontFromFileTTF(name.c_str(), pixels))
-            {
-                g_uiFontName = kSuiteFonts[actual];
+        for (int actual : {choice, 0})
+            if (auto *font = load(fonts / kSuiteFontFiles[actual], 0, kSuiteFonts[actual]))
                 return font;
-            }
-        }
     }
     ImFontConfig config;
     config.SizePixels = pixels;
@@ -1533,7 +1553,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     using Clock = std::chrono::steady_clock;
     auto nextFrame = Clock::now();
     ULONGLONG nextExchange = 0, nextSave = 0, nextSurface = 0, nextProcessCheck = 0;
-    KeyEdge f2, f3, f4, f5, f6, shiftT, f8, pickerKey, replayTab, replayEscape, replaySpace, replayLeft,
+    KeyEdge f2, f3, f4, f5, f6, shiftT, f8, pickerKey, restartKey, replayTab, replayEscape, replaySpace, replayLeft,
         replayRight, replayHome, replayEnd, replayFast, replaySlow, replayMark;
     bool occluded = false;
     auto appliedHotkeys = suite_keys::preferences;
@@ -1644,6 +1664,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             ReleaseHotkeys();
             appliedHotkeys = suite_keys::preferences;
         }
+        // Older mods still handle T directly. Wait for the version that understands
+        // trainer ownership before registering a restart key or issuing its command.
+        auto modVersion = g_pShared ? suite_update::Version::Parse(g_pShared->version) : std::nullopt;
+        bool restartSupported = modVersion && *modVersion >= suite_update::Version{{7, 21, 0}};
+        bool replayReserved = g_pShared && g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3;
+        bool restartAllowed = restartSupported && g_speedrunMode && g_pShared->speedrunModeActive &&
+                              !replayReserved && !HasPendingRequest() && !g_commands.runReviewRequest;
         int modifiers = (GetAsyncKeyState(VK_CONTROL) < 0 ? suite_keys::Control : 0) |
                         (GetAsyncKeyState(VK_MENU) < 0 ? suite_keys::Alt : 0) |
                         (GetAsyncKeyState(VK_SHIFT) < 0 ? suite_keys::Shift : 0);
@@ -1651,7 +1678,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         {
             unsigned bit = 1u << i;
             const auto &shortcut = appliedHotkeys.bindings[i];
-            if (!shortcutsAllowed || !shortcut.key)
+            if (!shortcutsAllowed || !shortcut.key || (i == suite_keys::Restart && !restartAllowed))
             {
                 if (g_hotkeysRegistered & bit)
                     UnregisterHotKey(g_hWnd, i + 1);
@@ -1671,7 +1698,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             bool down =
                 shortcut.key && (GetAsyncKeyState(shortcut.key) & 0x8000) && modifiers == shortcut.modifiers;
             bool enabled = shortcutsAllowed && !bindingsChanged &&
-                           (index == suite_keys::Menu || !UpdateInputRequested());
+                           (index == suite_keys::Menu || !UpdateInputRequested()) &&
+                           (index != suite_keys::Restart || restartAllowed);
             bool fallback = key.Update(down, enabled);
             unsigned bit = 1u << index;
             return enabled && shortcut.key &&
@@ -1748,6 +1776,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             else
                 inspector_ui::StartPick(3);
             binding.Invalidate();
+        }
+        if (keyPressed(restartKey, suite_keys::Restart))
+        {
+            g_commands.speedrunLoadLevelCmd = 1;
+            nextExchange = 0;
         }
         bool replayActive = g_pShared && g_pShared->timerState != 1 && g_pShared->replay3dState >= 2 &&
                             g_pShared->replay3dState <= 3;
@@ -2274,7 +2307,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         }
         auto deadline =
             Clock::now() + std::chrono::milliseconds(
-                               suite_keys::NeedsPolling(shortcutsAllowed, g_hotkeysRegistered) ? 20 : 100);
+                               suite_keys::NeedsPolling(shortcutsAllowed, g_hotkeysRegistered,
+                                                       restartAllowed ? ~0u : ~(1u << suite_keys::Restart))
+                                   ? 20 : 100);
         if (visible && g_pd3dDevice)
             deadline = std::min(deadline, nextFrame);
         auto duration = deadline - Clock::now();

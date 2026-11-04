@@ -176,6 +176,17 @@ int main()
     Navigation nav;
     assert(nav.Is(Page::Cheats) && !nav.Select(Page::Cheats, 1));
     assert(nav.Select(Page::Replay, 2) && nav.changed == 2 && !nav.Select(Page::Count, 3));
+    std::array<bool, PageCount> seen{};
+    int groups = 0;
+    for (const auto &item : NavigationItems)
+    {
+        int index = int(item.page);
+        assert(index >= 0 && index < PageCount && !seen[index]);
+        seen[index] = true;
+        assert(item.compact && item.compact[0]);
+        groups += item.group != nullptr;
+    }
+    assert(std::all_of(seen.begin(), seen.end(), [](bool value) { return value; }) && groups == 3);
     ResultHighlights highlights;
 
     struct Seed

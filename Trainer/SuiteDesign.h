@@ -2,6 +2,7 @@
 #include "SuiteExperience.h"
 #include "DesignModel.h"
 #include <cstdio>
+#include <cfloat>
 
 namespace suite_ui
 {
@@ -24,7 +25,7 @@ enum class Icon
     Magnifier
 };
 inline constexpr std::array<const char *, PageCount> PageNames = {
-    "Cheats", "Seed Map", "Speedrun", "Settings", "Replay", "Diagnostics", "Inspector", "Updates"};
+    "Practice", "Seeds & routes", "Modes & runs", "Settings", "Replays & clips", "Diagnostics", "Inspector", "Updates"};
 inline constexpr std::array<const char *, PageCount> PageDetails = {
     "Live training tools",    "Explore layouts and routes",  "Your progress across every mode",
     "Make the suite yours",   "Review every turn",           "Connection and system health",
@@ -234,11 +235,19 @@ inline void Sidebar(float height)
                            "Scan the connection and inspect technical details.",
                            "Picker shortcut, compact object card and engine details on request.",
                            "Stable releases, automatic installation and the full version history."};
-    for (int i = 0; i < PageCount; i++)
+    for (const auto &item : NavigationItems)
     {
+        int i = int(item.page);
+        if (item.group)
+        {
+            if (wide)
+                ImGui::TextDisabled("%s", item.group);
+            else
+                ImGui::Separator();
+        }
         ImGui::PushID(i);
         auto a = ImGui::GetCursorScreenPos();
-        float h = 50 * u;
+        float h = (wide ? 44 : 52) * u;
         bool selected = navigation.Is(Page(i));
         bool click = ImGui::InvisibleButton("##Navigate", {width, h}, ImGuiButtonFlags_EnableNav);
         if (click && navigation.Select(Page(i), ImGui::GetTime()))
@@ -259,12 +268,22 @@ inline void Sidebar(float height)
                  i == int(Page::Updates)     ? Icon::Update
                  : i == int(Page::Inspector) ? Icon::Magnifier
                                              : Icon(i),
-                 {a.x + 13 * u, a.y + 13 * u}, 24 * u,
-                 ImGui::GetColorU32(Blend(Blend(ink, background, .36f), heading, active)));
+                 {a.x + (wide ? 11 * u : (width - 22 * u) * .5f), a.y + (wide ? 10 : 4) * u},
+                 22 * u, ImGui::GetColorU32(Blend(Blend(ink, background, .36f), heading, active)));
         if (wide)
-            TextAt(d, {a.x + 48 * u, a.y + 16 * u}, PageNames[i],
-                   selected ? ink : Blend(ink, background, .25f), 17 * u,
-                   {a.x + 48 * u, a.y, a.x + width, a.y + h});
+            TextAt(d, {a.x + 43 * u, a.y + 13 * u}, PageNames[i],
+                   selected ? ink : Blend(ink, background, .25f), 16 * u,
+                   {a.x + 43 * u, a.y, a.x + width, a.y + h});
+        else
+        {
+            // Tiny windows still show a task label. The full name and purpose
+            // are available in the heading and tooltip.
+            float font = 10 * u;
+            float labelWidth = ImGui::GetFont()->CalcTextSizeA(font, FLT_MAX, 0, item.compact).x;
+            TextAt(d, {a.x + std::max(0.f, (width - labelWidth) * .5f), a.y + 31 * u}, item.compact,
+                   selected ? ink : Blend(ink, background, .25f), font,
+                   {a.x, a.y, a.x + width, a.y + h});
+        }
         if (ImGui::IsItemFocused())
             d->AddRect(a, {a.x + width, a.y + h}, ImGui::GetColorU32(heading), 7 * u, 0, u);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))

@@ -32,7 +32,9 @@ void DesignInteractionCases()
     assert(rail);
     auto click = rail->DC.CursorStartPos;
     click.x += rail->Size.x * .5f;
-    click.y += 2 * (50 + ImGui::GetStyle().ItemSpacing.y) + 25;
+    // Modes & runs is the first task under the Practice group. Click the
+    // actual row, below its group heading, then exercise every stable page ID.
+    click.y += ImGui::GetTextLineHeightWithSpacing() + 22;
     io.AddMousePosEvent(click.x, click.y);
     Frame();
     assert(suite_ui::navigation.Is(suite_ui::Page::Cheats));
@@ -41,9 +43,14 @@ void DesignInteractionCases()
     io.AddMouseButtonEvent(0, false);
     Frame();
     assert(suite_ui::navigation.Is(suite_ui::Page::Speedrun));
-    ImGui::ActivateItemByID(ImHashStr("##Navigate", 0, rail->GetID(3)));
-    Frame();
-    assert(suite_ui::navigation.Is(suite_ui::Page::Settings));
+    for (auto page : {suite_ui::Page::Cheats, suite_ui::Page::SeedMap, suite_ui::Page::Inspector,
+                      suite_ui::Page::Replay, suite_ui::Page::Settings, suite_ui::Page::Updates,
+                      suite_ui::Page::Diagnostics})
+    {
+        ImGui::ActivateItemByID(ImHashStr("##Navigate", 0, rail->GetID(int(page))));
+        Frame();
+        assert(suite_ui::navigation.Is(page));
+    }
     suite_ui::navigation.Select(suite_ui::Page::Cheats, ImGui::GetTime());
     g_speedrunMode = true;
     g_practiceMode = false;

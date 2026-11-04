@@ -122,6 +122,13 @@ struct TrainerPreferences
             if (split == std::string::npos)
                 continue;
             std::string key = line.substr(0, split);
+            if (key == "appearance.fontId0" || key == "appearance.fontId1" || key == "appearance.fontId2")
+            {
+                auto id = line.substr(split + 1);
+                if (suite_fonts::ValidId(id))
+                    result.appearance.fontIds[size_t(key.back() - '0')] = std::move(id);
+                continue;
+            }
             std::istringstream number(line.substr(split + 1));
             number.imbue(std::locale::classic());
             double value = 0;

@@ -470,43 +470,68 @@ class PhysicalNavigation
                     }
                 }
             }
-            size_t old = edges.size();
             edges.resize(nodes.size());
             for (auto &row : edges)
                 row.resize(nodes.size(), -1);
-            for (size_t i = 0; i < nodes.size(); i++)
-                for (size_t j = std::max(i + 1, old); j < nodes.size(); j++)
+            // Check visibility only when A* can improve a path. A successful
+            // local detour does not need the complete corner-to-corner graph.
+            // Canonical endpoint order retains the existing physical checks.
+            size_t checks = 0;
+            auto edge = [&](size_t i, size_t j) {
+                if (i > j)
+                    std::swap(i, j);
+                if (edges[i][j] < 0)
                 {
-                    if ((j & 31) == 0 && canceled())
+                    if ((checks++ & 31) == 0 && canceled())
                         throw std::runtime_error("Canceled");
                     auto segment = CheckSegment(nodes[i], nodes[j]);
-                    bool clear = (segment & 2) != 0;
                     edges[i][j] = edges[j][i] = (segment & 4) != 0
                                                     ? Distance(nodes[i], nodes[j])
                                                     : std::numeric_limits<double>::infinity();
-                    if (!clear)
+                    if ((segment & 2) == 0)
                         collect(nodes[i], nodes[j]);
                 }
-            std::vector<double> costs(nodes.size(), std::numeric_limits<double>::infinity());
+                return edges[i][j];
+            };
+            std::vector<double> costs(nodes.size(), std::numeric_limits<double>::infinity()),
+                lower(nodes.size());
             std::vector<int> parent(nodes.size(), -1);
+            // Distance's float coordinate subtraction can round slightly below
+            // the geometric distance. Round this double-coordinate heuristic
+            // down by more than float's relative subtraction error, so it is
+            // still a lower bound on every graph path, including tiny edges.
+            for (size_t i = 0; i < nodes.size(); i++)
+            {
+                double x = double(nodes[i].x) - b.x, y = double(nodes[i].y) - b.y,
+                       z = double(nodes[i].z) - b.z;
+                lower[i] = std::sqrt(x * x + y * y + z * z) *
+                           (1 - 4 * std::numeric_limits<float>::epsilon());
+            }
             using Item = std::pair<double, int>;
             std::priority_queue<Item, std::vector<Item>, std::greater<Item>> queue;
             costs[0] = 0;
-            queue.push({0, 0});
+            queue.push({lower[0], 0});
             while (!queue.empty())
             {
-                auto [cost, id] = queue.top();
+                if (canceled())
+                    throw std::runtime_error("Canceled");
+                auto [estimate, id] = queue.top();
                 queue.pop();
-                if (cost != costs[id])
+                if (estimate != costs[id] + lower[id])
                     continue;
                 if (id == 1)
                     break;
+                double cost = costs[id];
                 for (size_t j = 0; j < nodes.size(); j++)
-                    if (j != size_t(id) && edges[id][j] >= 0 && cost + edges[id][j] < costs[j])
+                    if (j != size_t(id) && cost + Distance(nodes[id], nodes[j]) < costs[j])
                     {
-                        costs[j] = cost + edges[id][j];
-                        parent[j] = id;
-                        queue.push({costs[j], int(j)});
+                        double next = cost + edge(size_t(id), j);
+                        if (next < costs[j])
+                        {
+                            costs[j] = next;
+                            parent[j] = id;
+                            queue.push({next + lower[j], int(j)});
+                        }
                     }
             }
             if (std::isfinite(costs[1]))
@@ -517,6 +542,13 @@ class PhysicalNavigation
                 std::reverse(result.begin(), result.end());
                 return result;
             }
+            // An unsuccessful round must discover exactly the same blockers
+            // as the exhaustive graph before growing its candidate set. This
+            // preserves the existing round/obstacle limits and unreachable
+            // results even for disconnected floors and nested obstacles.
+            for (size_t i = 0; i < nodes.size(); i++)
+                for (size_t j = i + 1; j < nodes.size(); j++)
+                    edge(i, j);
         }
         return {};
     }

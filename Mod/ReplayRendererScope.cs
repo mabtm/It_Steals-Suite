@@ -245,55 +245,124 @@ public static class ReplayCameraPipeline
         return result;
     }
 
-    private static void Render(Camera camera, RenderTexture target)
+    private sealed class Binding
     {
-        var saved = camera.targetTexture;
-        float aspect = camera.aspect;
-        try
-        {
-            camera.targetTexture = target;
-            if (target != null)
-                camera.aspect = (float)target.width / target.height;
-            camera.Render();
-        }
-        finally
-        {
-            camera.targetTexture = saved;
-            camera.aspect = aspect;
-        }
+        public Camera Camera;
+        public RenderTexture Target;
+        public float Aspect;
     }
 
-    public static void Render(Camera main, RenderTexture output, RenderTexture scene, List<Camera> cameras)
+    private static void ResetHistory(Camera camera)
+    {
+        // The installed game's post-processing package owns these temporal
+        // buffers. Manual export can seek backwards or render many samples in
+        // one Unity frame, so no earlier sample is a valid history frame.
+        // Keep this optional package out of the replay file/SDK contract.
+        if (camera == null)
+            return;
+        foreach (var effect in camera.GetComponents<MonoBehaviour>())
+            if (effect != null && effect.enabled &&
+                effect.GetType().FullName == "UnityEngine.Rendering.PostProcessing.PostProcessLayer")
+            {
+                var reset = effect.GetType().GetMethod("ResetHistory", Type.EmptyTypes);
+                if (reset != null)
+                    reset.Invoke(effect, null);
+            }
+    }
+
+    public static void Render(Camera main, RenderTexture output, RenderTexture scene, List<Camera> cameras,
+                              Action<RenderTexture> presentScene = null)
     {
         var active = RenderTexture.active;
+        RenderTexture exportScene = null;
+        var bindings = new List<Binding>();
+        var chain = new List<Camera>();
+        var unique = new HashSet<Camera>();
+        foreach (var camera in cameras)
+            if (camera != null && camera != main && camera.enabled &&
+                camera.gameObject.activeInHierarchy && unique.Add(camera))
+                chain.Add(camera);
+        chain.Add(main);
+        chain.Sort((a, b) =>
+        {
+            if (a == b)
+                return 0;
+            int order = a.depth.CompareTo(b.depth);
+            // The world camera clears the shared target. Cameras at the same
+            // depth (notably hands in older captures) must composite after it.
+            return order != 0 ? order : a == main ? -1 : b == main ? 1 : 0;
+        });
         try
         {
-            cameras.Sort((a, b) => a.depth.CompareTo(b.depth));
-            foreach (var camera in cameras)
-                if (camera != null && camera.enabled && camera.gameObject.activeInHierarchy &&
-                    camera.targetTexture != null && camera.targetTexture != scene)
-                    Render(camera, camera.targetTexture);
-            foreach (var camera in cameras)
-                if (scene != null && camera != null && camera.enabled &&
-                    camera.gameObject.activeInHierarchy && camera.targetTexture == scene &&
-                    camera.depth < main.depth)
-                    Render(camera, scene);
-            Render(main, scene ?? output);
-            foreach (var camera in cameras)
-                if (scene != null && camera != null && camera.enabled &&
-                    camera.gameObject.activeInHierarchy && camera.targetTexture == scene &&
-                    camera.depth >= main.depth)
-                    Render(camera, scene);
             if (scene != null)
-                Graphics.Blit(scene, output);
-            foreach (var camera in cameras)
-                if (camera != null && camera.enabled && camera.gameObject.activeInHierarchy &&
-                    camera.targetTexture == null)
-                    Render(camera, output);
+            {
+                var descriptor = scene.descriptor;
+                descriptor.width = output.width;
+                descriptor.height = output.height;
+                descriptor.useDynamicScale = false;
+                exportScene = RenderTexture.GetTemporary(descriptor);
+                exportScene.filterMode = scene.filterMode;
+                exportScene.wrapMode = scene.wrapMode;
+            }
+            // Bind the complete rig before any OnPreCull/OnRenderImage or
+            // canvas callback observes its size. In particular the arms and
+            // UI must never see a mixture of game and export resolutions.
+            foreach (var camera in chain)
+            {
+                var binding = new Binding { Camera = camera, Target = camera.targetTexture,
+                                            Aspect = camera.aspect };
+                bindings.Add(binding);
+                RenderTexture target = camera == main || scene != null && binding.Target == scene
+                                           ? exportScene ?? output
+                                           : binding.Target ?? output;
+                camera.targetTexture = target;
+                camera.aspect = (float)target.width / target.height;
+            }
+            if (presentScene != null && exportScene != null)
+                presentScene(exportScene);
+            Canvas.ForceUpdateCanvases();
+            foreach (var binding in bindings)
+                ResetHistory(binding.Camera);
+            // Independent textures (for example the radar) keep their own
+            // resolution; only cameras sharing the world texture composite.
+            foreach (var binding in bindings)
+                if (binding.Camera != main && binding.Target != null && binding.Target != scene)
+                    binding.Camera.Render();
+            foreach (var binding in bindings)
+                if (binding.Camera == main || scene != null && binding.Target == scene)
+                    binding.Camera.Render();
+            if (exportScene != null)
+                Graphics.Blit(exportScene, output);
+            foreach (var binding in bindings)
+                if (binding.Camera != main && binding.Target == null)
+                    binding.Camera.Render();
         }
         finally
         {
-            RenderTexture.active = active;
+            try
+            {
+                // Restore every participant even when a game render callback
+                // fails. The game-owned texture is never resized or released.
+                foreach (var binding in bindings)
+                {
+                    if (binding.Camera != null)
+                    {
+                        binding.Camera.targetTexture = binding.Target;
+                        binding.Camera.aspect = binding.Aspect;
+                    }
+                }
+                if (presentScene != null && exportScene != null)
+                    presentScene(scene);
+                Canvas.ForceUpdateCanvases();
+                foreach (var binding in bindings)
+                    ResetHistory(binding.Camera);
+            }
+            finally
+            {
+                if (exportScene != null)
+                    RenderTexture.ReleaseTemporary(exportScene);
+                RenderTexture.active = active;
+            }
         }
     }
 }

@@ -2,6 +2,15 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.21.0 Changelog
+
+- Fixed a bug caused by incomplete official MelonLoader installations blocking Suite Setup: missing files can now be repaired from the checksum-verified distribution while existing mods/settings remain intact. Modified or conflicting loaders are rejected before file changes, and interrupted repairs roll back.
+- Improved navigation preparation with on-demand physical detour searches that retain wall, floor and clearance validation. Timer captures distinguish the game's movable vault-door collider from the fixed bunker walls.
+- Fixed a bug caused by export cameras observing mixed game/export resolutions: world, arms and scene display now share the export-sized target before rendering, UI layout is refreshed, and temporal post-processing history is reset between export samples. Normal playback and game-owned textures are restored after capture.
+- Improved shortcuts with Quick restart in Settings > Shortcuts, with T as its default and support for modifiers, reassignment and removal. Updated trainer/mod pairs avoid duplicate game restarts; older mod versions retain their existing T behavior.
+- Improved font selection with searchable installed system/user fonts and a local Fonts folder, including supported TrueType/OpenType collection faces. Saved selections use stable identities and fall back safely when a font is unavailable.
+- Improved menu navigation with task groups for Practice, Review and Suite, keeping the existing tools available. Public releases remain available without sign-in, and revoked saved credentials no longer block public update checks; Windows release checks now select anonymous or authenticated transport according to repository visibility.
+
 ### v7.20.2 Changelog
 
 - Fixed a bug caused by the Stop seed search button being disabled while a game command awaits acknowledgement. Cancellation now stops native preparation/workers immediately, while the game stop waits for the existing command to be acknowledged.

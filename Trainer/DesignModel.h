@@ -20,6 +20,25 @@ enum class Page
 };
 inline constexpr int PageCount = int(Page::Count);
 
+// The enum remains stable for saved selection and UI IDs. Present related
+// tasks together instead of mixing maintenance pages into the play workflow.
+struct NavigationItem
+{
+    Page page;
+    const char *group;
+    const char *compact;
+};
+inline constexpr std::array<NavigationItem, PageCount> NavigationItems = {{
+    {Page::Speedrun, "Practice", "Runs"},
+    {Page::Cheats, nullptr, "Tools"},
+    {Page::SeedMap, nullptr, "Seeds"},
+    {Page::Inspector, nullptr, "Inspect"},
+    {Page::Replay, "Review", "Clips"},
+    {Page::Settings, "Suite", "Setup"},
+    {Page::Updates, nullptr, "Update"},
+    {Page::Diagnostics, nullptr, "Status"},
+}};
+
 struct Navigation
 {
     Page page = Page::Cheats;

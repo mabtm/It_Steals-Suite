@@ -12,6 +12,8 @@ inline constexpr size_t kMappingSize = 32768, kCommandOffset = 64, kPayloadOffse
 inline constexpr uint32_t kTelemetryConfigured = 0x80000000u, kTelemetryMap = 1, kTelemetryPath = 2, kTelemetryDetails = 4, kTelemetryLive = 8;
 inline constexpr uint32_t kTelemetryWalls=16,kTelemetryCrystals=32,kTelemetryMonster=64,kTelemetryPlanner=128,kTelemetryGeometry=256,kTelemetryInputs=1024,kTelemetryInspector=2048;
 inline constexpr uint32_t kTelemetrySkipIntro = 4096;
+// The connected trainer owns restart, including an intentionally unassigned key.
+inline constexpr uint32_t kTelemetryRestartHotkey = 8192;
 // Packed values are never read from live shared memory; the complete byte copy
 // is protected by a named mutex on both sides.
 #pragma pack(push, 1)

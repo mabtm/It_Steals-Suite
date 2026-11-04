@@ -55,6 +55,16 @@ Game, Unity, MelonLoader, and Harmony assemblies are local build inputs. Keep th
 
 ## Check a change
 
+### Community fixes: 7.21.0
+
+Timer geometry capture excludes only the actual `VaultButton.VaultDoorCollider` reference in scene 7. The game disables that collider and its navigation obstacle when the vault opens; fixed bunker walls and frames still participate in physical clearance checks. Physical detour repair now evaluates visibility edges on demand with A*, and evaluates remaining edges after an unsuccessful round before expanding the blocker set. Regression comparisons retain the previous exhaustive implementation as an independent reference. Static geometry checks do not verify live door timing or enemy interactions.
+
+Clip export allocates a temporary scene target at export resolution, binds the full camera chain before rendering, remaps the scene's display images and refreshes Canvas layout. The optional installed post-processing layer resets temporal history for each sample and on return to playback. Game-owned targets, image references, camera aspect and active render target are restored. Camera-contract tests cover mixed resolutions, equal-depth composition and failure cleanup; actual rendered output still needs a Windows game check.
+
+Quick restart is the ninth trainer action, default T. Trainer ownership uses a spare telemetry flag and is advertised only with a compatible mod at least 7.21.0; the mod then suppresses its standalone T fallback. Earlier trainer/mod combinations retain the old fallback. The command layout is unchanged. Font selection retains legacy defaults while storing stable identities for discovered Windows system/user fonts and the local Fonts directory. Only supported outline font faces are listed; unsupported containers and unavailable saved faces use the defaults.
+
+The installer verifies the official pinned archive before repairing an incomplete installation, rejects modified distribution files and conflicting path types, and journals only missing files. Regression coverage uses the real pinned distribution as well as rollback fixtures. Public-repository Windows CI exercises anonymous update listing/download and a revoked saved credential; private CI retains authenticated coverage. Changing repository visibility remains a repository-owner operation.
+
 Python 3 and a C++20 compiler run the native tests. `--ui` adds real ImGui interaction tests; `--managed` adds C# contract programs and requires Mono's `mcs` and `mono`.
 
 ```sh

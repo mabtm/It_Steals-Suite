@@ -186,6 +186,16 @@ public static class SceneGeometry
             var output = new List<MapFootprint>();
             int pointCount = 0, layer = LayerMask.NameToLayer("Walls");
             var timer = player.TimerMode ? UnityEngine.Object.FindObjectOfType<Monster3>() : null;
+            // VaultButton.ChangeDoor enables/disables this exact collider and
+            // its NavMeshObstacle. It is an openable door, not a permanent
+            // bunker wall. Keep every other collider, including the frame and
+            // vault sides; never exclude an entire vault hierarchy by name.
+            var timerDoors = new HashSet<int>();
+            if (player.TimerMode)
+                foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+                    foreach (var button in root.GetComponentsInChildren<VaultButton>(true))
+                        if (button.VaultDoorCollider != null)
+                            timerDoors.Add(button.VaultDoorCollider.GetInstanceID());
             int captureFrame = Time.frameCount;
             double captureAt = Time.realtimeSinceStartupAsDouble;
             bool captureGrounded = cc.isGrounded;
@@ -224,6 +234,11 @@ public static class SceneGeometry
                         continue;
                     }
                     trace.InactiveAccepted = !collider.gameObject.activeInHierarchy;
+                    if (timerDoors.Contains(collider.GetInstanceID()))
+                    {
+                        trace.Reason = "Openable Timer vault door: route requires opening it";
+                        continue;
+                    }
                     if (timer != null && timer.cieling != null &&
                         (collider.transform == timer.cieling.transform ||
                          collider.transform.IsChildOf(timer.cieling.transform)))

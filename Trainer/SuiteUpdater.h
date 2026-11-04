@@ -249,6 +249,16 @@ class Service
                 url = std::move(next);
                 continue;
             }
+            // A revoked private-release credential must not block public releases.
+            // Retry this same API request anonymously once; never forward the token
+            // to a release-storage redirect.
+            if (status == 401 && api && !token.value.empty())
+            {
+                SecureZeroMemory(token.value.data(), token.value.size());
+                token.value.clear();
+                --redirects;
+                continue;
+            }
             if (status == 401 || status == 404)
                 throw std::runtime_error(
                     "Release access is unavailable. For private builds, connect a GitHub token with Contents: read access to this repository.");
