@@ -1,4 +1,10 @@
 #pragma once
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 #include "SuiteBranding.h"
 #include "PracticeRouting.h"
 #include "PlannerRandom.h"
