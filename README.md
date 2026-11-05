@@ -29,22 +29,26 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.22.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
+**[v7.23.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
 
-- Improved speedrun categories with explicit Set-Seed selection, separately stored personal bests, both deterministic seed recipes and latched start evidence. Other aids remain invalid; seed/category changes invalidate the attempt, and historical Practice runs retain their status.
-- Improved the Suite as Elite-Suite while retaining its native dark in-game style: compact top tabs, clearly separated training controls and a mode list beside category/seed setup replace the large sidebar and cards. Explicit Start, Details and context actions remain available; settings, replays and installation identities stay compatible.
-- Fixed a bug caused by navigation refinement repeatedly repairing the same disconnected bunker component after the first checked connection. Timer preparation now reports its actual stages and reuses physically verified routes; fixed walls, floors and player clearance remain checked.
+- Improved speedrun organization with a permanent attempt archive, sortable PBs, local Top 5, history and statistics across all eight modes. Random Seed and Set-Seed stay separate; exact seed/recipe and session/date filters do not change run setup. Earlier retained attempts, scalar PBs and lifetime counters remain intact, with missing historical evidence clearly labelled.
+- Fixed a bug caused by extra replay cameras holding transforms between samples while the view and flashlight interpolated. Arm-camera poses now follow the requested replay/export time, including backward seeks; new recordings preserve stationary endpoints before movement. Capture gaps remain discontinuous. The reported arm alignment still requires visual confirmation in the game.
+- Improved replay retention so valid PB/Top-5 candidates bypass ordinary duration/crystal thresholds, receive storage priority and keep a retention marker. Stable identities link archive rows to committed recordings; storage backpressure and unavailable replays remain visible.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
 
 ## Preview development
 
-This branch contains **Elite-Suite 7.22.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
+This branch contains **Elite-Suite 7.23.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
 
 Set-Seed is a separate local speedrun category. Choose **Set-Seed** before starting; both the practice base-seed and captured spawn-seed recipes are supported. The selected seed and recipe are fixed for that attempt. All other trainer aids and normal integrity checks still apply. Random-Seed and Set-Seed personal bests remain separate; historical fixed-seed Practice runs keep their recorded status.
 
 The preview adds run-data format 9. Before upgrading older run data, it retains a permanent pre-v9 backup beside the stats file. Older stable builds cannot write format 9, so retain that backup when testing or rolling back.
+
+**Runs > PBs / Top 5 / History / Statistics** reads the permanent archive, also while the game is disconnected. Filters do not alter run setup. Use **Filters** for an exact seed, seed recipe, session or date range; click column headings to sort. All eight modes keep separate Random Seed and Set-Seed rankings. Practice remains unranked. Earlier retained attempts and scalar PBs are preserved; missing older run history cannot be reconstructed.
+
+In a replay, expand **Splits / reference**, choose **Use this run as reference**, then open another recording. Matching layouts and pickup order show signed split deltas. Replay labels are editable; the recorded run category is fixed. Valid PB/Top-5 candidates bypass ordinary recording thresholds and receive save priority; storage warnings and missing replay links remain explicit.
 
 ## Install
 

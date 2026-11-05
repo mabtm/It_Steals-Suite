@@ -175,10 +175,11 @@ inline bool SetSpeedrunMode(bool enabled, bool currentLevel = false)
 #include "TrainingUI.h"
 
 #include "RunStatisticsUI.h"
+#include "RunArchiveUI.h"
 
 inline void RenderSpeedrunPage()
 {
-    run_stats::Render();
+    suite_runs::Render();
 }
 
 inline void RenderHudSettings()

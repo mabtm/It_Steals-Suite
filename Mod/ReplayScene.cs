@@ -363,6 +363,7 @@ public sealed class ReplayScenePlayback
 {
     private sealed class Binding
     {
+        public ReplayCameraSampling CameraSampling;
         public Component Source;
         public ReplaySceneTrack Track;
         public int Index = -2;
@@ -481,7 +482,8 @@ public sealed class ReplayScenePlayback
                 Missing++;
                 continue;
             }
-            var binding = new Binding { Source = source, Track = track };
+            var binding = new Binding { Source = source, Track = track,
+                CameraSampling = track.Kind == ReplaySceneData.Camera ? new ReplayCameraSampling(track) : null };
             bindings.Add(binding);
             Save(binding);
             var camera = source as Camera;
@@ -614,7 +616,17 @@ public sealed class ReplayScenePlayback
             b.Index = index;
             var camera = b.Source as Camera;
             if (camera != null)
+            {
+                if (index >= 0)
+                {
+                    var p = b.CameraSampling.At(index, at);
+                    camera.transform.localPosition = new Vector3(p.X, p.Y, p.Z);
+                    camera.transform.localRotation = new Quaternion(p.Qx, p.Qy, p.Qz, p.Qw);
+                    camera.transform.localScale = new Vector3(p.Sx, p.Sy, p.Sz);
+                    camera.fieldOfView = p.Fov;
+                }
                 camera.enabled = index >= 0 && b.CameraOn && originalCamera;
+            }
         }
     }
 

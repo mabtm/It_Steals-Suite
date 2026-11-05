@@ -882,6 +882,7 @@ void ApplyPreferences(TrainerPreferences p)
     inspector_fx::preferences = p.inspector;
     suite_input::preferences = p.input;
     suite_ui::replayPreferences = p.replay;
+    RestoreReplayFilters();
     suite_keys::preferences = p.hotkeys;
     suite_ui::preferences = p.experience;
     suite_ui::fontsDirty = true;
@@ -1092,7 +1093,7 @@ std::string BuildDiagnostics()
         << "; last upload " << g_lastHudUpload << " ms";
     if (g_pShared)
     {
-        out << "\nHelper Update/LateUpdate CPU: mean " << g_pShared->helperWorkMean << " ms; p95 "
+        out << "\nHelper Update/LateUpdate + camera capture CPU: mean " << g_pShared->helperWorkMean << " ms; p95 "
             << g_pShared->helperWorkP95 << " ms"
             << "\nMovement model: scene " << g_pShared->movementScene << "; revision "
             << g_pShared->movementRevision << "; rejected " << g_pShared->movementRejected;
@@ -1542,6 +1543,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     g_mapWorker.SetDirectory(g_settings.Directory());
     g_mapWorker.LoadCaches();
     practice::g_replayArchive.SetDirectory(g_settings.Directory() / L"Replays");
+    if (auto location = game_launch::Resolve(game_launch::ApplicationDirectory(), game_launch::SteamRoots());
+        !location.game.empty())
+    {
+        auto records = location.game.parent_path() / L"UserData" / L"ItStealsPracticeSuite";
+        suite_runs::service.SetDirectory(records);
+        practice::g_replayArchive.SetSourceDirectory(records / L"RunReviews");
+    }
     if (g_compactMode)
         g_overlayVisible = true; // Restore HUD without taking focus.
     std::error_code directoryError;
@@ -1647,9 +1655,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                         wchar_t exe[32768]{};
                         DWORD count = 32768;
                         if (QueryFullProcessImageNameW(info, 0, exe, &count))
+                        {
+                            suite_runs::service.SetDirectory(std::filesystem::path(exe).parent_path() /
+                                L"UserData" / L"ItStealsPracticeSuite");
                             practice::g_replayArchive.SetSourceDirectory(
                                 std::filesystem::path(exe).parent_path() / L"UserData" /
                                 L"ItStealsPracticeSuite" / L"RunReviews");
+                        }
                         CloseHandle(info);
                     }
                 }
@@ -2360,6 +2372,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     g_settings.Shutdown();
     suite_navigation_capture::service.Shutdown();
     practice::g_replayArchive.Shutdown();
+    suite_runs::service.Shutdown();
     if (io.IniFilename)
         ImGui::SaveIniSettingsToDisk(io.IniFilename);
     ReleaseSurface();

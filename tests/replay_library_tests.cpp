@@ -8,6 +8,14 @@
 int main()
 {
     using namespace practice;
+    std::string profile = "{\"version\":1,\"unit\":\"ms\",\"p95_window\":128,\"stages\":{";
+    for (auto name : CaptureStages)
+        profile += std::string(profile.back() == '{' ? "" : ",") + '"' + name + "\":{\"count\":2,\"mean\":1.5,\"p95\":2,\"max\":3}";
+    profile += "}}";
+    auto cost = ParseCaptureProfile(profile);
+    assert(cost[6].count == 2 && cost[6].mean == 1.5 && cost[6].p95 == 2 && cost[6].maximum == 3);
+    auto badProfile = profile; badProfile.replace(badProfile.find("128"), 3, "127");
+    bool refused = false; try { ParseCaptureProfile(badProfile); } catch (...) { refused = true; } assert(refused);
     auto state = std::make_shared<ReplayArchiveState>();
     constexpr int64_t day = 864000000000ll, epoch = 621355968000000000ll;
     for (int i = 0; i < 120; i++)
@@ -22,6 +30,8 @@ int main()
         row.favorite = i % 4 == 0;
         row.name = "Run " + std::to_string(i);
         row.category = i % 2 ? "Training" : "PB";
+        row.runCategory = i % 3;
+        row.selectedSeed = row.seed;
         row.notes = i % 7 ? "" : "Important turn";
         state->runs.push_back(row);
     }
@@ -48,6 +58,13 @@ int main()
     for (auto i : view.shown)
         assert(state->runs[i].favorite && state->runs[i].scene == 13 && state->runs[i].outcome == 2);
     filter = {};
+    filter.category = 1;
+    view.Update(state, filter);
+    assert(view.shown.size() == 40);
+    for (auto i : view.shown) assert(state->runs[i].runCategory == 1);
+    filter.category = -1; filter.sort = ReplaySort::Category; filter.ascending = true;
+    view.Update(state, filter);
+    assert(state->runs[view.shown.front()].runCategory == 0 && state->runs[view.shown.back()].runCategory == 2);
     filter.sort = ReplaySort::Time;
     filter.ascending = true;
     view.Update(state, filter);

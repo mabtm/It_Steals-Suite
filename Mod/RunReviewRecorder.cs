@@ -320,7 +320,11 @@ public static class RunReviewRecorder
     public static void Finish(RunRecord record, RunStore store)
     {
         if (active == null || active.Review.Id != record.Id)
+        {
+            if (store.RetainRankedReplay(record))
+                store.LastReportError = "PB / Top 5 replay " + record.Id + " is unavailable: map capture did not start.";
             return;
+        }
         active.Review.Outcome = (int)record.Outcome;
         active.Review.Seconds = record.Seconds;
         active.Movement = MovementCapture.ForMap(active, true);
@@ -339,7 +343,9 @@ public static class RunReviewRecorder
         active.Review.ValidityReason = RunValidity.Reason(record);
         ReplayCapture.End();
         var motion = ReplayInputCapture.Finish(record.Seconds);
-        bool retain = recording.Accept(record.Seconds, active.Review.Collected.Count);
+        bool ranked = store.RetainRankedReplay(record);
+        bool retain = ranked ||
+                      recording.Accept(record.Seconds, active.Review.Collected.Count);
         if (!retain && motion != null && motion.AudioSession != null)
             motion.AudioSession.Discard();
         if (retain)
@@ -353,7 +359,9 @@ public static class RunReviewRecorder
         try
         {
             if (retain)
-                store.QueueReview(record.Id, active.Encode(), motion, VerificationReport.Encode(record));
+                store.QueueReview(record.Id, active.Encode(), motion, VerificationReport.Encode(record),
+                                  ranked ? "ELITE_REPLAY_KEEP|1|" + record.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                                           (record.PersonalBest ? "|PB" : "|TOP5") : null);
         }
         catch (Exception e)
         {

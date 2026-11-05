@@ -9,10 +9,26 @@
 #include "ReplayInputUI.h"
 #include "ClipUI.h"
 #include "RunExperienceModel.h"
+#include "ReplaySplitModel.h"
 inline bool g_reviewFromArchive = false;
 inline int64_t g_reviewLoadedId = 0;
 inline practice::ReplayLibraryView g_replayLibraryView;
 inline practice::ReplayLibraryFilter g_replayLibraryFilter;
+inline void RestoreReplayFilters()
+{
+    const auto &p = suite_ui::replayPreferences;
+    auto &f = g_replayLibraryFilter;
+    f.level = p.libraryLevel; f.category = p.libraryCategory; f.status = p.libraryStatus;
+    f.sort = practice::ReplaySort(p.librarySort); f.ascending = p.libraryAscending;
+    f.favorites = p.libraryFavorites;
+}
+inline void RememberReplayFilters()
+{
+    auto &p = suite_ui::replayPreferences;
+    const auto &f = g_replayLibraryFilter;
+    p.libraryLevel = f.level; p.libraryCategory = f.category; p.libraryStatus = f.status;
+    p.librarySort = int(f.sort); p.libraryAscending = f.ascending; p.libraryFavorites = f.favorites;
+}
 
 inline ImVec4 ReplayStatusColor(int outcome, bool valid)
 {
@@ -186,6 +202,7 @@ inline void OpenReplayLibrary()
 
 inline void ReplayList()
 {
+    struct Remember { ~Remember() { RememberReplayFilters(); } } remember;
     static char search[160]{};
     auto &filter = g_replayLibraryFilter;
     float width = ImGui::GetContentRegionAvail().x;
@@ -217,6 +234,12 @@ inline void ReplayList()
         ImGui::SetNextItemWidth(std::min(180.f * g_dpiScale, ImGui::GetContentRegionAvail().x));
         ImGui::Combo("##Replay status", &filter.status, statuses, 5);
         Help("Filter by run outcome and observed local validity.");
+        SameLineIfFits("Run category");
+        const char *categories[] = {"All run categories", "Random Seed", "Set-Seed", "Practice"};
+        int category = filter.category + 1;
+        ImGui::SetNextItemWidth(std::min(200.f * g_dpiScale, ImGui::GetContentRegionAvail().x));
+        if (ImGui::Combo("##Replay run category", &category, categories, 4)) filter.category = category - 1;
+        Help("The category recorded when the run started. Editing a replay's label does not change its speedrun category.");
         SameLineIfFits("Favorites");
         suite_ui::Checkbox("Favorites", &filter.favorites);
         Help("Show only recordings marked as favorites.");
@@ -227,13 +250,14 @@ inline void ReplayList()
             filter.query.clear();
             filter.level = -1;
             filter.status = 0;
+            filter.category = -1;
             filter.favorites = false;
         }
     };
     if (compact)
     {
         SameLineIfFits("Filters *");
-        bool active = filter.level >= 0 || filter.status || filter.favorites;
+        bool active = filter.level >= 0 || filter.category >= 0 || filter.status || filter.favorites;
         if (suite_ui::Button(active ? "Filters *###ReplayFilters" : "Filters###ReplayFilters"))
             ImGui::OpenPopup("Replay library filters");
         Help("Mode, status and favorites filters. The asterisk indicates active filters.");
@@ -278,24 +302,28 @@ inline void ReplayList()
         return;
     }
     float height = std::max(1.f, ImGui::GetContentRegionAvail().y - 4 * g_dpiScale);
-    if (ImGui::BeginTable("Replay archive", 7,
+    if (ImGui::BeginTable("Replay archive", 8,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX |
-                              ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Sortable,
-                          ImVec2(0, height), std::max(1000.f * g_dpiScale, ImGui::GetContentRegionAvail().x)))
+                              ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Sortable | ImGuiTableFlags_NoSavedSettings,
+                          ImVec2(0, height), std::max(1150.f * g_dpiScale, ImGui::GetContentRegionAvail().x)))
     {
+        const auto preferred = [&](practice::ReplaySort value) -> ImGuiTableColumnFlags {
+            return filter.sort == value ? ImGuiTableColumnFlags_DefaultSort |
+                (filter.ascending ? ImGuiTableColumnFlags_PreferSortAscending : ImGuiTableColumnFlags_PreferSortDescending) : 0;
+        };
         ImGui::TableSetupColumn("Fav", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort,
                                 36 * g_dpiScale);
-        ImGui::TableSetupColumn("Name / category", ImGuiTableColumnFlags_WidthStretch, 0, 2);
-        ImGui::TableSetupColumn("Mode", ImGuiTableColumnFlags_WidthFixed, 155 * g_dpiScale, 3);
+        ImGui::TableSetupColumn("Name / label", ImGuiTableColumnFlags_WidthStretch | preferred(practice::ReplaySort::Name), 0, 2);
+        ImGui::TableSetupColumn("Mode", ImGuiTableColumnFlags_WidthFixed | preferred(practice::ReplaySort::Mode), 155 * g_dpiScale, 3);
+        ImGui::TableSetupColumn("Run category", ImGuiTableColumnFlags_WidthFixed | preferred(practice::ReplaySort::Category), 125 * g_dpiScale, 7);
         ImGui::TableSetupColumn("Time",
-                                ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending,
+                                ImGuiTableColumnFlags_WidthFixed | preferred(practice::ReplaySort::Time),
                                 95 * g_dpiScale, 4);
         ImGui::TableSetupColumn("Recorded",
-                                ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort |
-                                    ImGuiTableColumnFlags_PreferSortDescending,
+                                ImGuiTableColumnFlags_WidthFixed | preferred(practice::ReplaySort::Date),
                                 155 * g_dpiScale, 1);
-        ImGui::TableSetupColumn("Seed", ImGuiTableColumnFlags_WidthFixed, 100 * g_dpiScale, 5);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 85 * g_dpiScale, 6);
+        ImGui::TableSetupColumn("Seed", ImGuiTableColumnFlags_WidthFixed | preferred(practice::ReplaySort::Seed), 100 * g_dpiScale, 5);
+        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed | preferred(practice::ReplaySort::Status), 85 * g_dpiScale, 6);
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableHeadersRow();
         if (auto sort = ImGui::TableGetSortSpecs(); sort && sort->SpecsDirty && sort->SpecsCount)
@@ -334,17 +362,20 @@ inline void ReplayList()
                 ImGui::EndDisabled();
                 Help((std::string(OutcomeLabel(byte(row.outcome))) +
                       (row.saved ? " | saved replay" : " | recent recording") +
+                      (row.protectedRecording ? " | protected PB / Top 5 recording" : "") +
                       (row.notes.empty() ? "" : "\n" + row.notes))
                          .c_str());
                 ImGui::TableNextColumn();
                 int level = MapLevelIndex(row.scene);
                 ImGui::TextUnformatted(level >= 0 ? kMapLevelNames[level] : "Unknown");
                 ImGui::TableNextColumn();
+                ImGui::TextUnformatted(practice::RecordedCategoryName(row.runCategory));
+                ImGui::TableNextColumn();
                 ImGui::TextUnformatted(FormatRunTime(row.seconds).c_str());
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(text.date.empty() ? "Unknown" : text.date.c_str());
                 ImGui::TableNextColumn();
-                ImGui::Text("%d", row.seed);
+                ImGui::Text("%d", row.runCategory == 1 ? row.selectedSeed : row.seed);
                 ImGui::TableNextColumn();
                 ImGui::TextColored(ReplayStatusColor(row.outcome, row.valid), "%s",
                                    practice::ReplayStatusName(row.outcome, row.valid));
@@ -395,7 +426,8 @@ inline void ReplayEditor(std::shared_ptr<const practice::MapData> data)
         ImGui::SetNextItemWidth(-80 * g_dpiScale);
         ImGui::InputText("Name", name, sizeof(name));
         ImGui::SetNextItemWidth(-80 * g_dpiScale);
-        ImGui::InputText("Category", category, sizeof(category));
+        ImGui::InputText("Label", category, sizeof(category));
+        Help("An optional library label. The recorded Random Seed / Set-Seed / Practice category cannot be edited.");
         ImGui::InputTextMultiline("Notes", notes, sizeof(notes),
                                   ImVec2(std::max(100.f, ImGui::GetContentRegionAvail().x - 80 * g_dpiScale),
                                          std::min(140.f * g_dpiScale, ImGui::GetIO().DisplaySize.y * .25f)));
@@ -427,6 +459,65 @@ inline void ReplayEditor(std::shared_ptr<const practice::MapData> data)
         else
             ImGui::TextDisabled("Saving replay...");
     }
+}
+
+inline void ReplaySplits(const practice::MapData &data, bool retained)
+{
+    if (!suite_ui::CollapsingHeader("Splits / reference")) return;
+    auto reference = practice::g_replayArchive.Reference();
+    ImGui::BeginDisabled(!retained);
+    if (suite_ui::SmallButton("Use this run as reference")) practice::g_replayArchive.SetReference(data.review->id);
+    ImGui::EndDisabled();
+    Help("Open another recording to compare its pickup and segment times. Only matching mode, category, seed recipe, layout and pickup order produce split deltas.");
+    if (reference)
+    {
+        SameLineIfFits("Clear");
+        if (suite_ui::SmallButton("Clear")) practice::g_replayArchive.SetReference(0);
+        ImGui::TextDisabled("Reference: %s / %s", FormatRunTime(reference->review->seconds).c_str(), practice::ReplayRecordedAt(reference->review->id).c_str());
+        if (!practice::MatchingSplitLayout(data, *reference)) ImGui::TextWrapped("Different category or layout; split comparison unavailable.");
+        else if (data.review->outcome == 1 && reference->review->outcome == 1)
+            ImGui::Text("Finish delta: %+.3f s", data.review->seconds - reference->review->seconds);
+    }
+    auto splits = practice::PickupSplits(data, reference.get());
+    if (splits.empty()) { ImGui::TextDisabled("No observed crystal pickups in this recording."); return; }
+    if (ImGui::BeginTable("Pickup splits", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchSame))
+    {
+        for (auto c : {"Crystal", "Elapsed", "Segment", "Delta"}) ImGui::TableSetupColumn(c);
+        ImGui::TableHeadersRow();
+        for (const auto &s : splits)
+        {
+            ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::Text("#%d", s.crystal + 1);
+            ImGui::TableNextColumn(); ImGui::TextUnformatted(FormatRunTime(s.at).c_str());
+            ImGui::TableNextColumn(); ImGui::TextUnformatted(FormatRunTime(s.segment).c_str());
+            ImGui::TableNextColumn();
+            if (s.comparable) ImGui::TextColored(s.delta <= 0 ? ImVec4(.4f, .9f, .65f, 1) : g_accentCol, "%+.3f", s.delta);
+            else ImGui::TextDisabled("--");
+        }
+        ImGui::EndTable();
+    }
+}
+
+inline void RecordingCpu(int64_t run)
+{
+    auto archive = practice::g_replayArchive.Get();
+    auto found = archive->byId.find(run);
+    if (found == archive->byId.end() || !archive->runs[found->second].hasCaptureCpu ||
+        !suite_ui::CollapsingHeader("Recording CPU profile")) return;
+    const auto &row = archive->runs[found->second];
+    if (ImGui::BeginTable("Capture stages", 4, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_RowBg))
+    {
+        for (auto label : {"Stage", "Mean ms", "p95 ms", "Max ms"}) ImGui::TableSetupColumn(label);
+        ImGui::TableHeadersRow();
+        const char *stages[] = {"Colliders", "Audio sync", "Cameras / UI", "Effects", "Rig poses", "View frame", "Total"};
+        for (int i = 0; i < 7; i++)
+        {
+            const auto &c = row.captureCpu[i];
+            ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::TextUnformatted(stages[i]);
+            for (auto value : {c.mean, c.p95, c.maximum}) { ImGui::TableNextColumn(); ImGui::Text("%.3f", value); }
+        }
+        ImGui::EndTable();
+    }
+    Help("CPU observation time per capture call. Mean and maximum cover this run; p95 uses the last 128 calls per stage. GPU work and game rendering are not included. Every PC uses the same recording policy.");
 }
 
 inline void RenderReplayPolicy()
@@ -604,6 +695,8 @@ inline void RenderRunReview()
         ImGui::PopFont();
     ImGui::Text("Seed  %d", d.seed);
     Help("Captured layout seed.");
+    ReplaySplits(d, retained);
+    RecordingCpu(review.id);
     ImGui::TextDisabled("%s / %zu of %zu crystals", OutcomeLabel(byte(review.outcome)),
                         review.collected.size(), d.selected.size());
     ReplayEditor(result->data);

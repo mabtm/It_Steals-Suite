@@ -13,6 +13,7 @@ public sealed class ReplaySceneFrame
 
 public sealed class ReplaySceneTrack
 {
+    internal double PendingHold;
     public int Kind;
     public string Path = "", Prefab = "", Spawn = "";
     public readonly List<ReplaySceneFrame> Frames = new List<ReplaySceneFrame>();
@@ -74,7 +75,7 @@ public sealed class ReplaySceneData
         if (frames.Count > 0)
         {
             var previous = frames[frames.Count - 1];
-            if (at < previous.Seconds)
+            if (at < Math.Max(previous.Seconds, track.PendingHold))
             {
                 Drop();
                 return;
@@ -83,8 +84,20 @@ public sealed class ReplaySceneData
             for (int i = 0; same && i < length; i++)
                 same = values[i] == previous.Values[i];
             if (same)
+            {
+                track.PendingHold = at;
                 return;
+            }
+            // Interpolated cameras need the last stationary endpoint. Without
+            // it deduplication can smear a later movement backwards in time.
+            if (track.Kind == Camera && track.PendingHold > previous.Seconds)
+                AddFrame(track, track.PendingHold, previous.Values, previous.Values.Length);
         }
+        AddFrame(track, at, values, length);
+    }
+
+    private void AddFrame(ReplaySceneTrack track, double at, byte[] values, int length)
+    {
         if (Count == MaxFrames || length > MaxPayload || Bytes + length + 12 > MaxBytes ||
             ReserveBytes != null && !ReserveBytes(length + 12))
         {
@@ -93,7 +106,7 @@ public sealed class ReplaySceneData
         }
         var copy = new byte[length];
         Buffer.BlockCopy(values, 0, copy, 0, length);
-        frames.Add(new ReplaySceneFrame { Seconds = at, Values = copy });
+        track.Frames.Add(new ReplaySceneFrame { Seconds = at, Values = copy });
         Bytes += length + 12;
         Count++;
     }

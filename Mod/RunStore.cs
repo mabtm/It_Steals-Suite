@@ -11,6 +11,12 @@ using MelonLoader;
 public sealed class RunStore : IDisposable
 {
     private readonly string path;
+    private readonly RunLedger ledger;
+    private long lastRunId;
+    private bool loading = true;
+    private readonly Queue<string> ledgerRows = new Queue<string>();
+    public volatile string LastLedgerError;
+    public volatile string LedgerWarning;
     private readonly Dictionary<int, double> best = new Dictionary<int, double>();
     private readonly Dictionary<int, double> setSeedBest = new Dictionary<int, double>();
     private readonly SortedDictionary<int, int[]> days = new SortedDictionary<int, int[]>();
@@ -28,7 +34,7 @@ public sealed class RunStore : IDisposable
 
     private sealed class ReportJob
     {
-        public string Name, Text, ReviewReport;
+        public string Name, Text, ReviewReport, Protection;
         public byte[] Bytes;
         public ReplayMotionData Motion;
         public long Memory;
@@ -36,6 +42,7 @@ public sealed class RunStore : IDisposable
 
     private long reviewQueueBytes;
     private readonly Queue<ReportJob> reports = new Queue<ReportJob>();
+    private readonly Queue<ReportJob> rankedReviews = new Queue<ReportJob>();
     private bool stopping;
     private volatile bool writing, writingReport;
     private bool readOnly, preserveBackup;
@@ -46,13 +53,13 @@ public sealed class RunStore : IDisposable
     public bool SavePending
     {
         get {
-            lock (queueGate) return pending != null || pendingMovement != null || writing;
+            lock (queueGate) return pending != null || pendingMovement != null || writing || ledgerRows.Count != 0;
         }
     }
     public bool ReportsPending
     {
         get {
-            lock (queueGate) return reports.Count != 0 || writingReport;
+            lock (queueGate) return reports.Count != 0 || rankedReviews.Count != 0 || writingReport;
         }
     }
     private static readonly CultureInfo culture = CultureInfo.InvariantCulture;
@@ -60,6 +67,7 @@ public sealed class RunStore : IDisposable
     public RunStore(string directory, string legacyRoot = null)
     {
         path = Path.Combine(directory, "speedruns-v3.txt");
+        ledger = new RunLedger(directory);
         try
         {
             Directory.CreateDirectory(directory);
@@ -88,6 +96,36 @@ public sealed class RunStore : IDisposable
             if (recovered.ExportReport)
                 QueueReport(recovered);
         }
+        loading = false;
+        foreach (var record in History) Archive(record, legacy: true);
+    }
+
+    public bool RetainRankedReplay(RunRecord record) { return ledger.ShouldRetain(record); }
+
+    public void Archive(RunRecord record, long session = 0, bool quick = false, bool legacy = false)
+    {
+        if (loading || readOnly || Array.IndexOf(ModeStatistics.Scenes, record.Scene) < 0) return;
+        string line = RunLedger.Encode(record, session, quick, legacy);
+        QueueArchiveLine(line);
+    }
+
+    public void ArchiveSession(long id)
+    {
+        if (!readOnly) QueueArchiveLine(RunLedger.Session(id));
+    }
+
+    private void QueueArchiveLine(string line)
+    {
+        lock (queueGate)
+        {
+            if (stopping) return;
+            if (ledgerRows.Count >= 4096)
+            {
+                LastLedgerError = "Run archive queue is full; archive data could not be queued.";
+                return;
+            }
+            EnsureWriter(); ledgerRows.Enqueue(line); wake.Set();
+        }
     }
 
     public double Best(int scene, RunCategory category = RunCategory.RandomSeed)
@@ -100,10 +138,12 @@ public sealed class RunStore : IDisposable
 
     public long NextId(long utcTicks)
     {
-        long id = utcTicks;
+        long id = Math.Max(utcTicks, lastRunId < DateTime.MaxValue.Ticks ? lastRunId + 1 : lastRunId);
         foreach (RunRecord r in History)
             if (r.Id >= id && r.Id < long.MaxValue)
                 id = r.Id + 1;
+        if (id >= DateTime.MaxValue.Ticks) throw new InvalidOperationException("Run identity space exhausted");
+        lastRunId = id;
         return id;
     }
 
@@ -133,6 +173,7 @@ public sealed class RunStore : IDisposable
         foreach (RunRecord old in History)
             if (old.Id == record.Id && old.Number == record.Number)
                 return;
+        lastRunId = Math.Max(lastRunId, record.Id);
         var copy = record.Copy();
         copy.Events.Clear();
         History.Add(copy);
@@ -400,6 +441,7 @@ public sealed class RunStore : IDisposable
         Active = null;
         preUpgradeBytes = null;
         PreUpgradeBackupPath = null;
+        lastRunId = 0;
         best.Clear();
         setSeedBest.Clear();
         days.Clear();
@@ -468,6 +510,13 @@ public sealed class RunStore : IDisposable
             string key = line.Substring(0, split), value = line.Substring(split + 1);
             if (version >= 8 && Modes.Read(key, value))
                 continue;
+            if (key == "lastRunId")
+            {
+                long id;
+                if (long.TryParse(value, out id) && id >= 0 && id < DateTime.MaxValue.Ticks)
+                    lastRunId = Math.Max(lastRunId, id);
+                continue;
+            }
             if (key == "history" || key == "active")
             {
                 RunRecord r = Unpack(value);
@@ -578,6 +627,7 @@ public sealed class RunStore : IDisposable
             .Append("\nfurthest=")
             .Append(FurthestProgress.ToString("R", culture))
             .Append('\n');
+        text.Append("lastRunId=").Append(lastRunId).Append('\n');
         Modes.Write(text);
         var keys = new List<int>(best.Keys);
         keys.Sort();
@@ -683,7 +733,7 @@ public sealed class RunStore : IDisposable
         {
             if (stopping)
                 return;
-            if (reports.Count >= 64)
+            if (reports.Count + rankedReviews.Count >= 64)
             {
                 ReportQueueWarning = "Report queue was full; at least one report could not be saved.";
                 return;
@@ -696,22 +746,10 @@ public sealed class RunStore : IDisposable
 
     public void QueueReview(long id, byte[] bytes)
     {
-        lock (queueGate)
-        {
-            if (stopping)
-                return;
-            if (reports.Count >= 64)
-            {
-                ReportQueueWarning = "Run review queue is full";
-                return;
-            }
-            EnsureWriter();
-            reports.Enqueue(new ReportJob { Name = "run-" + id + ".isrun", Bytes = bytes });
-            wake.Set();
-        }
+        QueueReview(id, bytes, null, null);
     }
 
-    public void QueueReview(long id, byte[] bytes, ReplayMotionData motion, string report)
+    public void QueueReview(long id, byte[] bytes, ReplayMotionData motion, string report, string protection = null)
     {
         long memory = (bytes == null ? 0 : bytes.LongLength) + (motion == null ? 0 : motion.EstimatedBytes);
         lock (queueGate)
@@ -722,17 +760,29 @@ public sealed class RunStore : IDisposable
                     motion.AudioSession.Discard();
                 return;
             }
-            if (reports.Count >= 64 || reviewQueueBytes + memory > 192L * 1024 * 1024)
+            // Rank-worthy recordings take priority over queued ordinary reviews.
+            // All memory remains bounded; disk failures are reported, never hidden.
+            while (protection != null && reports.Count != 0 &&
+                   (reports.Count + rankedReviews.Count >= 64 || reviewQueueBytes + memory > 192L * 1024 * 1024))
             {
-                ReportQueueWarning = "Run review storage is falling behind; recording was not saved";
+                var omitted = reports.Dequeue();
+                reviewQueueBytes -= omitted.Memory;
+                if (omitted.Motion != null && omitted.Motion.AudioSession != null) omitted.Motion.AudioSession.Discard();
+                ReportQueueWarning = "Ordinary recording omitted to prioritize a PB / Top 5 replay; storage is falling behind.";
+            }
+            if (reports.Count + rankedReviews.Count >= 64 || reviewQueueBytes + memory > 192L * 1024 * 1024)
+            {
+                ReportQueueWarning = (protection == null ? "Run" : "PB / Top 5") + " recording " + id +
+                                     " was not saved: storage queue limit reached";
                 if (motion != null && motion.AudioSession != null)
                     motion.AudioSession.Discard();
                 return;
             }
             EnsureWriter();
             reviewQueueBytes += memory;
-            reports.Enqueue(new ReportJob { Name = "run-" + id + ".isrun", Bytes = bytes, Motion = motion,
-                                            ReviewReport = report, Memory = memory });
+            var job = new ReportJob { Name = "run-" + id + ".isrun", Bytes = bytes, Motion = motion,
+                                      ReviewReport = report, Memory = memory, Protection = protection };
+            if (protection == null) reports.Enqueue(job); else rankedReviews.Enqueue(job);
             wake.Set();
         }
     }
@@ -788,6 +838,10 @@ public sealed class RunStore : IDisposable
             }
             if (job.ReviewReport != null)
                 ImmutableText(Path.ChangeExtension(target, ".validation.json"), job.ReviewReport);
+            if (job.Motion != null && job.Motion.CaptureProfile != null)
+                ImmutableText(Path.ChangeExtension(target, ".capture.json"), job.Motion.CaptureProfile);
+            if (job.Protection != null)
+                ImmutableText(Path.ChangeExtension(target, ".keep"), job.Protection);
             if (job.Bytes != null)
                 File.WriteAllBytes(temp, job.Bytes);
             else
@@ -856,36 +910,51 @@ public sealed class RunStore : IDisposable
 
     private void Writer()
     {
+        long ledgerRetry = 0;
         try
         {
             while (true)
             {
-                wake.WaitOne();
+                wake.WaitOne(1000);
                 while (true)
                 {
                     string text;
                     ReportJob report;
                     byte[] movement;
+                    string ledgerRow;
                     lock (queueGate)
                     {
                         text = pending;
                         pending = null;
                         movement = pendingMovement;
                         pendingMovement = null;
-                        report = reports.Count > 0 ? reports.Dequeue() : null;
-                        if (text == null && report == null && movement == null)
+                        report = rankedReviews.Count > 0 ? rankedReviews.Dequeue() : reports.Count > 0 ? reports.Dequeue() : null;
+                        ledgerRow = ledgerRows.Count != 0 && DateTime.UtcNow.Ticks >= ledgerRetry
+                                        ? ledgerRows.Dequeue() : null;
+                        if (text == null && report == null && movement == null && ledgerRow == null)
                         {
                             if (stopping)
                                 return;
                             break;
                         }
-                        writing = text != null || movement != null;
+                        writing = text != null || movement != null || ledgerRow != null;
                         writingReport = report != null;
                     }
                     if (text != null)
                         Write(text);
                     if (movement != null)
                         WriteMovement(movement);
+                    if (ledgerRow != null)
+                        try
+                        {
+                            ledger.Append(ledgerRow); LastLedgerError = null; LedgerWarning = ledger.Warning;
+                        }
+                        catch (Exception error)
+                        {
+                            LastLedgerError = "Run archive not saved: " + error.Message;
+                            lock (queueGate) if (!stopping) ledgerRows.Enqueue(ledgerRow);
+                            ledgerRetry = DateTime.UtcNow.Ticks + TimeSpan.TicksPerSecond;
+                        }
                     writing = false;
                     if (report != null)
                     {

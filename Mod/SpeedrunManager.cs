@@ -530,9 +530,9 @@ public sealed class SpeedrunManager
         data.WriteString(SharedLayout.ReportError, store.LastReportError ?? store.ReportQueueWarning ?? "",
                          96);
         data.WriteString(SharedLayout.StatsWarning,
-                         store.LoadWarning ?? RunReviewRecorder.RecoveryWarning ?? "", 96);
-        data.Write(SharedLayout.StatsSaveStatus, store.LastError != null ? 2 : store.SavePending ? 1 : 0);
-        data.WriteString(SharedLayout.StatsError, store.LastError ?? "", 96);
+                         store.LoadWarning ?? store.LedgerWarning ?? RunReviewRecorder.RecoveryWarning ?? "", 96);
+        data.Write(SharedLayout.StatsSaveStatus, store.LastError != null || store.LastLedgerError != null ? 2 : store.SavePending ? 1 : 0);
+        data.WriteString(SharedLayout.StatsError, store.LastError ?? store.LastLedgerError ?? "", 96);
         data.Write(SharedLayout.SeedSourcesVerified, PracticeRandom.SourcesVerified);
         if (record != null)
         {

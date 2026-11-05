@@ -100,6 +100,11 @@ int main(int argc, char **argv)
     TrainerPreferences p;
     p.seed = 123;
     p.captureOverlay = true;
+    p.replay.libraryLevel = 7; p.replay.libraryCategory = 1; p.replay.libraryStatus = 2;
+    p.replay.librarySort = 6; p.replay.libraryAscending = true; p.replay.libraryFavorites = true;
+    auto library = TrainerPreferences::Decode(p.Encode()).replay;
+    assert(library.libraryLevel == 7 && library.libraryCategory == 1 && library.libraryStatus == 2 &&
+        library.librarySort == 6 && library.libraryAscending && library.libraryFavorites);
     p.hotkeys.bindings[suite_keys::Menu] = {'J', suite_keys::Control | suite_keys::Shift};
     p.skipGameIntro = false;
     p.appearance.fontIds = {"Suite:München.ttf#0", "User:custom=face.ttc#2", "Windows:consola.ttf#0"};

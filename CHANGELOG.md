@@ -2,6 +2,16 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.23.0 Changelog
+
+- Improved speedrun organization with a permanent attempt archive, sortable PBs, local Top 5, history and statistics across all eight modes. Random Seed and Set-Seed stay separate; exact seed/recipe and session/date filters do not change run setup. Earlier retained attempts, scalar PBs and lifetime counters remain intact, with missing historical evidence clearly labelled.
+- Fixed a bug caused by extra replay cameras holding transforms between samples while the view and flashlight interpolated. Arm-camera poses now follow the requested replay/export time, including backward seeks; new recordings preserve stationary endpoints before movement. Capture gaps remain discontinuous. The reported arm alignment still requires visual confirmation in the game.
+- Improved replay retention so valid PB/Top-5 candidates bypass ordinary duration/crystal thresholds, receive storage priority and keep a retention marker. Stable identities link archive rows to committed recordings; storage backpressure and unavailable replays remain visible.
+- Improved replay organization with recorded-category filtering/sorting, distinct from editable library labels. Mode/category/status/favorites filters and sort order survive restart.
+- Improved replay analysis with observed pickup/segment splits and selectable reference recordings. Split deltas require matching mode, category, seed recipe, layout and pickup order; divergent routes remain unpaired.
+- Improved capture diagnostics with bounded CPU profiles for collider, audio, scene/camera/UI, effects, rig-pose and view stages. Helper CPU measurements include camera callbacks, and duplicate capture callbacks within one render frame are avoided. All PCs use the same recording policy.
+- Improved the native Runs workspace with short tab transitions, responsive record tables and collapsible details. This version remains a pre-release outside stable automatic updates.
+
 ### v7.22.0 Changelog
 
 - Improved speedrun categories with explicit Set-Seed selection, separately stored personal bests, both deterministic seed recipes and latched start evidence. Other aids remain invalid; seed/category changes invalidate the attempt, and historical Practice runs retain their status.

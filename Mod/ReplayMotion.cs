@@ -80,6 +80,7 @@ public sealed class ReplayMotionInfo
 
 public sealed class ReplayMotionData
 {
+    public string CaptureProfile; // Optional diagnostic companion; recording wire data is unchanged.
     public const int MaxFrames = 262144, MaxTicks = 524288, MaxEvents = 131072, MaxBytes = 128 * 1024 * 1024;
     public int InputFormat = 8;
     public long Id;

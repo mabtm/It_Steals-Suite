@@ -68,7 +68,7 @@ try {
     $msbuild=& $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
     if (-not $msbuild) { throw 'MSBuild is required for the native checks.' }
     $nativeIncludes=[Security.SecurityElement]::Escape((Join-Path $repo 'Trainer'))
-    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','seed_neighbor_tests','hotkey_tests','font_catalog_tests','physical_repair_tests','timer_preparation_tests','navigation_diagnostic_tests','ui_motion_audio_tests','performance_timing_tests','replay_library_tests','run_statistics_tests','navigation_visibility_tests','navigation_startup_tests')) {
+    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','seed_neighbor_tests','hotkey_tests','font_catalog_tests','physical_repair_tests','timer_preparation_tests','navigation_diagnostic_tests','ui_motion_audio_tests','performance_timing_tests','replay_library_tests','run_statistics_tests','navigation_visibility_tests','navigation_startup_tests','run_data_tests','replay_split_tests')) {
         $check = $nativeTest
         Write-Output "Verifying Windows native contract: $check"
         $nativeSource=[Security.SecurityElement]::Escape((Join-Path $repo ('tests/'+$nativeTest+'.cpp')))
@@ -89,8 +89,10 @@ try {
 "@)
         & $msbuild $nativeProject /p:Configuration=Release /p:Platform=x64 /nologo /verbosity:minimal 2>&1 | Tee-Object -Variable compileOutput
         if ($LASTEXITCODE -ne 0) { throw ("Native check compilation failed: $nativeTest`n" + ($compileOutput | Select-Object -Last 12 | Out-String)) }
-        $nativeArgument = if ($nativeTest -eq 'navigation_startup_tests') { Join-Path $repo 'tests/fixtures' } else { $work }
-        & (Join-Path $work ('native/'+$nativeTest+'.exe')) $nativeArgument 2>&1 | Tee-Object -Variable contractOutput
+        $nativeArguments = if ($nativeTest -eq 'run_data_tests') {
+            @((Join-Path $repo 'tests/fixtures/run-data-wire.tsv'), (Join-Path $work 'run-data'), (Join-Path $repo 'tests/fixtures/run-counter-wire.txt'))
+        } elseif ($nativeTest -eq 'navigation_startup_tests') { @(Join-Path $repo 'tests/fixtures') } else { @($work) }
+        & (Join-Path $work ('native/'+$nativeTest+'.exe')) @nativeArguments 2>&1 | Tee-Object -Variable contractOutput
         if ($LASTEXITCODE -ne 0) { throw ("Native contract failed: $nativeTest (exit $LASTEXITCODE)`n" + ($contractOutput | Select-Object -Last 12 | Out-String)) }
     }
     }

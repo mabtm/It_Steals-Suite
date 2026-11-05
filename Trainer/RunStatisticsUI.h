@@ -271,6 +271,7 @@ inline void Settings()
             ImGui::TextWrapped(
                 "Clear global and per-mode counters, playtime, daily/session statistics and averages?");
             ImGui::TextWrapped("Personal bests and saved replays are retained.");
+            ImGui::TextWrapped("The permanent run archive and its derived statistics remain available.");
             ImGui::BeginDisabled(!g_pShared || g_pShared->timerState == 1 || HasPendingRequest());
             if (suite_ui::Button("Reset counters"))
             {
@@ -573,7 +574,7 @@ inline void Render()
         SelectionOverview();
         ImGui::Spacing();
         SectionHeading("Recent attempts / all categories");
-        RecentAttempts();
+        if (suite_ui::CollapsingHeader("Show recent attempts")) RecentAttempts();
         ImGui::Spacing();
         ImGui::TextDisabled("%s", dashboard.sinceLabel.c_str());
         if (!g_pShared)

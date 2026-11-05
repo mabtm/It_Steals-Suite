@@ -15,16 +15,48 @@
 #include <mutex>
 #include <set>
 #include <thread>
+#include <unordered_map>
 
 namespace practice
 {
+inline const char *RecordedCategoryName(int category)
+{
+    return category == 0 ? "Random Seed" : category == 1 ? "Set-Seed" : category == 2 ? "Practice" : "Unknown";
+}
+inline constexpr const char *CaptureStages[] = {"colliders", "audio_sync", "scene_cameras_ui", "effects", "visual_poses", "view_frame", "capture_total"};
+struct CaptureCost { uint64_t count = 0; double mean = 0, p95 = 0, maximum = 0; };
+inline std::array<CaptureCost, 7> ParseCaptureProfile(std::string_view text)
+{
+    auto json = suite_update::JsonReader(text).Read();
+    if (json.At("version").UInt() != 1 || json.At("unit").String() != "ms" || json.At("p95_window").UInt() != 128)
+        throw std::runtime_error("Unsupported capture CPU profile");
+    std::array<CaptureCost, 7> result;
+    for (size_t i = 0; i < result.size(); i++)
+    {
+        const auto &stage = json.At("stages").At(CaptureStages[i]);
+        auto number = [&](const char *key) {
+            auto &j = stage.At(key); double n = 0;
+            auto read = std::from_chars(j.text.data(), j.text.data() + j.text.size(), n);
+            if (j.kind != suite_update::Json::Kind::Number || read.ec != std::errc{} ||
+                read.ptr != j.text.data() + j.text.size() || !std::isfinite(n) || n < 0 || n > 315360000000.)
+                throw std::runtime_error("Invalid capture CPU profile");
+            return n;
+        };
+        double count = number("count");
+        if (std::floor(count) != count) throw std::runtime_error("Invalid capture sample count");
+        result[i] = {uint64_t(count), number("mean"), number("p95"), number("max")};
+    }
+    return result;
+}
 struct ReplayInfo
 {
     int64_t id = 0;
-    int scene = 0, seed = 0, outcome = 0;
+    int scene = 0, seed = 0, outcome = 0, runCategory = -1, selectedSeed = 0;
     double seconds = 0;
-    bool valid = false, saved = false, favorite = false;
+    bool valid = false, saved = false, favorite = false, rawSeed = false, protectedRecording = false;
     std::string name, category, notes, reason;
+    std::array<CaptureCost, 7> captureCpu{};
+    bool hasCaptureCpu = false;
     std::filesystem::path file;
 };
 
@@ -71,6 +103,7 @@ inline std::string ReplayName(const MapData &data)
 struct ReplayArchiveState
 {
     std::vector<ReplayInfo> runs;
+    std::unordered_map<int64_t, size_t> byId;
     std::shared_ptr<const ReplayRevalidation> revalidation;
     std::string error, motionError, exportPath;
     bool busy = false;
@@ -92,6 +125,7 @@ class ReplayArchive
         Refresh,
         ChangeSource,
         LoadRecording,
+        LoadReference,
         SaveRecording,
         ExportPackage,
         LoadMotion,
@@ -129,6 +163,7 @@ class ReplayArchive
     std::set<int64_t> favorites;
     std::shared_ptr<const ReplayArchiveState> state = std::make_shared<ReplayArchiveState>();
     std::shared_ptr<const MapData> loaded;
+    std::shared_ptr<const MapData> splitReference;
     std::shared_ptr<const ReplayMotion> motion;
     std::shared_ptr<const ReplayRevalidation> revalidation;
     std::atomic<uint64_t> nextRevalidation{0};
@@ -262,8 +297,14 @@ class ReplayArchive
         {
             (void)path;
             auto old = rows.find(item.info.id);
-            if (old == rows.end() || item.info.saved)
+            if (old == rows.end()) rows[item.info.id] = item.info;
+            else if (item.info.saved)
+            {
+                bool keep = old->second.protectedRecording;
                 rows[item.info.id] = item.info;
+                rows[item.info.id].protectedRecording |= keep;
+            }
+            else old->second.protectedRecording |= item.info.protectedRecording;
         }
         for (auto it = rows.rbegin(); it != rows.rend(); ++it)
         {
@@ -289,6 +330,7 @@ class ReplayArchive
                     {
                     }
                 }
+            snapshot->byId.emplace(row.id, snapshot->runs.size());
             snapshot->runs.push_back(std::move(row));
         }
         std::atomic_store(&state, std::shared_ptr<const ReplayArchiveState>(snapshot));
@@ -328,6 +370,11 @@ class ReplayArchive
                     info.id = r.id;
                     info.scene = data->scene;
                     info.seed = data->seed;
+                    info.runCategory = r.category;
+                    info.selectedSeed = r.selectedSeed;
+                    info.rawSeed = r.rawSpawnSeed;
+                    info.protectedRecording = std::filesystem::exists(entry.path().parent_path() /
+                        (entry.path().stem().string() + ".keep"));
                     info.outcome = r.outcome;
                     info.seconds = r.seconds;
                     info.valid = r.valid;
@@ -335,6 +382,15 @@ class ReplayArchive
                     info.saved = directory == root;
                     info.file = entry.path();
                     info.name = ReplayName(*data);
+                    auto profile = entry.path(); profile.replace_extension(".capture.json");
+                    if (std::filesystem::exists(profile))
+                        try
+                        {
+                            auto bytes = Read(profile, 16384);
+                            info.captureCpu = ParseCaptureProfile(std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+                            info.hasCaptureCpu = true;
+                        }
+                        catch (const std::exception &e) { problem = "Capture CPU diagnostic: " + std::string(e.what()); }
                     next.emplace(entry.path(), Cached{size, modified, std::move(info)});
                 }
                 catch (const std::exception &e)
@@ -825,6 +881,11 @@ class ReplayArchive
         auto report = Companion(*job.data, ".validation.json");
         if (!report.empty())
             Atomic(File(row.id, ".validation.json"), Read(report, 65536), false);
+        for (auto extension : {".keep", ".capture.json"})
+        {
+            auto companion = Companion(*job.data, extension);
+            if (!companion.empty()) Atomic(File(row.id, extension), Read(companion, 16384), false);
+        }
         auto verification = Companion(*job.data, ".verification.json");
         if (!verification.empty())
             Atomic(File(row.id, ".verification.json"), Read(verification, 16384), false);
@@ -1111,6 +1172,18 @@ class ReplayArchive
         case JobKind::LoadRecording:
             LoadRecording(job);
             break;
+        case JobKind::LoadReference:
+        {
+            if (!job.id) { std::atomic_store(&splitReference, std::shared_ptr<const MapData>{}); break; }
+            auto snapshot = Get(); auto row = snapshot->byId.find(job.id);
+            if (row == snapshot->byId.end()) throw std::runtime_error("Split reference recording is unavailable");
+            std::string error;
+            auto data = DecodeMap(Read(snapshot->runs[row->second].file, MapCapacity - 64), error);
+            if (!data || !data->review || data->review->id != job.id)
+                throw std::runtime_error("Split reference could not be read: " + error);
+            std::atomic_store(&splitReference, data);
+            break;
+        }
         case JobKind::SaveRecording:
             SaveRecording(job);
             break;
@@ -1244,6 +1317,8 @@ class ReplayArchive
     {
         Queue({.kind = JobKind::LoadRecording, .id = id});
     }
+    void SetReference(int64_t id) { Queue({.kind = JobKind::LoadReference, .id = id}); }
+    std::shared_ptr<const MapData> Reference() const { return std::atomic_load(&splitReference); }
 
     void RecordVerification(const GameData &data, uint32_t session)
     {

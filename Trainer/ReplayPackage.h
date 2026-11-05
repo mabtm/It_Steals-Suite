@@ -193,6 +193,7 @@ struct ReplayPackageExporter
 };
 
 inline constexpr ReplayPackageExporter ReplayPackageExporters[] = {
+    {"7.22.0", true},
     {"7.21.0", true},
     {"7.20.2", true},
     {"7.20.1", true},

@@ -156,6 +156,11 @@ int main(int argc, char **argv)
         archive.Load(1000);
         Await([&] { return archive.Loaded() && archive.Loaded()->review->id == 1000; });
         auto data = archive.Loaded();
+        archive.SetReference(1000);
+        Await([&] { return archive.Reference() && archive.Reference()->review->id == 1000; });
+        assert(archive.Loaded() == data);
+        archive.SetReference(0);
+        Await([&] { return !archive.Reference(); });
         archive.Save(data, "Early attempt / café", "Routing / practice",
                      "Take the first corner later.\nCamera test / カメラ");
         Await([&] {

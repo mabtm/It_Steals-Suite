@@ -11,13 +11,14 @@ enum class ReplaySort
     Mode,
     Time,
     Seed,
-    Status
+    Status,
+    Category
 };
 
 struct ReplayLibraryFilter
 {
     std::string query;
-    int level = -1, status = 0;
+    int level = -1, status = 0, category = -1;
     bool favorites = false, ascending = false;
     ReplaySort sort = ReplaySort::Date;
     bool operator==(const ReplayLibraryFilter &) const = default;
@@ -75,7 +76,8 @@ class ReplayLibraryView
                 text.push_back({std::to_string(row.id),
                                 label,
                                 Lower(label),
-                                Lower(row.name + " " + row.category + " " + std::to_string(row.seed) + " " +
+                                Lower(row.name + " " + row.category + " " + RecordedCategoryName(row.runCategory) + " " +
+                                      std::to_string(row.runCategory == 1 ? row.selectedSeed : row.seed) + " " +
                                       (level >= 0 ? kMapLevelNames[level] : "Unknown")),
                                 {}});
             }
@@ -91,6 +93,7 @@ class ReplayLibraryView
                           (filter.status == 3 && !ReplayAborted(row.outcome) && !row.valid) ||
                           (filter.status == 4 && ReplayAborted(row.outcome));
             if ((filter.level < 0 || MapLevelIndex(row.scene) == filter.level) && status &&
+                (filter.category < 0 || row.runCategory == filter.category) &&
                 (!filter.favorites || row.favorite) &&
                 (text[i].search.find(query) != std::string::npos || NotesMatch(row.notes, query)))
                 shown.push_back(i);
@@ -114,10 +117,13 @@ class ReplayLibraryView
                 comparison = compare(x.seconds, y.seconds);
                 break;
             case ReplaySort::Seed:
-                comparison = compare(x.seed, y.seed);
+                comparison = compare(x.runCategory == 1 ? x.selectedSeed : x.seed, y.runCategory == 1 ? y.selectedSeed : y.seed);
                 break;
             case ReplaySort::Status:
                 comparison = compare(Status(x), Status(y));
+                break;
+            case ReplaySort::Category:
+                comparison = compare(x.runCategory, y.runCategory);
                 break;
             }
             return comparison ? (filter.ascending ? comparison < 0 : comparison > 0) : x.id > y.id;

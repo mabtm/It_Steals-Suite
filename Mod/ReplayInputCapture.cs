@@ -9,6 +9,10 @@ public static class ReplayInputCapture
 {
     private static ReplayMotionData active;
     private static MouseLook player;
+    private static CaptureProfiler profile;
+    private static long outsideWork;
+    private static int lastRenderFrame = -1;
+    public static long TakeCameraWork() { long value = outsideWork; outsideWork = 0; return value; }
     private static int firstFrame;
     private static uint tick, keys, reads, actions;
     private static bool inside;
@@ -56,6 +60,7 @@ public static class ReplayInputCapture
         if (map == null || map.Review == null || mouse == null)
             return;
         player = mouse;
+        profile = new CaptureProfiler(); lastRenderFrame = -1;
         firstFrame = Time.frameCount;
         tick = keys = reads = actions = 0;
         horizontal = vertical = mx = my = jx = jy = 0;
@@ -358,6 +363,9 @@ public static class ReplayInputCapture
     {
         if (active == null || player == null)
             return;
+        if (camera != PlayerContext.View(player) || lastRenderFrame == Time.frameCount) return;
+        lastRenderFrame = Time.frameCount;
+        long started = CaptureProfiler.Now;
         try
         {
             if (camera == PlayerContext.View(player))
@@ -371,6 +379,7 @@ public static class ReplayInputCapture
                 active.Coverage.Fail(ReplayCoverage.Camera);
             }
         }
+        finally { outsideWork += CaptureProfiler.Now - started; }
     }
 
     public static void CaptureInactiveCamera()
@@ -397,13 +406,14 @@ public static class ReplayInputCapture
     {
         if (active == null || cam == null || player == null)
             return;
-        ReplayColliderCapture.Camera(seconds);
-        ReplayAudioCapture.Sync(seconds);
-        ReplaySceneCapture.Sample(seconds);
-        bool animationCut = ReplayExperienceCapture.Sample(seconds);
-        ReplayVisualCapture.Sample(seconds, false, animationCut);
+        long total = CaptureProfiler.Now, stage = total;
         try
         {
+            ReplayColliderCapture.Camera(seconds); profile.Elapsed(CaptureProfiler.Collider, stage); stage = CaptureProfiler.Now;
+            ReplayAudioCapture.Sync(seconds); profile.Elapsed(CaptureProfiler.Audio, stage); stage = CaptureProfiler.Now;
+            ReplaySceneCapture.Sample(seconds); profile.Elapsed(CaptureProfiler.Scene, stage); stage = CaptureProfiler.Now;
+            bool animationCut = ReplayExperienceCapture.Sample(seconds); profile.Elapsed(CaptureProfiler.Effects, stage); stage = CaptureProfiler.Now;
+            ReplayVisualCapture.Sample(seconds, false, animationCut); profile.Elapsed(CaptureProfiler.Poses, stage); stage = CaptureProfiler.Now;
             var body = PlayerContext.Body(player);
             if (body == null)
             {
@@ -475,6 +485,7 @@ public static class ReplayInputCapture
             active.Info.Flags |= 2;
             active.Coverage.Fail(ReplayCoverage.Camera);
         }
+        finally { profile.Elapsed(CaptureProfiler.View, stage); profile.Elapsed(CaptureProfiler.Total, total); }
     }
 
     public static ReplayMotionData Finish(double seconds)
@@ -491,6 +502,7 @@ public static class ReplayInputCapture
         ReplaySceneCapture.Sample(seconds, true);
         ReplayAudioCapture.Finish(seconds);
         done.Coverage.Seal(seconds);
+        done.CaptureProfile = profile.Encode();
         Stop();
         return done;
     }

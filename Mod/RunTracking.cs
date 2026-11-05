@@ -115,6 +115,7 @@ public sealed class RunRecord
 public sealed class RunTracker
 {
     private readonly RunStore store;
+    private readonly long sessionId = DateTime.UtcNow.Ticks;
     public RunRecord Active
     {
         get {
@@ -129,6 +130,7 @@ public sealed class RunTracker
     public RunTracker(RunStore data)
     {
         store = data;
+        store.ArchiveSession(sessionId);
     }
 
     private RunAids lastFeatures;
@@ -335,6 +337,7 @@ public sealed class RunTracker
         Last = record;
         store.Active = null;
         store.QueueSave();
+        store.Archive(record, sessionId, quickReset);
         if (record.ExportReport)
             store.QueueReport(record);
         return true;

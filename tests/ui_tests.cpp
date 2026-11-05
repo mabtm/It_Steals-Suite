@@ -2174,6 +2174,86 @@ void NativeRestartControlsCases()
     std::cout << "Native Quick restart: active setup retained while browsing, pending/replay/review/mode/version/offline guards: PASS\n";
 }
 
+void RunArchiveCases(const std::string &output)
+{
+    using namespace suite_runs;
+    auto savedCommands = g_commands;
+    auto savedQuery = query;
+    auto savedShared = g_pShared;
+    auto directory = std::filesystem::path(output).parent_path() / "run-archive-ui";
+    std::filesystem::create_directories(directory);
+    constexpr int64_t session = 638000000000000000LL;
+    {
+        std::ofstream out(directory / "run-ledger-v1.tsv", std::ios::binary);
+        auto checked = [&](const std::string &body) {
+            char digest[17]; snprintf(digest, sizeof(digest), "%016llx", (unsigned long long)Hash(body));
+            out << body << '|' << digest << '\n';
+        };
+        out << "ELITE_RUN_LEDGER|1\n";
+        checked("SESSION|" + std::to_string(session));
+        for (int mode = 0; mode < 8; mode++) for (int cat = 0; cat < 2; cat++) for (int n = 0; n < 10; n++)
+        {
+            auto id = session + (mode * 20 + cat * 10 + n + 1) * 10000000LL;
+            auto time = std::to_string(72.125 + mode * 11.375 - n * 3.125);
+            std::string aid = cat ? "2" : "0";
+            checked(std::to_string(id) + "|" + std::to_string(kMapScenes[mode]) + "|" + std::to_string(cat) +
+                "|" + std::to_string(id) + "|" + std::to_string(id + 1000000000LL) + "|" + time +
+                "|" + std::to_string(cat + 1) + "|1|42|42|0|1|1|" + aid + "|0|0|" + std::to_string(session) + "|1|1|" + aid + "|0");
+        }
+    }
+    service.SetDirectory(directory);
+    g_pShared = nullptr; // Archive remains fully usable without a connected game.
+    suite_ui::navigation.Select(suite_ui::Page::Speedrun, ImGui::GetTime());
+    g_compactMode = g_runReviewOpen = suite_hud::active = suite_clip::open = false;
+    g_allOverlayEnabled = g_overlayVisible = true;
+    auto &io = ImGui::GetIO();
+    for (ImVec2 viewport : {ImVec2(1280, 900), ImVec2(800, 600), ImVec2(480, 360)})
+        for (float dpi : {1.f, 1.5f})
+        {
+            io.DisplaySize = viewport; ApplyTheme(dpi); io.Fonts->Build(); io.Fonts->SetTexID(1);
+            io.AddMousePosEvent(-1000, -1000);
+            g_resetLayout = true; page = 0; Frame(); g_resetLayout = false; Frame();
+            for (int selected = 1; selected < 5; selected++)
+            {
+                query = {}; range = 0;
+                ImGuiTabBar *tabs = nullptr;
+                for (int i = 0; i < GImGui->TabBars.GetMapSize(); i++)
+                {
+                    auto *bar = GImGui->TabBars.TryGetMapData(i);
+                    if (bar && bar->CurrFrameVisible == ImGui::GetFrameCount() && bar->Tabs.Size == 5 &&
+                        std::strcmp(ImGui::TabBarGetTabName(bar, &bar->Tabs[0]), "Setup") == 0) tabs = bar;
+                }
+                page = selected; // compact selector and normal tab bar share the same view state
+                if (tabs) tabs->NextSelectedTabId = tabs->Tabs[selected].ID;
+                auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+                auto expected = selected == 1 ? 16u : selected == 2 ? 80u : selected == 3 ? 160u : 0u;
+                for (;;)
+                {
+                    Frame();
+                    auto view = service.Get();
+                    if (page == selected && view->source && view->source->records->size() == 160 &&
+                        view->query.display == (selected == 1 ? Display::Bests : selected == 2 ? Display::TopFive : selected == 3 ? Display::History : Display::Statistics) &&
+                        view->rows.size() == expected) break;
+                    if (std::chrono::steady_clock::now() >= until)
+                    {
+                        std::cerr << "Archive view timeout: viewport=" << viewport.x << 'x' << viewport.y << " dpi=" << dpi
+                            << " desired=" << selected << " actual=" << page << " source=" << bool(view->source)
+                            << " rows=" << view->rows.size() << " expected=" << expected;
+                        if (view->source) std::cerr << " records=" << view->source->records->size() << " error=" << view->source->error;
+                        std::cerr << '\n'; assert(false);
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                }
+                for (int i = 0; i < 16; i++) Frame();
+                assert(std::memcmp(&savedCommands, &g_commands, sizeof(g_commands)) == 0);
+                if (viewport.x == 1280 && dpi == 1 && !output.empty())
+                    Dump(output + "/speedrun-archive-" + std::to_string(selected) + "-test-data.draw");
+            }
+        }
+    page = 0; query = savedQuery; range = 0; g_pShared = savedShared;
+    std::cout << "Native offline run archive: 24 page/viewport/DPI cases, 160 actual journal records, 16 PBs, 80 top-five entries, durable history, statistics and no game commands: PASS\n";
+}
+
 int main(int argc, char **argv)
 {
     std::cout.setf(std::ios::unitbuf);
@@ -2182,6 +2262,10 @@ int main(int argc, char **argv)
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.DeltaTime = 1.f / 60;
+    if (argc > 2 && std::string(argv[2]) == "--archive-only")
+    {
+        RunArchiveCases(argv[1]); ImGui::DestroyContext(); return 0;
+    }
     if (argc > 2 && std::string(argv[2]) == "--ui-benchmark")
     {
         EliteUiBenchmark();
@@ -3228,7 +3312,9 @@ int main(int argc, char **argv)
         libraryFrame();
         assert(g_replayLibraryFilter.favorites && g_replayLibraryView.shown.size() == 1);
         auto *table = GImGui->Tables.GetByKey(tableID);
-        auto &column = table->Columns[3];
+        auto timeColumn = std::find_if(table->Columns.begin(), table->Columns.end(), [](const auto &c) { return c.UserID == 4; });
+        assert(timeColumn != table->Columns.end());
+        auto &column = *timeColumn;
         io.AddMousePosEvent((column.MinX + column.MaxX) * .5f, table->OuterRect.Min.y + 10);
         libraryFrame();
         io.AddMouseButtonEvent(0, true);
@@ -3487,6 +3573,7 @@ int main(int argc, char **argv)
         SeedRouteReliabilityUICases(argv[1]);
     }
     RunStatisticsCases(argc > 1 ? argv[1] : "");
+    RunArchiveCases(argc > 1 ? argv[1] : ".");
     if (argc > 1)
     {
         std::ofstream done(std::string(argv[1]) + "/ui-complete.txt");

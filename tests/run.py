@@ -17,9 +17,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "capture_profiler_tests": ["FrameCostMeter.cs", "CaptureProfiler.cs"],
+    "replay_camera_sampling_tests": ["ReplaySceneData.cs", "ReplayCameraSampling.cs"],
     "restart_contract_tests": ["SharedMemoryProtocol.cs", "SharedLayout.cs"],
     "mode_statistics_tests": ["ModeStatistics.cs"],
     "statistics_store_tests": [],
+    "run_ledger_tests": [],
     "frame_policy_tests": ["FramePolicy.cs"],
     "capture_gpu_tests": ["CaptureGpu.cs"],
     "recording_channels_tests": [
@@ -78,6 +81,8 @@ def run_logged(command, log, cwd, env=None, timeout=600):
 def arguments(name, work, fixtures):
     pairs = {
         "statistics_store_tests": [work],
+        "run_ledger_tests": [work, fixtures / "run-data-wire.tsv", fixtures / "run-counter-wire.txt"],
+        "run_data_tests": [fixtures / "run-data-wire.tsv", work, fixtures / "run-counter-wire.txt"],
         "planner_tests": [work, fixtures / "map-wire.bin"],
         "seed_search_tests": [
             fixtures / "seed-batch-wire.bin",
@@ -160,7 +165,7 @@ def execute(name, managed, args, root, output, fixtures):
                 "-out:" + str(executable),
                 *sources,
             ]
-            if name == "statistics_store_tests":
+            if name in ("statistics_store_tests", "run_ledger_tests"):
                 command.append("-r:" + str(root / "bin/ItStealsHelper.dll"))
                 shutil.copy2(root / "bin/ItStealsHelper.dll", folder / "ItStealsHelper.dll")
             if name == "clip_channel_tests":
@@ -221,7 +226,7 @@ def execute(name, managed, args, root, output, fixtures):
         if result["buildExitCode"]:
             raise RuntimeError("Compilation failed; see " + str(folder / "build.log"))
         environment = os.environ.copy()
-        if name == "statistics_store_tests":
+        if name in ("statistics_store_tests", "run_ledger_tests"):
             environment["MONO_PATH"] = str(output / "loader")
         if name == "capture_gpu_tests":
             environment["LD_LIBRARY_PATH"] = (
@@ -297,7 +302,7 @@ def main():
         if not shutil.which(tool):
             parser.error("Required executable not found: " + tool)
     output.mkdir(parents=True, exist_ok=True)
-    if ("statistics_store_tests", True) in selected:
+    if any((name, True) in selected for name in ("statistics_store_tests", "run_ledger_tests")):
         # Use the same pinned official loader as Setup; no proprietary game SDK.
         installer = (root / "Installer/Install.ps1").read_text()
         url = re.search(r"\$script:LoaderUrl = '([^']+)'", installer)[1]

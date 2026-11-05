@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.22.0";
+    public const string Version = "7.23.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -519,7 +519,7 @@ public sealed class ItStealsMod : MelonMod
         }
         finally
         {
-            workCost.Observe((updateWork + System.Diagnostics.Stopwatch.GetTimestamp() - workStarted) *
+            workCost.Observe((updateWork + ReplayInputCapture.TakeCameraWork() + System.Diagnostics.Stopwatch.GetTimestamp() - workStarted) *
                              1000.0 / System.Diagnostics.Stopwatch.Frequency);
         }
     }
