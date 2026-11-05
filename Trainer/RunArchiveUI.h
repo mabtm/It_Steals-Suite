@@ -10,8 +10,18 @@ inline char fromDate[11]{}, throughDate[11]{};
 inline bool DateTicks(const char *text, int64_t &ticks, bool end = false)
 {
     int y = 0, m = 0, d = 0;
+    auto digits = [&](int start, int count, int &value) {
+        value = 0;
+        for (int i = start; i < start + count; i++)
+        {
+            if (text[i] < '0' || text[i] > '9') return false;
+            value = value * 10 + text[i] - '0';
+        }
+        return true;
+    };
     if (strlen(text) != 10 || text[4] != '-' || text[7] != '-' ||
-        sscanf(text, "%4d-%2d-%2d", &y, &m, &d) != 3 || y < 1970 || y > 9998 || m < 1 || m > 12 || d < 1 || d > 31)
+        !digits(0, 4, y) || !digits(5, 2, m) || !digits(8, 2, d) ||
+        y < 1970 || y > 9998 || m < 1 || m > 12 || d < 1 || d > 31)
         return false;
     std::tm local{}; local.tm_year = y - 1900; local.tm_mon = m - 1; local.tm_mday = d;
     local.tm_isdst = -1;

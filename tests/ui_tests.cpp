@@ -2177,6 +2177,11 @@ void NativeRestartControlsCases()
 void RunArchiveCases(const std::string &output)
 {
     using namespace suite_runs;
+    int64_t start = 0, through = 0;
+    assert(DateTicks("2024-02-29", start) && DateTicks("2024-02-29", through, true));
+    assert(through >= start + 22LL * 3600 * 10000000 && through < start + 26LL * 3600 * 10000000);
+    assert(!DateTicks("2023-02-29", start) && !DateTicks("2026-13-01", start) &&
+        !DateTicks("2026-+1-01", start) && !DateTicks("2026-11-5", start));
     auto savedCommands = g_commands;
     auto savedQuery = query;
     auto savedShared = g_pShared;
