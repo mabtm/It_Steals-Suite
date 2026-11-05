@@ -876,6 +876,8 @@ TrainerPreferences CollectPreferences()
     return p;
 }
 
+inline void RestoreReplayFilters();
+
 void ApplyPreferences(TrainerPreferences p)
 {
     p.Validate();
