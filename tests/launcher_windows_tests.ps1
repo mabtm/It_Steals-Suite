@@ -89,7 +89,7 @@ try {
 "@)
         & $msbuild $nativeProject /p:Configuration=Release /p:Platform=x64 /nologo /verbosity:minimal 2>&1 | Tee-Object -Variable compileOutput
         if ($LASTEXITCODE -ne 0) { throw ("Native check compilation failed: $nativeTest`n" + ($compileOutput | Select-Object -Last 12 | Out-String)) }
-        $nativeArguments = if ($nativeTest -eq 'run_data_tests') {
+        [string[]]$nativeArguments = if ($nativeTest -eq 'run_data_tests') {
             @((Join-Path $repo 'tests/fixtures/run-data-wire.tsv'), (Join-Path $work 'run-data'), (Join-Path $repo 'tests/fixtures/run-counter-wire.txt'))
         } elseif ($nativeTest -eq 'navigation_startup_tests') { @(Join-Path $repo 'tests/fixtures') } else { @($work) }
         & (Join-Path $work ('native/'+$nativeTest+'.exe')) @nativeArguments 2>&1 | Tee-Object -Variable contractOutput
