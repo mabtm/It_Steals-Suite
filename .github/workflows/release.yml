@@ -101,8 +101,14 @@ jobs:
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Updater contract tests failed.' }
       - name: Build native trainer and all release packages
         run: |
-          & .\Installer\Release.ps1 -PlatformToolset v143 -SourceCommit $env:GITHUB_SHA
-          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Release packaging failed.' }
+          try {
+            & .\Installer\Release.ps1 -PlatformToolset v143 -SourceCommit $env:GITHUB_SHA
+            if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Release packaging failed.' }
+          } catch {
+            $message = $_.Exception.Message.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Output "::error::$message"
+            throw
+          }
       - name: Verify actual production GPU shaders, coordinator, calibration and CPU fault recovery
         run: |
           & .\tests\seed_gpu_windows_tests.ps1

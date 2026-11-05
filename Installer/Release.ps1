@@ -28,8 +28,23 @@ if (-not $SkipBuild) {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
     $msbuild = & $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
     if (-not $msbuild) { throw 'Install Visual Studio C++ Build Tools with MSBuild and a Windows SDK.' }
-    & $msbuild (Join-Path $root 'Trainer/ItStealsTrainer.vcxproj') /m /t:Rebuild /p:Configuration=Release /p:Platform=x64 "/p:PlatformToolset=$PlatformToolset" /nologo /verbosity:minimal
-    if ($LASTEXITCODE -ne 0) { throw 'Native trainer build failed.' }
+    $nativeLog = Join-Path $root 'build/native-build.log'
+    $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $nativeLog))
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $msbuild (Join-Path $root 'Trainer/ItStealsTrainer.vcxproj') /m /t:Rebuild /p:Configuration=Release /p:Platform=x64 "/p:PlatformToolset=$PlatformToolset" /nologo /verbosity:minimal 2>&1 | Tee-Object -FilePath $nativeLog
+        $nativeExit = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $previousPreference }
+    if ($nativeExit -ne 0) {
+        if ($env:GITHUB_ACTIONS -eq 'true') {
+            foreach ($line in Get-Content -LiteralPath $nativeLog | Where-Object { $_ -match '\b(error|fatal)\b' } | Select-Object -First 12) {
+                $message = $line.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+                Write-Output "::error::$message"
+            }
+        }
+        throw "Native trainer build failed. Compiler output: $nativeLog"
+    }
 }
 if (-not $TrainerBinary) { $TrainerBinary = Join-Path $root 'bin/ItStealsTrainer.exe' }
 $TrainerBinary = [IO.Path]::GetFullPath($TrainerBinary)

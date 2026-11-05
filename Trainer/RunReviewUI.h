@@ -533,7 +533,7 @@ inline void RenderReplayPolicy()
             ImGui::SliderInt("Crystals collected", &rule.crystals, 1, 64);
         rule.Validate();
         ImGui::TextWrapped(
-            "The rule is fixed at run start. Short attempts stay temporary until restart. Statistics and validation are always kept; recordings have no delete action.");
+            "The rule is fixed at run start. Valid PB / Top 5 finishes bypass it and receive save priority. Other short attempts stay temporary until restart. Storage warnings are shown explicitly; recordings have no delete action.");
     }
 }
 
