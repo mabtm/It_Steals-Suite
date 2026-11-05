@@ -5,9 +5,9 @@ Changes by version. The full development history is in Git.
 ### v7.22.0 Changelog
 
 - Improved speedrun categories with explicit Set-Seed selection, separately stored personal bests, both deterministic seed recipes and latched start evidence. Other aids remain invalid; seed/category changes invalidate the attempt, and historical Practice runs retain their status.
-- Improved the Suite as Elite-Suite, with a new graphite and ice-blue interface, clearer workspace hierarchy, responsive navigation and explicit primary actions. Existing update files, settings, replays and installation identities remain compatible.
+- Improved the Suite as Elite-Suite while retaining its native dark in-game style: compact top tabs, clearly separated training controls and a mode list beside category/seed setup replace the large sidebar and cards. Explicit Start, Details and context actions remain available; settings, replays and installation identities stay compatible.
 - Fixed a bug caused by navigation refinement repeatedly repairing the same disconnected bunker component after the first checked connection. Timer preparation now reports its actual stages and reuses physically verified routes; fixed walls, floors and player clearance remain checked.
-- Improved menu motion with precise time-based transitions, bounded hover feedback and short original interface sounds. The visible menu retains its 60 FPS target; hidden and passive output keep their reduced work budgets, with measured output cadence available in diagnostics.
+- Improved native menu motion with short tab-selection and page transitions, bounded hover feedback and short original interface sounds. The visible menu retains its 60 FPS target; hidden and passive output keep their reduced work budgets, with measured output cadence available in diagnostics.
 - Improved mode selection and seed adoption so browsing does not immediately cover the start controls, and starting a mode uses the seed most recently selected in the seed workspace.
 - Improved bug reporting with a background navigation-capture export that preserves the exact active search packet and its progress details for reproducible diagnostics.
 

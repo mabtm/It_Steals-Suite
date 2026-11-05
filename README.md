@@ -32,7 +32,7 @@
 **[v7.22.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
 
 - Improved speedrun categories with explicit Set-Seed selection, separately stored personal bests, both deterministic seed recipes and latched start evidence. Other aids remain invalid; seed/category changes invalidate the attempt, and historical Practice runs retain their status.
-- Improved the Suite as Elite-Suite, with a new graphite and ice-blue interface, clearer workspace hierarchy, responsive navigation and explicit primary actions. Existing update files, settings, replays and installation identities remain compatible.
+- Improved the Suite as Elite-Suite while retaining its native dark in-game style: compact top tabs, clearly separated training controls and a mode list beside category/seed setup replace the large sidebar and cards. Explicit Start, Details and context actions remain available; settings, replays and installation identities stay compatible.
 - Fixed a bug caused by navigation refinement repeatedly repairing the same disconnected bunker component after the first checked connection. Timer preparation now reports its actual stages and reuses physically verified routes; fixed walls, floors and player clearance remain checked.
 
 [Full changelog](CHANGELOG.md)

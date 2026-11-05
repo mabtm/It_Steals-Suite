@@ -43,9 +43,9 @@ void EliteDesignCases(const std::string &output)
             if (viewport.x == 480)
             {
                 // Every destination is available above the workspace at the
-                // narrow viewport, without scrolling the navigation rail.
+                // narrow viewport, without scrolling the native tab strip.
                 assert(navigation->Size.x > root->Size.x * .8f && navigation->ScrollMax.y < 1);
-                assert(navigation->InnerClipRect.GetHeight() >= 40 * suite_ui::Unit());
+                assert(navigation->InnerClipRect.GetHeight() >= ImGui::GetFrameHeight());
             }
             for (auto page : {suite_ui::Page::Cheats, suite_ui::Page::Speedrun, suite_ui::Page::SeedMap,
                               suite_ui::Page::Inspector, suite_ui::Page::Replay, suite_ui::Page::Settings,

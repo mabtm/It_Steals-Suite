@@ -66,51 +66,33 @@ inline bool StartSelected()
     return started;
 }
 
+// Native mode rows keep selection separate from loading. Keep the stable row
+// ID shared with keyboard/navigation and direct interaction verification.
 inline void Card(int index, float width)
 {
     using namespace suite_ui;
-    float u = Unit();
-    const auto &mode = dashboard.modes[index];
+    float u = Unit(), height = 36 * u;
     ImGui::PushID(index);
     auto a = ImGui::GetCursorScreenPos();
-    ImVec2 b(a.x + width, a.y + 132 * u);
-    bool click = ImGui::InvisibleButton("##Mode card", {width, 132 * u}, ImGuiButtonFlags_EnableNav);
+    bool click = ImGui::InvisibleButton("##Mode card", {width, height}, ImGuiButtonFlags_EnableNav);
     auto id = ImGui::GetItemID();
-    float selected = Animate(id ^ 0x4118u, dashboard.selected == index ? 1.f : 0.f);
-    float hover = Animate(id ^ 0x4119u, ImGui::IsItemHovered() ? 1.f : 0.f);
-    float entry = Animate(id ^ 0x411au, 1.f, true, .18f);
-    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * entry);
-    float flash =
-        preferences.motion ? float(std::clamp(1. - (ImGui::GetTime() - pbFlash[index]) / .8, 0., 1.)) : 0;
+    float selected = Animate(id ^ 0x4118u, dashboard.selected == index ? 1.f : 0.f, true, .12f);
+    float hover = Animate(id ^ 0x4119u, ImGui::IsItemHovered() ? 1.f : 0.f, true, .1f);
     auto *draw = ImGui::GetWindowDrawList();
-    Surface(draw, a, b, dashboard.selected == index);
-    draw->AddRect(a, {b.x - 2 * u, b.y - 3 * u},
-                  ImGui::GetColorU32(Alpha(heading, .08f + .6f * selected + .16f * hover + .1f * flash)),
-                  9 * u, 0, (1 + selected * .35f) * u);
-    ImVec4 clip(a.x + 13 * u, a.y, b.x - 12 * u, b.y);
-    TextAt(draw, {a.x + 15 * u, a.y + 12 * u}, kMapLevelNames[index], ink, 16 * u, clip);
-    TextAt(draw, {a.x + 15 * u, a.y + 37 * u},
-           dashboard.snapshot.statsCategory == 1 ? "SET-SEED PERSONAL BEST" : "RANDOM-SEED PERSONAL BEST",
-           Blend(ink, background, .45f), 10 * u,
-           clip);
-    draw->AddText(g_timerFont ? g_timerFont : ImGui::GetFont(), 28 * u, {a.x + 14 * u, a.y + 49 * u},
-                  ImGui::GetColorU32(mode.pb > 0 ? heading : Blend(ink, background, .55f)),
-                  pbLabels[index].c_str(), nullptr, 0, &clip);
-    const char *labels[] = {"ATTEMPTS", "FINISHES", "TIME PLAYED"};
-    const std::string *values[] = {&mode.attempts, &mode.finished, &mode.timeShort};
-    float cell = (width - 30 * u) / 3;
-    for (int i = 0; i < 3; i++)
-    {
-        float x = a.x + 15 * u + i * cell;
-        ImVec4 column(x, a.y, x + cell - 4 * u, b.y);
-        TextAt(draw, {x, a.y + 92 * u}, labels[i], Blend(ink, background, .48f), 9 * u, column);
-        TextAt(draw, {x, a.y + 106 * u}, values[i]->c_str(), ink, 14 * u, column);
-    }
+    draw->AddRectFilled(a, {a.x + width, a.y + height},
+        ImGui::GetColorU32(Blend(background, heading, .06f * hover + .16f * selected)), 3 * u);
+    if (selected > .01f)
+        draw->AddRectFilled(a, {a.x + 3 * u, a.y + height},
+                            ImGui::GetColorU32(Alpha(heading, selected)), u);
+    float textWidth = ImGui::CalcTextSize(kMapLevelNames[index]).x;
+    float font = ImGui::GetFontSize() * std::min(1.f, std::max(1.f, width - 24 * u) /
+                                                        std::max(1.f, textWidth));
+    TextAt(draw, {a.x + 12 * u, a.y + (height - font) * .5f}, kMapLevelNames[index], ink, font,
+           {a.x + 10 * u, a.y, a.x + width - 8 * u, a.y + height});
     if (ImGui::IsItemFocused())
-        draw->AddRect(a, b, ImGui::GetColorU32(heading), 9 * u, 0, 2 * u);
+        draw->AddRect(a, {a.x + width, a.y + height}, ImGui::GetColorU32(heading), 3 * u);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
         ImGui::SetTooltip("Select %s. Use Details to view its statistics, or Start to play.", kMapLevelNames[index]);
-    ImGui::PopStyleVar();
     if (click)
     {
         dashboard.selected = index;
@@ -236,8 +218,14 @@ inline void CategorySetup()
             if (type)
                 setupSpawn = type == 1;
         }
-        suite_ui::Checkbox("Use captured spawn seed", &setupSpawn);
-        Help("Off uses the standard derived base-seed recipe. On reuses a captured spawn seed from Seeds & routes. Both deterministic recipes are supported in Set-Seed; changing the recipe during a run invalidates that attempt.");
+        int recipe = setupSpawn ? 1 : 0;
+        const char *recipes[] = {"Practice base seed", "Captured spawn seed"};
+        ImGui::SetNextItemWidth(std::min(300 * suite_ui::Unit(),
+            std::max(100 * suite_ui::Unit(), ImGui::GetContentRegionAvail().x -
+                ImGui::CalcTextSize("Recipe").x - ImGui::GetStyle().ItemInnerSpacing.x)));
+        if (ImGui::Combo("Recipe", &recipe, recipes, 2))
+            setupSpawn = recipe == 1;
+        Help("Practice base seed uses the standard derived recipe. Captured spawn seed reuses the exact seed from Seeds & routes. Both recipes are supported in Set-Seed; changing the recipe during a run invalidates that attempt.");
         if (g_pShared && !g_pShared->rngPatchComplete)
             ImGui::TextWrapped("Set-Seed requires all RNG hooks to be ready before starting.");
         if (!setupPractice && g_pShared)
@@ -326,8 +314,10 @@ inline void RefreshDashboard()
         }
 }
 
-// Small/high-DPI windows use a compact mode picker instead of clipping an
-// eight-card dashboard. The whole panel scrolls, including setup and actions.
+inline void RestartButton();
+
+// Small/high-DPI windows keep mode, category and actions together in a
+// scrolling native panel instead of squeezing the two-column workspace.
 inline void RenderCompact()
 {
     ImGui::BeginChild("SpeedrunCompactScroll", {0, 0});
@@ -353,6 +343,9 @@ inline void RenderCompact()
             SetSpeedrunMode(false);
     }
     ImGui::EndDisabled();
+    const auto restartLabel = suite_keys::Label("Quick restart", suite_keys::Restart);
+    SameLineIfFits(restartLabel.c_str());
+    RestartButton();
     const char *filters[] = {"Overview", dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed", "Practice"};
     ImGui::SetNextItemWidth(-1);
     ImGui::Combo("##StatisticsCategory", &viewFilter, filters, 3);
@@ -372,103 +365,230 @@ inline void RenderCompact()
     ImGui::EndChild();
 }
 
-inline void Render()
+inline bool CanRestart()
 {
-    float u = suite_ui::Unit();
-    SyncSetupSelection();
-    if (ImGui::GetContentRegionAvail().y < 240 * u)
-    {
-        RenderCompact();
-        return;
-    }
-    bool shortLabels = ImGui::GetContentRegionAvail().x < 420 * u;
-    const char *startLabel = shortLabels ? "Start mode" : "Start selected mode";
-    const char *disableLabel = shortLabels ? "Stop mode" : "Disable Speedrun";
-    auto buttonWidth = [](const char *label) {
-        return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2;
-    };
-    float buttonsWidth = buttonWidth(startLabel) + buttonWidth("Details") +
-                         ImGui::GetStyle().ItemSpacing.x;
-    if (g_speedrunMode)
-        buttonsWidth += buttonWidth(disableLabel) + ImGui::GetStyle().ItemSpacing.x;
-    const bool wrapFooter = buttonsWidth > ImGui::GetContentRegionAvail().x;
-    float footer = ImGui::GetTextLineHeightWithSpacing() + 8 * u +
-                   ImGui::GetFrameHeightWithSpacing() * (wrapFooter ? 2 : 1);
-    ImGui::BeginChild("SpeedrunScroll", {0, -footer});
-    CategorySetup();
-    ImGui::Spacing();
+    auto version = g_pShared ? suite_update::Version::Parse(g_pShared->version) : std::nullopt;
+    return version && *version >= suite_update::Version{{7, 21, 0}} && g_speedrunMode &&
+           g_pShared->speedrunModeActive &&
+           !(g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3) &&
+           !HasPendingRequest() && !g_commands.runReviewRequest;
+}
+
+inline void RestartButton()
+{
+    const auto label = suite_keys::Label("Quick restart", suite_keys::Restart);
+    ImGui::BeginDisabled(!CanRestart());
+    if (suite_ui::Button(label.c_str()) && CanRestart())
+        g_commands.speedrunLoadLevelCmd = 1;
+    ImGui::EndDisabled();
+    Help("Restart the active mode with its current run setup. Available with game mod 7.21.0 or newer after the previous command completes.");
+}
+
+inline void StatisticsFilter()
+{
     const char *filters[] = {"Overview", dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed", "Practice"};
     for (int i = 0; i < 3; i++)
     {
         if (i)
-            ImGui::SameLine();
+            SameLineIfFits(filters[i]);
         bool selected = viewFilter == i;
         if (selected)
             ImGui::PushStyleColor(ImGuiCol_Button, suite_ui::Alpha(g_headerCol, .25f));
         if (suite_ui::Button(filters[i]))
             viewFilter = i;
         if (!i && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-            ImGui::SetTooltip("Normal play, Practice, and the displayed clean category. Random Seed and Set-Seed records are tracked separately.");
+            ImGui::SetTooltip("Overview includes normal play, Practice and the displayed clean category. Random Seed and Set-Seed records remain separate.");
         if (selected)
             ImGui::PopStyleColor();
     }
     RefreshDashboard();
-    const char *cleanCategory = dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed";
-    if (!viewFilter)
-        ImGui::TextDisabled("%s + normal / Practice", cleanCategory);
-    else if (viewFilter == 1)
-        ImGui::TextDisabled("%s speedruns", cleanCategory);
-    else
+    if (viewFilter == 2)
         ImGui::TextDisabled("Practice statistics");
-    SameLineIfFits(dashboard.sinceLabel.c_str());
-    ImGui::TextDisabled("%s", dashboard.sinceLabel.c_str());
-    if (!g_pShared)
-        ImGui::TextWrapped(dashboard.available ? "Game disconnected / showing the last received statistics."
-                                               : "Connect It Steals to load your saved statistics.");
-    ImGui::Spacing();
-    float available = ImGui::GetContentRegionAvail().x;
-    auto a = ImGui::GetCursorScreenPos();
-    auto *draw = ImGui::GetWindowDrawList();
-    ImGui::Dummy({available, 62 * u});
-    suite_ui::Surface(draw, a, {a.x + available, a.y + 62 * u});
-    const char *labels[] = {"TIME PLAYED", "ATTEMPTS", "FINISHES"};
-    const char *values[] = {available < 420 * u ? dashboard.timeShort.c_str() : dashboard.time.c_str(),
-                            dashboard.attempts.c_str(), dashboard.finished.c_str()};
-    float cell = available / 3, inset = available < 420 * u ? 8 * u : 14 * u;
-    for (int i = 0; i < 3; i++)
-    {
-        float x = a.x + i * cell + inset;
-        ImVec4 clip(x, a.y, a.x + (i + 1) * cell - inset, a.y + 62 * u);
-        float width = ImGui::CalcTextSize(values[i]).x;
-        float font = std::min(
-            23 * u, std::max(12 * u, ImGui::GetFontSize() * (cell - 2 * inset) / std::max(1.f, width)));
-        suite_ui::TextAt(draw, {x, a.y + 11 * u}, labels[i],
-                         suite_ui::Blend(suite_ui::ink, suite_ui::background, .4f), 10 * u, clip);
-        suite_ui::TextAt(draw, {x, a.y + 30 * u}, values[i], suite_ui::ink, font, clip);
-    }
-    ImGui::Spacing();
-    int columns = available >= 750 * u ? 3 : available >= 490 * u ? 2 : 1;
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {5 * u, 5 * u});
-    if (ImGui::BeginTable("Mode cards", columns, ImGuiTableFlags_SizingStretchSame))
-    {
-        for (int i = 0; i < kMapLevelCount; i++)
+    else
+        ImGui::TextDisabled(viewFilter == 1 ? "%s speedruns" : "%s + normal / Practice",
+                           dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed");
+}
+
+inline void SectionHeading(const char *label)
+{
+    ImGui::PushStyleColor(ImGuiCol_Text, g_headerCol);
+    ImGui::SeparatorText(label);
+    ImGui::PopStyleColor();
+}
+
+inline void SelectionOverview()
+{
+    const auto &mode = dashboard.modes[dashboard.selected];
+    const char *cleanCategory = dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed";
+    int latest = -1;
+    for (int i = 0; i < dashboard.snapshot.historyCount; i++)
+        if (ReadHistory(dashboard.snapshot, i).scene == kMapScenes[dashboard.selected])
         {
-            ImGui::TableNextColumn();
-            Card(i, ImGui::GetContentRegionAvail().x);
+            latest = i;
+            break;
+        }
+    if (ImGui::BeginTable("Selected mode times", 2, ImGuiTableFlags_SizingStretchSame))
+    {
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("%s PERSONAL BEST", cleanCategory);
+        const auto drawValue = [&](const std::string &text, bool available) {
+            float u = suite_ui::Unit();
+            auto at = ImGui::GetCursorScreenPos();
+            float width = ImGui::GetContentRegionAvail().x;
+            float baseWidth = ImGui::CalcTextSize(text.c_str()).x;
+            float font = std::min(28 * u, ImGui::GetFontSize() * width / std::max(1.f, baseWidth));
+            auto *draw = ImGui::GetWindowDrawList();
+            auto *fontFace = g_timerFont ? g_timerFont : ImGui::GetFont();
+            float actualWidth = fontFace->CalcTextSizeA(font, FLT_MAX, 0, text.c_str()).x;
+            font *= std::min(1.f, width / std::max(1.f, actualWidth));
+            ImVec4 clip(at.x, at.y, at.x + width, at.y + 36 * u);
+            draw->AddText(fontFace, font, at,
+                ImGui::GetColorU32(available ? g_textCol : suite_ui::Muted()), text.c_str(), nullptr, 0, &clip);
+            ImGui::Dummy({width, 36 * u});
+        };
+        drawValue(pbLabels[dashboard.selected], mode.pb > 0);
+        ImGui::TableNextColumn();
+        if (latest >= 0)
+        {
+            const auto run = ReadHistory(dashboard.snapshot, latest);
+            ImGui::TextDisabled("LAST ATTEMPT / %s", run.CategoryLabel());
+            drawValue(FormatRunTime(run.seconds), true);
+        }
+        else
+        {
+            ImGui::TextDisabled("LAST ATTEMPT");
+            drawValue("--:--.---", false);
         }
         ImGui::EndTable();
     }
-    ImGui::PopStyleVar();
-    ImGui::Spacing();
-    Settings();
-    if (g_pShared && g_pShared->statsSaveStatus == 2)
-        ImGui::TextColored(g_accentCol, "Statistics could not be saved: %s", g_pShared->statsError);
-    if (g_pShared && g_pShared->statsWarning[0])
-        ImGui::TextWrapped("Data recovery: %s", g_pShared->statsWarning);
+    if (ImGui::BeginTable("Selected mode totals", 3, ImGuiTableFlags_SizingStretchSame))
+    {
+        const char *labels[] = {"Attempts", "Finishes", "Time played"};
+        const std::string *values[] = {&mode.attempts, &mode.finished, &mode.timeShort};
+        for (int i = 0; i < 3; i++)
+        {
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("%s", labels[i]);
+            ImGui::TextUnformatted(values[i]->c_str());
+        }
+        ImGui::EndTable();
+    }
+    Help("Personal bests show the clean category in the latest game snapshot, independently of the draft category above. Attempts, finishes and playtime use the selected statistics filter.");
+}
+
+inline void RecentAttempts()
+{
+    int recent = 0;
+    if (ImGui::BeginTable("Recent selected attempts", 3,
+                          ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
+                              ImGuiTableFlags_SizingStretchSame))
+    {
+        ImGui::TableSetupColumn("Category");
+        ImGui::TableSetupColumn("Time");
+        ImGui::TableSetupColumn("Outcome");
+        ImGui::TableHeadersRow();
+        for (int i = 0; i < dashboard.snapshot.historyCount && recent < 4; i++)
+        {
+            const auto run = ReadHistory(dashboard.snapshot, i);
+            if (run.scene != kMapScenes[dashboard.selected])
+                continue;
+            const char *outcomes[] = {"Running", "Finished", "Reset", "Death", "Interrupted", "Stopped"};
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(run.CategoryLabel());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(FormatRunTime(run.seconds).c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(outcomes[std::min(int(run.outcome), 5)]);
+            recent++;
+        }
+        ImGui::EndTable();
+    }
+    if (!recent)
+        ImGui::TextDisabled("No recent attempts retained for this mode.");
+}
+
+inline void Render()
+{
+    float u = suite_ui::Unit();
+    SyncSetupSelection();
+    if (ImGui::GetContentRegionAvail().y < 300 * u || ImGui::GetContentRegionAvail().x < 650 * u)
+    {
+        RenderCompact();
+        return;
+    }
+    const char *startLabel = "Start selected mode";
+    const char *disableLabel = "Disable Speedrun";
+    auto buttonWidth = [](const char *label) {
+        return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2;
+    };
+    const auto restartLabel = suite_keys::Label("Quick restart", suite_keys::Restart);
+    float footerWidth = ImGui::GetContentRegionAvail().x;
+    float used = 0;
+    int rows = 1;
+    for (const char *label : {startLabel, "Details", restartLabel.c_str(), g_speedrunMode ? disableLabel : ""})
+    {
+        if (!label[0])
+            continue;
+        float width = buttonWidth(label);
+        if (used && used + ImGui::GetStyle().ItemSpacing.x + width > footerWidth)
+        {
+            rows++;
+            used = width;
+        }
+        else
+            used += (used ? ImGui::GetStyle().ItemSpacing.x : 0) + width;
+    }
+    float footer = ImGui::GetTextLineHeightWithSpacing() + 8 * u +
+                   ImGui::GetFrameHeightWithSpacing() * rows;
+    ImGui::BeginChild("SpeedrunScroll", {0, -footer});
+    RefreshDashboard();
+    if (ImGui::BeginTable("Run setup columns", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable))
+    {
+        ImGui::TableSetupColumn("Mode selection", ImGuiTableColumnFlags_WidthFixed,
+                                std::clamp(ImGui::GetContentRegionAvail().x * .25f, 190 * u, 245 * u));
+        ImGui::TableSetupColumn("Run configuration");
+        ImGui::TableNextColumn();
+        SectionHeading("Game mode");
+        if (ImGui::BeginTable("Mode cards", 1, ImGuiTableFlags_SizingStretchSame))
+        {
+            for (int i = 0; i < kMapLevelCount; i++)
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                Card(i, ImGui::GetContentRegionAvail().x);
+            }
+            ImGui::EndTable();
+        }
+        ImGui::Spacing();
+        ImGui::TextDisabled("Select, then Start.");
+        ImGui::TextWrapped("Browsing a mode does not change the active game.");
+        ImGui::TableNextColumn();
+        SectionHeading("Run setup");
+        CategorySetup();
+        ImGui::Spacing();
+        SectionHeading("Mode overview");
+        StatisticsFilter();
+        ImGui::Spacing();
+        SelectionOverview();
+        ImGui::Spacing();
+        SectionHeading("Recent attempts / all categories");
+        RecentAttempts();
+        ImGui::Spacing();
+        ImGui::TextDisabled("%s", dashboard.sinceLabel.c_str());
+        if (!g_pShared)
+            ImGui::TextWrapped(dashboard.available ? "Game disconnected / showing the last received statistics."
+                                                   : "Connect It Steals to load your saved statistics.");
+        Settings();
+        if (g_pShared && g_pShared->statsSaveStatus == 2)
+            ImGui::TextColored(g_accentCol, "Statistics could not be saved: %s", g_pShared->statsError);
+        if (g_pShared && g_pShared->statsWarning[0])
+            ImGui::TextWrapped("Data recovery: %s", g_pShared->statsWarning);
+        ImGui::EndTable();
+    }
     ImGui::EndChild();
     ImGui::Separator();
-    std::string selected = std::string(kMapLevelNames[dashboard.selected]) + "  /  " +
-                           SetupCategoryName();
+    std::string selected = std::string(kMapLevelNames[dashboard.selected]) + "  /  " + SetupCategoryName();
     auto at = ImGui::GetCursorScreenPos();
     float width = ImGui::GetContentRegionAvail().x;
     float textWidth = ImGui::CalcTextSize(selected.c_str()).x;
@@ -480,10 +600,12 @@ inline void Render()
     if (suite_ui::PrimaryButton(startLabel))
         StartSelected();
     ImGui::EndDisabled();
-    Help("Start the selected mode with the run setup above. Selecting a card does not load the game.");
+    Help("Start the selected mode with the run setup above. Browsing a mode does not load the game.");
     SameLineIfFits("Details");
     if (suite_ui::Button("Details"))
         ImGui::OpenPopup("Mode statistics");
+    SameLineIfFits(restartLabel.c_str());
+    RestartButton();
     ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
     if (g_speedrunMode)
     {

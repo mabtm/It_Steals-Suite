@@ -32,10 +32,10 @@ void DesignInteractionCases()
             rail = w;
     assert(rail);
     auto click = rail->DC.CursorStartPos;
-    click.x += rail->Size.x * .5f;
-    // Modes & runs is the first task under the Practice group. Click the
-    // actual row, below its group heading, then exercise every stable page ID.
-    click.y += ImGui::GetTextLineHeightWithSpacing() + 3 + 23;
+    // The Run destination is the first native tab. Click its visible label,
+    // then exercise every stable destination ID below.
+    click.x += ImGui::GetFontSize() * 2;
+    click.y += ImGui::GetFrameHeight() * .5f;
     io.AddMousePosEvent(click.x, click.y);
     Frame();
     assert(suite_ui::navigation.Is(suite_ui::Page::Cheats));
@@ -63,7 +63,11 @@ void DesignInteractionCases()
         if (std::strstr(w->Name, "/PracticeScroll_") && w->LastFrameActive == ImGui::GetFrameCount())
             tools = w;
     assert(tools);
-    auto collider = ImHashStr("##Feature", 0, tools->GetID("Actual colliders"));
+    auto *training = GImGui->Tables.GetByKey(tools->GetID("Training groups"));
+    auto collider = ImHashStr("Actual colliders", 0,
+        training && training->LastFrameActive == ImGui::GetFrameCount() ? training->ID : tools->ID);
+    // A queued activation for a previously known control must not bypass the
+    // clean-category lock after its availability changes.
     ImGui::ActivateItemByID(collider);
     Frame();
     assert(!g_hitboxCheck);
@@ -74,6 +78,13 @@ void DesignInteractionCases()
     Frame();
     assert(!g_hitboxCheck);
     g_pShared = &data;
+    Frame();
+    ImGui::ActivateItemByID(collider);
+    Frame();
+    assert(g_hitboxCheck);
+    Frame();
+    assert(g_hitboxCheck); // Repainting must not toggle the aid again.
+    g_hitboxCheck = false;
     bool value = false, locked = false;
     int changes = 0;
     ImVec2 at;
@@ -83,15 +94,12 @@ void DesignInteractionCases()
         suite_ui::BeginFrame(true, false);
         ImGui::SetNextWindowPos({40, 40}, ImGuiCond_Always);
         ImGui::SetNextWindowSize({720, 260}, ImGuiCond_Always);
-        ImGui::Begin("Design cards QA");
+        ImGui::Begin("Native checkbox QA");
         ImGui::BeginDisabled(locked);
-        if (suite_ui::FeatureCard("Actual colliders", suite_ui::Icon::Collider, &value, "Exact live shapes",
-                                  "Actual collider geometry"))
+        if (suite_ui::Checkbox("Actual colliders", &value))
             changes++;
         feature = ImGui::GetItemID();
-        at = ImGui::GetItemRectMin();
-        at.x += 90;
-        at.y += 35;
+        at = GImGui->LastItemData.Rect.GetCenter();
         ImGui::EndDisabled();
         ImGui::End();
         ImGui::Render();
@@ -211,7 +219,7 @@ void DesignInteractionCases()
     data = saved;
     io.ConfigFlags = config;
     std::cout
-        << "Design interaction: actual mouse and keyboard sidebar; feature card toggle once / disabled lock; pickup and flash click seek exact timestamps; timeline drag, Home/End and cache rebinding; bounded clipped drawing: PASS\n";
+        << "Design interaction: actual mouse and keyboard native tabs; native checkbox toggle once / disabled lock; pickup and flash click seek exact timestamps; timeline drag, Home/End and cache rebinding; bounded clipped drawing: PASS\n";
 }
 
 void DesignGallery(const std::string &output)

@@ -15,15 +15,15 @@ void ApplyTheme(float scale)
     auto &current = ImGui::GetStyle();
     current.ItemInnerSpacing = ImVec2(8, 6);
     current.WindowBorderSize = 1;
-    current.WindowPadding = ImVec2(18, 16);
-    current.FramePadding = ImVec2(12, 6);
-    current.ItemSpacing = ImVec2(12, 10);
-    current.WindowRounding = 14;
-    current.ChildRounding = 10;
-    current.FrameRounding = 7;
-    current.TabRounding = 6;
+    current.WindowPadding = ImVec2(16, 12);
+    current.FramePadding = ImVec2(10, 5);
+    current.ItemSpacing = ImVec2(10, 8);
+    current.WindowRounding = 6;
+    current.ChildRounding = 4;
+    current.FrameRounding = 4;
+    current.TabRounding = 4;
     current.GrabRounding = 4;
-    current.PopupRounding = 8;
+    current.PopupRounding = 5;
     current.ScrollbarRounding = 8;
     current.ScrollbarSize = 10;
     current.TabBarBorderSize = 1;
@@ -172,110 +172,7 @@ inline bool SetSpeedrunMode(bool enabled, bool currentLevel = false)
     return true;
 }
 
-inline void RenderCheatsPage(bool cheatRestricted)
-{
-    ImGui::BeginChild("PracticeScroll", ImVec2(0, 0));
-    ImGui::BeginDisabled(!g_pShared || cheatRestricted);
-    bool cards = ImGui::GetContentRegionAvail().x >= 600 * suite_ui::Unit();
-    bool grid = cards && ImGui::BeginTable("Feature cards", 2, ImGuiTableFlags_SizingStretchSame);
-    if (grid)
-    {
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-    }
-    suite_ui::FeatureCard(
-        "Actual colliders", suite_ui::Icon::Collider, &g_hitboxCheck,
-        g_pShared && g_pShared->hitboxEnabled ? "Applied in game" : "Exact live collider shapes",
-        "Cyan: player body. Green: triggers. Yellow: crystal pickup colliders. Mesh and terrain colliders are omitted. Training aids invalidate a clean run.");
-    if (grid)
-        ImGui::TableNextColumn();
-    suite_ui::FeatureCard(
-        "Fullbright", suite_ui::Icon::Sun, &g_brightnessOn,
-        g_pShared && g_pShared->brightnessEnabled ? "Applied in game" : "Bright scene lighting",
-        "Use the available unlit texture shaders to brighten the scene while retaining textures and transparency. Original shaders are restored when disabled. This aid invalidates a clean run.");
-    if (grid)
-    {
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-    }
-    suite_ui::FeatureCard(
-        "Minimap", suite_ui::Icon::Map, &g_showMinimapWindow, "Live geometry and markers",
-        "Show the observed map, player heading and enabled crystal or monster markers. Configure colors and compass in Settings.");
-    if (grid)
-        ImGui::TableNextColumn();
-    bool freecam = g_pShared && g_pShared->freecamActive;
-    suite_ui::FeatureCard(
-        "Free camera", suite_ui::Icon::Camera, &freecam,
-        freecam ? "Active / player stays in place" : "Press F1 in the game",
-        "F1 in the game toggles a camera without colliders. WASD / Q / E moves; Shift is faster; right mouse looks around. The player cannot collect crystals while using Freecam.",
-        true, "F1");
-    if (grid)
-        ImGui::EndTable();
-    suite_ui::Section("Visual options", 0, [&] {
-        ImGui::BeginDisabled(!g_hitboxCheck);
-        suite_ui::Checkbox("Hide player hitbox", &g_hidePlayerHitbox);
-        ImGui::EndDisabled();
-        ImGui::BeginDisabled(!g_showMinimapWindow);
-        suite_ui::Checkbox("Monster navigation path", &g_showPath);
-        ImGui::EndDisabled();
-        Help("Path data is requested only while the map and this option are visible.");
-        if (g_pShared && g_pShared->hitboxDetails[0])
-        {
-            ImGui::TextDisabled("Collider details");
-            Help(g_pShared->hitboxDetails);
-        }
-    });
-    ImGui::Spacing();
-    ImGui::BeginDisabled(!g_pShared || !g_pShared->freecamActive || HasPendingRequest());
-    if (suite_ui::Button("Teleport player to camera"))
-    {
-        g_commands.teleportX = g_pShared->freecamX;
-        g_commands.teleportY = g_pShared->freecamY;
-        g_commands.teleportZ = g_pShared->freecamZ;
-        g_commands.teleportCmd = 1;
-        g_commands.teleportScene = static_cast<uint32_t>(g_pShared->currentSceneIndex + 1);
-        g_commands.teleportExitFreecam = 0;
-    }
-    Help("Move the player to the camera location. This marks the run as assisted.");
-    ImGui::EndDisabled();
-    ImGui::EndDisabled();
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-    suite_ui::Section("Advanced scene tools", 0, [&]() {
-        ImGui::TextColored(g_headerCol, "Scene selection");
-        static int scene = 3;
-        const char *scenes[] = {"Intro",
-                                "DeathMessage",
-                                "TitleScreen",
-                                "Classic",
-                                "Camera",
-                                "Hide & Seek",
-                                "SpiderModeEnding",
-                                "Timer",
-                                "Ghost",
-                                "GhostModeEnding",
-                                "Credits",
-                                "ClassicEnding",
-                                "Camera Bright",
-                                "Hide & Seek Outside",
-                                "Classic Bonus",
-                                "SoundTestScreen",
-                                "FileDeletionScreen"};
-        ImGui::BeginDisabled(!g_pShared || g_speedrunMode || HasPendingRequest());
-        ImGui::SetNextItemWidth(-1);
-        ImGui::Combo("##Scene", &scene, scenes, IM_ARRAYSIZE(scenes));
-        if (suite_ui::Button("Load selected scene"))
-        {
-            g_commands.levelLoadIndex = scene;
-            g_commands.levelLoadCmd = 1;
-        }
-        ImGui::EndDisabled();
-        if (g_speedrunMode)
-            ImGui::TextDisabled("Use the Speedrun level selector while that mode is active.");
-    });
-    ImGui::EndChild();
-}
+#include "TrainingUI.h"
 
 #include "RunStatisticsUI.h"
 
@@ -588,7 +485,7 @@ void RenderMainWindow(const std::string &mode, int seed)
     const bool tightShell = display.y < 480 * suite_ui::Unit();
     ImVec2 maximum(std::max(180.f, display.x - 24), std::max(160.f, display.y - 24));
     ImGui::SetNextWindowSize(
-        ImVec2(std::min(1120.f * g_dpiScale, maximum.x), std::min(840.f * g_dpiScale, maximum.y)),
+        ImVec2(std::min(1120.f * g_dpiScale, maximum.x), std::min(736.f * g_dpiScale, maximum.y)),
         g_resetLayout ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(20, std::min(72.f, std::max(12.f, display.y - 680.f * g_dpiScale))),
                             g_resetLayout ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
@@ -621,82 +518,62 @@ void RenderMainWindow(const std::string &mode, int seed)
     ImVec2 position = ImGui::GetWindowPos(), size = ImGui::GetWindowSize();
     ImGui::SetWindowPos(ImVec2(std::clamp(position.x, 0.f, std::max(0.f, display.x - size.x)),
                                std::clamp(position.y, 0.f, std::max(0.f, display.y - size.y))));
-    if (tightShell)
-    {
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(g_headerCol, "%s", suite_brand::Title);
-        if (suite_brand::Preview)
+    suite_ui::TrainerHeader(replayHeader ? "Replay" : mode.c_str(), g_pShared != nullptr,
+                            g_connectionStatus.c_str(), replayHeader);
+    ImGui::Separator();
+    // Replay keeps compact utilities above the canvas; an extra footer would
+    // otherwise reduce the real map height at 720p.
+    const bool footerUtilities = !tightShell && !replayHeader;
+    auto utilities = [&] {
+        bool narrow = ImGui::GetContentRegionAvail().x < 650 * suite_ui::Unit();
+        auto backLabel = tightShell ? std::string("Back")
+                                   : suite_keys::Label(narrow ? "Back" : "Return to game", suite_keys::Menu);
+        if (suite_ui::Button(backLabel.c_str()))
         {
-            auto at = ImGui::GetItemRectMin();
-            at.y = ImGui::GetItemRectMax().y + suite_ui::Unit();
-            ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), 10 * suite_ui::Unit(), at,
-                ImGui::GetColorU32(suite_ui::Muted()), "PREVIEW");
+            g_overlayVisible = false;
+            SetOverlayInteractive(false);
         }
-        ImGui::SameLine();
-    }
-    else
-        suite_ui::BrandHeader(replayHeader ? "Replay" : mode.c_str(), g_pShared != nullptr,
-                              g_connectionStatus.c_str());
-    if (!tightShell && !replayHeader && g_pShared && g_pShared->seedActive)
-        ImGui::TextColored(g_accentCol, "%s: %d",
-                           g_pShared->runCategory == 1 ? "Set-Seed" : "Practice seed", seed);
-    bool narrow = ImGui::GetContentRegionAvail().x < 650 * suite_ui::Unit();
-    auto backLabel = tightShell ? std::string("Back")
-                               : suite_keys::Label(narrow ? "Back" : "Return to game", suite_keys::Menu);
-    if (suite_ui::Button(backLabel.c_str()))
-    {
-        g_overlayVisible = false;
-        SetOverlayInteractive(false);
-    }
-    Help("Close the menu and pass mouse/keyboard input back to the game. The map and timer remain visible.");
-    auto hudLabel = tightShell ? std::string("HUD")
-                              : suite_keys::Label(narrow ? "HUD" : "Compact HUD", suite_keys::Hud);
-    SameLineIfFits(hudLabel.c_str());
-    ImGui::BeginDisabled(!CompactHudAllowed(g_speedrunMode, g_practiceMode));
-    if (suite_ui::Button(hudLabel.c_str()))
-    {
-        g_compactMode = true;
-        SetOverlayInteractive(false);
-    }
-    ImGui::EndDisabled();
-    Help(
-        "Compact HUD is available in Normal and Practice mode. Clean Speedrun uses only the Speedrun overlay.");
-    if (cheatRestricted && !tightShell)
-    {
-        SameLineIfFits("Clean speedrun");
-        ImGui::TextColored(g_headerCol, "Clean speedrun");
-        Help("Training aids are locked while a clean speedrun is selected.");
-    }
-    ImGui::Spacing();
+        Help("Close the menu and pass mouse/keyboard input back to the game. The map and timer remain visible.");
+        auto hudLabel = tightShell ? std::string("HUD")
+                                  : suite_keys::Label(narrow ? "HUD" : "Compact HUD", suite_keys::Hud);
+        SameLineIfFits(hudLabel.c_str());
+        ImGui::BeginDisabled(!CompactHudAllowed(g_speedrunMode, g_practiceMode));
+        if (suite_ui::Button(hudLabel.c_str()))
+        {
+            g_compactMode = true;
+            SetOverlayInteractive(false);
+        }
+        ImGui::EndDisabled();
+        Help("Compact HUD is available in Normal and Practice mode. Clean Speedrun uses only the Speedrun overlay.");
+        if (cheatRestricted && !tightShell)
+        {
+            SameLineIfFits("Clean speedrun");
+            ImGui::TextColored(g_headerCol, "Clean speedrun");
+            Help("Training aids are locked while a clean speedrun is selected.");
+        }
+    };
+    if (!footerUtilities)
+        utilities();
     {
         float u = suite_ui::Unit();
-        bool compactNavigation = ImGui::GetContentRegionAvail().x < 730 * u;
-        float rail = 204 * u;
-        float navigationHeight = compactNavigation
-                                     ? suite_ui::CompactNavigationHeight(ImGui::GetContentRegionAvail().x)
-                                     : std::max(4.f, ImGui::GetContentRegionAvail().y);
-        ImGui::BeginChild("Navigation", ImVec2(compactNavigation ? 0 : rail, navigationHeight),
-                          ImGuiChildFlags_None, compactNavigation ? ImGuiWindowFlags_NoScrollbar : 0);
-        if (compactNavigation)
-            suite_ui::CompactNavigation();
-        else
-            suite_ui::Sidebar(navigationHeight);
+        float navigationHeight = suite_ui::CompactNavigationHeight(ImGui::GetContentRegionAvail().x);
+        ImGui::BeginChild("Navigation", ImVec2(0, navigationHeight), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        suite_ui::CompactNavigation();
         ImGui::EndChild();
-        if (!compactNavigation)
-            ImGui::SameLine();
-        float bodyHeight = std::max(4.f, ImGui::GetContentRegionAvail().y);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, suite_ui::Panel(.24f));
+        float footerHeight = footerUtilities ? ImGui::GetFrameHeightWithSpacing() + 12 * u : 0;
+        float bodyHeight = std::max(4.f, ImGui::GetContentRegionAvail().y - footerHeight);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, g_mainBgCol);
         ImGui::PushStyleColor(ImGuiCol_Border, suite_ui::Color(AppearancePreferences::Outline, .45f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
-                            ImVec2((compactNavigation || replayHeader ? 10 : 22) * u,
-                                   (suite_ui::navigation.Is(suite_ui::Page::Replay) ? 0 : tightShell ? 4 : compactNavigation ? 10 : 20) * u));
-        ImGui::BeginChild("Workspace", ImVec2(0, bodyHeight), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                            ImVec2(0, (replayHeader ? 0 : tightShell ? 2 : 4) * u));
+        ImGui::BeginChild("Workspace", ImVec2(0, bodyHeight), ImGuiChildFlags_AlwaysUseWindowPadding,
                           suite_ui::navigation.Is(suite_ui::Page::Replay)
                               ? ImGuiWindowFlags_None
                               : ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        float reveal = suite_ui::Animate(
-            ImGui::GetID(suite_ui::PageNames[int(suite_ui::navigation.page)]) ^ 0x78100u, 1, true, .17f);
-        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * (.72f + .28f * reveal));
+        float reveal = !suite_ui::preferences.motion ? 1.f : float(std::clamp(
+            (ImGui::GetTime() - suite_ui::navigation.changed) / .14, 0., 1.));
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * (.78f + .22f * reveal));
         if (!tightShell && (!suite_ui::navigation.Is(suite_ui::Page::Replay) || !g_runReviewOpen))
             suite_ui::PageHeading(suite_ui::navigation.page);
         if (suite_ui::navigation.Is(suite_ui::Page::Updates))
@@ -729,6 +606,11 @@ void RenderMainWindow(const std::string &mode, int seed)
         ImGui::EndChild();
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(2);
+        if (footerUtilities)
+        {
+            ImGui::Separator();
+            utilities();
+        }
         bool expand = g_reviewTabActive && g_reviewWide;
         if (expand != reviewExpanded)
         {

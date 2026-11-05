@@ -2026,6 +2026,154 @@ static void SeedSearchStopUICases()
 #include "elite_ui_benchmark.inl"
 #include "elite_design_ui_cases.inl"
 
+// Exercise the shipped native training checkbox in compact and split layouts.
+// Browsing Training cannot switch a declared category or issue a game command.
+void NativeTrainingControlsCases()
+{
+    auto &io = ImGui::GetIO();
+    auto savedData = data;
+    auto *savedShared = g_pShared;
+    auto savedCommands = g_commands;
+    bool savedSpeedrun = g_speedrunMode, savedPractice = g_practiceMode;
+    bool savedSeeded = g_seededPractice, savedBrightness = g_brightnessOn;
+    bool savedPending = pendingRequest;
+    pendingRequest = false;
+    data = {};
+    data.pid = 1234;
+    data.playerReady = data.health = 1;
+    int checks = 0;
+    for (ImVec2 viewport : {ImVec2(480, 360), ImVec2(1280, 720)})
+        for (float dpi : {1.f, 1.5f})
+        {
+            io.DisplaySize = viewport;
+            ApplyTheme(dpi);
+            io.Fonts->Build();
+            io.Fonts->SetTexID(1);
+            for (int state = 0; state < 5; ++state)
+            {
+                g_speedrunMode = state >= 1 && state <= 3;
+                g_practiceMode = state == 3;
+                g_seededPractice = state == 2;
+                g_pShared = state == 4 ? nullptr : &data;
+                g_brightnessOn = false;
+                g_commands = {};
+                const bool restricted = g_speedrunMode && !g_practiceMode;
+                auto frame = [&] {
+                    ImGui::NewFrame();
+                    ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Always);
+                    ImGui::SetNextWindowSize({viewport.x - 20, viewport.y - 20}, ImGuiCond_Always);
+                    ImGui::Begin("Native training controls QA", nullptr, ImGuiWindowFlags_NoSavedSettings);
+                    RenderCheatsPage(restricted);
+                    ImGui::End();
+                    ImGui::Render();
+                    CheckHudRegions();
+                };
+                frame();
+                frame();
+                ImGuiWindow *controls = nullptr;
+                auto *parent = ImGui::FindWindowByName("Native training controls QA");
+                for (auto *window : GImGui->Windows)
+                    if (window->ParentWindow == parent &&
+                        std::strstr(window->Name, "/PracticeScroll_") &&
+                        window->LastFrameActive == ImGui::GetFrameCount())
+                        controls = window;
+                assert(controls);
+                auto *table = GImGui->Tables.GetByKey(controls->GetID("Training groups"));
+                auto checkbox = ImHashStr("Fullbright", 0,
+                    table && table->LastFrameActive == ImGui::GetFrameCount() ? table->ID : controls->ID);
+                // Include queued/stale navigation activations, not only the
+                // normal mouse path which ImGui filters for disabled items.
+                ImGui::ActivateItemByID(checkbox);
+                frame();
+                assert(g_brightnessOn == (state == 0 || state == 3));
+                frame();
+                assert(g_brightnessOn == (state == 0 || state == 3));
+                assert(g_speedrunMode == (state >= 1 && state <= 3) &&
+                       g_practiceMode == (state == 3) && g_seededPractice == (state == 2));
+                assert(!g_commands.levelLoadCmd && !g_commands.speedrunLoadLevelCmd &&
+                       !g_commands.setSeedCmd && !g_commands.teleportCmd);
+                ++checks;
+            }
+        }
+    data = savedData;
+    g_pShared = savedShared;
+    g_commands = savedCommands;
+    g_speedrunMode = savedSpeedrun;
+    g_practiceMode = savedPractice;
+    g_seededPractice = savedSeeded;
+    g_brightnessOn = savedBrightness;
+    pendingRequest = savedPending;
+    io.DisplaySize = {1280, 720};
+    ApplyTheme(1);
+    io.Fonts->Build();
+    io.Fonts->SetTexID(1);
+    std::cout << "Native training controls: " << checks
+              << " compact/split/DPI/category cases; no implicit category change, game command or repeated toggle: PASS\n";
+}
+
+void NativeRestartControlsCases()
+{
+    auto &io = ImGui::GetIO();
+    auto savedData = data;
+    auto *savedShared = g_pShared;
+    auto savedCommands = g_commands;
+    auto savedDashboard = run_stats::dashboard;
+    const int savedSetupSeed = run_stats::setupSeed;
+    const bool savedSpeedrun = g_speedrunMode, savedPending = pendingRequest;
+    io.DisplaySize = {800, 600};
+    ApplyTheme(1);
+    io.Fonts->Build();
+    io.Fonts->SetTexID(1);
+    auto frame = [&] {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos({20, 20}, ImGuiCond_Always);
+        ImGui::SetNextWindowSize({600, 200}, ImGuiCond_Always);
+        ImGui::Begin("Native restart controls QA", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        run_stats::RestartButton();
+        ImGui::End();
+        ImGui::Render();
+    };
+    for (int blocked = 0; blocked < 7; ++blocked)
+    {
+        data = {};
+        data.speedrunModeActive = 1;
+        std::strcpy(data.version, blocked == 5 ? "v7.20.2" : "v7.22.0");
+        data.replay3dState = blocked == 2 ? 2 : 0;
+        g_pShared = blocked == 6 ? nullptr : &data;
+        g_speedrunMode = blocked != 4;
+        pendingRequest = blocked == 1;
+        g_commands = {};
+        g_commands.speedrunLevelIndex = 2;
+        g_commands.practiceSeed = 1234;
+        g_commands.runReviewRequest = blocked == 3 ? 2 : 0;
+        auto expected = g_commands;
+        if (!blocked)
+            expected.speedrunLoadLevelCmd = 1;
+        // Browsing another mode or editing a draft must not change the active
+        // setup when Quick restart is used instead of Start selected mode.
+        run_stats::dashboard.selected = 7;
+        run_stats::setupSeed = -9876;
+        frame();
+        frame();
+        auto *window = ImGui::FindWindowByName("Native restart controls QA");
+        const auto label = suite_keys::Label("Quick restart", suite_keys::Restart);
+        ImGui::ActivateItemByID(window->GetID(label.c_str()));
+        frame();
+        assert(std::memcmp(&g_commands, &expected, sizeof(expected)) == 0);
+        assert(run_stats::dashboard.selected == 7 && run_stats::setupSeed == -9876);
+        frame();
+        assert(std::memcmp(&g_commands, &expected, sizeof(expected)) == 0);
+    }
+    data = savedData;
+    g_pShared = savedShared;
+    g_commands = savedCommands;
+    run_stats::dashboard = savedDashboard;
+    run_stats::setupSeed = savedSetupSeed;
+    g_speedrunMode = savedSpeedrun;
+    pendingRequest = savedPending;
+    std::cout << "Native Quick restart: active setup retained while browsing, pending/replay/review/mode/version/offline guards: PASS\n";
+}
+
 int main(int argc, char **argv)
 {
     std::cout.setf(std::ios::unitbuf);
@@ -2056,6 +2204,15 @@ int main(int argc, char **argv)
     {
         DesignInteractionCases();
         EliteDesignCases(argv[1]);
+        NativeTrainingControlsCases();
+        NativeRestartControlsCases();
+        ImGui::DestroyContext();
+        return 0;
+    }
+    if (argc > 2 && std::string(argv[2]) == "--native-only")
+    {
+        NativeTrainingControlsCases();
+        NativeRestartControlsCases();
         ImGui::DestroyContext();
         return 0;
     }
@@ -3307,6 +3464,8 @@ int main(int argc, char **argv)
     FinishVerificationCases(argc > 1 ? argv[1] : "");
     DesignInteractionCases();
     EliteDesignCases(argc > 1 ? argv[1] : "");
+    NativeTrainingControlsCases();
+    NativeRestartControlsCases();
     DesignGallery(argc > 1 ? argv[1] : "");
     ReplayInputCases(argc > 1 ? argv[1] : ".");
     if (argc > 1)

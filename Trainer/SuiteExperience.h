@@ -172,7 +172,8 @@ inline bool Button(const char *label, const ImVec2 &requestedSize = ImVec2(0, 0)
         hidden.w = 0;
         ImGui::PushStyleColor(ImGuiCol_Text, hidden);
     }
-    bool clicked = ImGui::Button(label, size);
+    bool clicked = ImGui::Button(label, size) &&
+                   !(GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled);
     HoverCue();
     if (confirmed)
         ImGui::PopStyleColor();
@@ -221,46 +222,19 @@ inline bool SmallButton(const char *label)
 
 inline bool Checkbox(const char *label, bool *value)
 {
-    auto *window = ImGui::GetCurrentWindow();
-    if (window->SkipItems)
-        return false;
-    auto id = window->GetID(label);
-    auto &style = ImGui::GetStyle();
-    float h = ImGui::GetFrameHeight(), w = h * 1.55f;
-    auto text = ImGui::CalcTextSize(label, nullptr, true);
-    auto p = ImGui::GetCursorScreenPos();
-    bool clicked =
-        ImGui::InvisibleButton(label, ImVec2(w + (text.x > 0 ? style.ItemInnerSpacing.x + text.x : 0), h),
-                               ImGuiButtonFlags_EnableNav);
+    const bool enabled = !(GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled);
+    const bool before = *value;
+    const bool clicked = ImGui::Checkbox(label, value);
     HoverCue();
+    // A queued navigation activation can outlive a category/connection change.
+    // Keep disabled controls inert even for an explicitly queued item ID.
+    if (!enabled)
+    {
+        *value = before;
+        return false;
+    }
     if (clicked)
-    {
-        *value = !*value;
-        ImGui::MarkItemEdited(id);
         Request(*value ? Tone::On : Tone::Off);
-    }
-    if (ImGui::IsItemVisible())
-    {
-        float on = Animate(id ^ 0x710901u, *value ? 1.f : 0.f),
-              hover = Animate(id ^ 0x91021u, ImGui::IsItemHovered() ? 1.f : 0.f);
-        auto *draw = ImGui::GetWindowDrawList();
-        float inset = h * .17f, track = h - 2 * inset;
-        ImVec2 a(p.x, p.y + inset), b(p.x + w, p.y + h - inset);
-        auto off = Mix(style.Colors[ImGuiCol_FrameBg], style.Colors[ImGuiCol_FrameBgHovered], hover * .5f);
-        auto active = heading;
-        active.w = 1;
-        auto background = Mix(off, active, on * .75f);
-        draw->AddRectFilled(a, b, ImGui::GetColorU32(background), track * .5f);
-        auto knob = Mix(style.Colors[ImGuiCol_TextDisabled], style.Colors[ImGuiCol_Text], on);
-        draw->AddCircleFilled(ImVec2(a.x + track * .5f + on * (w - track), p.y + h * .5f), track * .34f,
-                              ImGui::GetColorU32(knob), 16);
-        if (ImGui::IsItemFocused())
-            draw->AddRect(ImVec2(p.x - 2, p.y + inset - 2), ImVec2(p.x + w + 2, p.y + h - inset + 2),
-                          ImGui::GetColorU32(tint), track * .5f, 0, 1);
-        if (text.x > 0)
-            draw->AddText(ImVec2(p.x + w + style.ItemInnerSpacing.x, p.y + style.FramePadding.y),
-                          ImGui::GetColorU32(ImGuiCol_Text), label, ImGui::FindRenderedTextEnd(label));
-    }
     return clicked;
 }
 

@@ -191,161 +191,111 @@ inline void TextAt(ImDrawList *d, ImVec2 p, const char *text, ImVec4 color, floa
     d->AddText(ImGui::GetFont(), size, p, ImGui::GetColorU32(color), text, nullptr, 0, &clip);
 }
 
+// Compact native shell. Navigation keeps the saved Page IDs and the same
+// keyboard-accessible buttons, with no secondary navigation model or web view.
 inline void PageHeading(Page page)
 {
-    float u = Unit(), w = ImGui::GetContentRegionAvail().x;
-    bool compact = page == Page::Replay || ImGui::GetContentRegionAvail().y < 260 * u;
-    float h = (compact ? 32 : 66) * u;
-    auto a = ImGui::GetCursorScreenPos();
-    auto *d = ImGui::GetWindowDrawList();
-    ImVec4 clip(a.x, a.y, a.x + w, a.y + h);
-    TextAt(d, {a.x, a.y + 2 * u}, PageNames[int(page)], ink, (compact ? 20 : 27) * u, clip);
-    if (!compact)
-        TextAt(d, {a.x + u, a.y + 39 * u}, PageDetails[int(page)], Muted(), 15 * u,
-               clip);
-    ImGui::Dummy({w, h});
+    if (page == Page::Speedrun || page == Page::Cheats)
+        return; // These workspaces own their native section headings.
+    ImGui::PushStyleColor(ImGuiCol_Text, heading);
+    ImGui::SeparatorText(PageNames[int(page)]);
+    ImGui::PopStyleColor();
 }
 
-inline void Sidebar(float height)
+inline void TrainerHeader(const char *mode, bool connected, const char *status, bool compact = false)
 {
-    float u = Unit();
-    bool wide = ImGui::GetContentRegionAvail().x >= 128 * u;
-    float width = ImGui::GetContentRegionAvail().x;
-    auto origin = ImGui::GetCursorScreenPos();
-    const char *hints[] = {"Training aids; unavailable during clean speedruns.",
-                           "Preview layouts, choose a spawn and search seeds.",
-                           "Level, practice seed and local run verification.",
-                           "Appearance, HUD, minimap and system preferences.",
-                           "Review recordings with events and route playback.",
-                           "Scan the connection and inspect technical details.",
-                           "Picker shortcut, compact object card and engine details on request.",
-                           "Stable releases, automatic installation and the full version history."};
-    for (const auto &item : NavigationItems)
-    {
-        int i = int(item.page);
-        if (item.group)
-        {
-            if (wide)
-            {
-                ImGui::Dummy({0, 3 * u});
-                ImGui::TextDisabled("%s", item.group);
-            }
-            else
-                ImGui::Separator();
-        }
-        ImGui::PushID(i);
-        auto a = ImGui::GetCursorScreenPos();
-        float h = (wide ? 46 : 44) * u;
-        bool selected = navigation.Is(Page(i));
-        bool click = ImGui::InvisibleButton("##Navigate", {width, h}, ImGuiButtonFlags_EnableNav);
-        HoverCue();
-        if (click && navigation.Select(Page(i), ImGui::GetTime()))
-            Request(Tone::Tab);
-        float active = Animate(ImGui::GetItemID() ^ 0x947bfu, navigation.Is(Page(i)) ? 1.f : 0.f),
-              hover = Animate(ImGui::GetItemID() ^ 0x84ab1u, ImGui::IsItemHovered() ? 1.f : 0.f);
-        auto *d = ImGui::GetWindowDrawList();
-        if (active > 0 || hover > 0)
-            d->AddRectFilled(
-                a, {a.x + width, a.y + h},
-                ImGui::GetColorU32(Alpha(Blend(Panel(), heading, active * .10f),
-                                         std::max(active, hover * .7f))),
-                7 * u);
-        if (active > 0)
-            d->AddLine({a.x + 2 * u, a.y + 13 * u}, {a.x + 2 * u, a.y + h - 13 * u},
-                       ImGui::GetColorU32(Alpha(Color(AppearancePreferences::Animation), active)), 3 * u);
-        DrawIcon(d,
-                 i == int(Page::Updates)     ? Icon::Update
-                 : i == int(Page::Inspector) ? Icon::Magnifier
-                                             : Icon(i),
-                 {a.x + (wide ? 11 * u : (width - 22 * u) * .5f), a.y + (wide ? 10 : 4) * u},
-                 22 * u, ImGui::GetColorU32(Blend(Blend(ink, background, .36f), heading, active)));
-        if (wide)
-            TextAt(d, {a.x + 43 * u, a.y + 14 * u}, PageNames[i],
-                   selected ? ink : Blend(ink, background, .25f), 16 * u,
-                   {a.x + 43 * u, a.y, a.x + width, a.y + h});
-        else
-        {
-            // Tiny windows still show a task label. The full name and purpose
-            // are available in the heading and tooltip.
-            float font = 10 * u;
-            float labelWidth = ImGui::GetFont()->CalcTextSizeA(font, FLT_MAX, 0, item.compact).x;
-            TextAt(d, {a.x + std::max(0.f, (width - labelWidth) * .5f), a.y + 31 * u}, item.compact,
-                   selected ? ink : Blend(ink, background, .25f), font,
-                   {a.x, a.y, a.x + width, a.y + h});
-        }
-        if (ImGui::IsItemFocused())
-            d->AddRect(a, {a.x + width, a.y + h}, ImGui::GetColorU32(heading), 7 * u, 0, u);
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-        {
-            ImGui::BeginTooltip();
-            ImGui::TextUnformatted(PageNames[i]);
-            ImGui::PushTextWrapPos(260 * u);
-            ImGui::TextUnformatted(hints[i]);
-            ImGui::PopTextWrapPos();
-            ImGui::EndTooltip();
-        }
-        ImGui::PopID();
-    }
-    if (wide && height > 540 * u)
-    {
-        float y = std::max(ImGui::GetCursorScreenPos().y + 20 * u, origin.y + height - 49 * u);
-        ImGui::SetCursorScreenPos({origin.x, y});
-        auto *d = ImGui::GetWindowDrawList();
-        d->AddLine({origin.x, y}, {origin.x + width, y},
-                   ImGui::GetColorU32(Alpha(Color(AppearancePreferences::Outline), .5f)), u);
-        TextAt(d, {origin.x + 7 * u, y + 12 * u}, suite_brand::Credit, Muted(), 12 * u,
-               {origin.x, y, origin.x + width, y + 43 * u});
-        ImGui::Dummy({width, 44 * u});
-    }
+    float u = Unit(), width = ImGui::GetContentRegionAvail().x;
+    auto a = ImGui::GetCursorScreenPos();
+    auto *d = ImGui::GetWindowDrawList();
+    float h = (compact ? 25 : 29) * u;
+    const char *title = width < 380 * u ? "ELITE" : suite_brand::Name;
+    float titleSize = 18 * u;
+    DrawIcon(d, Icon::Path, {a.x, a.y + 3 * u}, 21 * u, ImGui::GetColorU32(heading));
+    TextAt(d, {a.x + 30 * u, a.y + 3 * u}, title, ink, titleSize,
+           {a.x, a.y, a.x + width * .62f, a.y + h});
+    float titleWidth = ImGui::GetFont()->CalcTextSizeA(titleSize, FLT_MAX, 0, title).x;
+    if (width > 700 * u)
+        TextAt(d, {a.x + titleWidth + 48 * u, a.y + 6 * u}, suite_brand::Credit, Muted(), 12 * u,
+               {a.x, a.y, a.x + width * .65f, a.y + h});
+    const char *state = connected ? mode : "Disconnected";
+    float stateSize = 13 * u;
+    float stateWidth = ImGui::GetFont()->CalcTextSizeA(stateSize, FLT_MAX, 0, state).x;
+    float stateX = std::max(a.x + width * .65f, a.x + width - stateWidth - 15 * u);
+    d->AddCircleFilled({stateX - 9 * u, a.y + 13 * u}, 2.5f * u,
+                       ImGui::GetColorU32(connected ? heading : Muted()), 12);
+    TextAt(d, {stateX, a.y + 5 * u}, state, connected ? heading : Muted(), stateSize,
+           {a.x + width * .65f, a.y, a.x + width, a.y + h});
+    ImGui::Dummy({width, h});
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+        ImGui::SetTooltip("%s", status);
 }
 
 inline int CompactNavigationColumns(float width)
 {
-    return width < 360 * Unit() && ImGui::GetIO().DisplaySize.y >= 360 * Unit() ? 4 : PageCount;
+    return width < 330 * Unit() && ImGui::GetIO().DisplaySize.y >= 430 * Unit() ? 4 : PageCount;
 }
 
 inline float CompactNavigationHeight(float width)
 {
-    return (CompactNavigationColumns(width) == 4 ? 90.f : 48.f) * Unit();
+    return (CompactNavigationColumns(width) == 4 ? 74.f : 38.f) * Unit();
 }
 
 inline void CompactNavigation()
 {
     float u = Unit(), width = ImGui::GetContentRegionAvail().x;
     int columns = CompactNavigationColumns(width);
-    float gap = 3 * u, cell = (width - gap * (columns - 1)) / columns, height = 42 * u;
+    float gap = 4 * u, cell = std::max(1.f, (width - gap * (columns - 1)) / columns), h = 34 * u;
     auto origin = ImGui::GetCursorScreenPos();
+    const char *full[] = {"Training", "Seeds & routes", "Run", "Settings", "Replays", "Status", "Inspector", "Updates"};
+    ImVec2 selectedMin{}, selectedMax{};
     for (int index = 0; index < PageCount; ++index)
     {
         const auto &item = NavigationItems[index];
         int i = int(item.page);
         auto a = ImVec2(origin.x + (index % columns) * (cell + gap),
-                        origin.y + (index / columns) * (height + 4 * u));
+                        origin.y + (index / columns) * (h + 4 * u));
         ImGui::SetCursorScreenPos(a);
         ImGui::PushID(i);
-        bool click = ImGui::InvisibleButton("##Navigate", {cell, height}, ImGuiButtonFlags_EnableNav);
+        bool click = ImGui::InvisibleButton("##Navigate", {cell, h}, ImGuiButtonFlags_EnableNav);
         HoverCue();
         if (click && navigation.Select(item.page, ImGui::GetTime()))
             Request(Tone::Tab);
         float active = Animate(ImGui::GetItemID() ^ 0x947bfu, navigation.Is(item.page) ? 1.f : 0.f),
               hover = Animate(ImGui::GetItemID() ^ 0x84ab1u, ImGui::IsItemHovered() ? 1.f : 0.f);
         auto *d = ImGui::GetWindowDrawList();
-        d->AddRectFilled(a, {a.x + cell, a.y + height},
-                         ImGui::GetColorU32(Blend(background, Panel(1.6f), std::max(active, hover * .7f))), 6 * u);
-        auto color = Blend(Muted(), heading, active);
-        DrawIcon(d, item.page == Page::Updates ? Icon::Update : item.page == Page::Inspector ? Icon::Magnifier : Icon(i),
-                 {a.x + (cell - 17 * u) * .5f, a.y + 4 * u}, 17 * u, ImGui::GetColorU32(color));
-        float size = (width < 360 * u && columns == PageCount ? 8 : 10) * u;
-        float tw = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0, item.compact).x;
-        TextAt(d, {a.x + std::max(0.f, (cell - tw) * .5f), a.y + 27 * u}, item.compact,
-               navigation.Is(item.page) ? ink : Muted(), size, {a.x, a.y, a.x + cell, a.y + height});
-        if (active > .01f || ImGui::IsItemFocused())
-            d->AddLine({a.x + 8 * u, a.y + height - u}, {a.x + cell - 8 * u, a.y + height - u},
-                       ImGui::GetColorU32(Alpha(heading, ImGui::IsItemFocused() ? 1.f : active)), 2 * u);
+        d->AddRectFilled(a, {a.x + cell, a.y + h},
+                         ImGui::GetColorU32(Blend(Panel(.6f), heading, active * .16f + hover * .055f)), 4 * u);
+        d->AddRect(a, {a.x + cell, a.y + h},
+                   ImGui::GetColorU32(Alpha(Color(AppearancePreferences::Outline), .75f)), 4 * u);
+        // Tiny high-DPI game windows retain all eight hit targets in one
+        // row. Short native labels preserve readable text instead of shrinking
+        // long words; tooltips still expose the complete destination names.
+        const char *shortLabels[] = {"Tools", "Seeds", "Run", "Prefs", "Play", "Info", "Obj", "Upd"};
+        const char *label = cell < 58 * u ? shortLabels[i] : cell >= 124 * u ? full[i] : item.compact;
+        float font = 16 * u;
+        float textWidth = ImGui::GetFont()->CalcTextSizeA(font, FLT_MAX, 0, label).x;
+        font *= std::min(1.f, std::max(1.f, cell - 10 * u) / std::max(1.f, textWidth));
+        textWidth = ImGui::GetFont()->CalcTextSizeA(font, FLT_MAX, 0, label).x;
+        TextAt(d, {a.x + std::max(0.f, (cell - textWidth) * .5f), a.y + (h - font) * .5f}, label,
+               navigation.Is(item.page) ? ink : Muted(), font, {a.x, a.y, a.x + cell, a.y + h});
+        if (navigation.Is(item.page))
+        {
+            selectedMin = a;
+            selectedMax = {a.x + cell, a.y + h};
+        }
+        if (ImGui::IsItemFocused())
+            d->AddRect(a, {a.x + cell, a.y + h}, ImGui::GetColorU32(heading), 4 * u, 0, u);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-            ImGui::SetTooltip("%s", PageNames[i]);
+            ImGui::SetTooltip("%s\n%s", PageNames[i], PageDetails[i]);
         ImGui::PopID();
     }
+    // One bounded, time-based underline follows the selected native tab.
+    // Keeping the interpolation local avoids touching layout or game state.
+    auto *d = ImGui::GetWindowDrawList();
+    float x = Animate(ImGui::GetID("Native navigation underline x"), selectedMin.x - origin.x, false, .13f);
+    float y = Animate(ImGui::GetID("Native navigation underline y"), selectedMax.y - origin.y - u, false, .13f);
+    d->AddRectFilled({origin.x + x, origin.y + y}, {origin.x + x + cell, origin.y + y + 2 * u},
+                     ImGui::GetColorU32(heading));
     ImGui::SetCursorScreenPos({origin.x, origin.y + CompactNavigationHeight(width)});
     ImGui::Dummy({width, 0});
 }
