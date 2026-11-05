@@ -236,6 +236,13 @@ inline void Statistics(const View &view)
 
 inline void Archive()
 {
+    // A run's journal entry can arrive before its larger replay file commits.
+    // Follow completed recordings while this view is open, using the existing
+    // cached IO worker rather than waiting for a manual visit to Replays.
+    static double nextReplayRefresh = 0;
+    double now = ImGui::GetTime();
+    if (now >= nextReplayRefresh || now < nextReplayRefresh - 5)
+    { nextReplayRefresh = now + 5; practice::g_replayArchive.Refresh(); }
     Filters();
     auto view = service.Get();
     Query selected = query;
