@@ -60,9 +60,21 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+  verify-windows-native:
+    name: Windows native production contracts
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify routing, fonts, diagnostics and interface timing with MSVC
+        shell: powershell
+        run: |
+          & .\tests\launcher_windows_tests.ps1 -NativeOnly
+          if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Windows native production contracts failed.' }
+
   release:
     name: Windows build, installer, and release
-    needs: verify
+    needs: [verify, verify-windows-native]
     runs-on: windows-2022
     timeout-minutes: 35
     permissions:
@@ -107,7 +119,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'The shipped encoder failed an audio/video timing check.' }
       - name: Test the real Windows launcher against a controlled executable
         run: |
-          & .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe
+          & .\tests\launcher_windows_tests.ps1 -TrainerBinary .\build\release\ItStealsTrainer.exe -SkipNative
           if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'Native launcher smoke test failed.' }
       - name: Test native capture and production updater with repository visibility
         env:

@@ -1,8 +1,9 @@
 [CmdletBinding()]
-param([string]$TrainerBinary)
+param([string]$TrainerBinary, [switch]$NativeOnly, [switch]$SkipNative)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'Run this smoke test on Windows.' }
+if ($NativeOnly -and $SkipNative) { throw 'NativeOnly and SkipNative cannot be combined.' }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $TrainerBinary) { $TrainerBinary = Join-Path $repo 'bin/ItStealsTrainer.exe' }
 if (@(Get-Process -Name 'It Steals', 'ItStealsTrainer' -ErrorAction SilentlyContinue).Count) { throw 'Run launcher smoke tests without a real game or trainer instance.' }
@@ -10,6 +11,7 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('SuiteLauncher-' + [guid]::NewGuid
 $null = [IO.Directory]::CreateDirectory($work)
 $owned = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
 $fixtureExecutable = ''
+$check = 'launcher setup'
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -61,11 +63,14 @@ function Read-StartedPid {
 }
 try {
     # Exercise production file replacement and routing on Windows as well as Linux.
+    if (-not $SkipNative) {
     $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
     $msbuild=& $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
     if (-not $msbuild) { throw 'MSBuild is required for the native checks.' }
     $nativeIncludes=[Security.SecurityElement]::Escape((Join-Path $repo 'Trainer'))
     foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','seed_neighbor_tests','hotkey_tests','font_catalog_tests','physical_repair_tests','timer_preparation_tests','navigation_diagnostic_tests','ui_motion_audio_tests','performance_timing_tests','replay_library_tests','run_statistics_tests','navigation_visibility_tests','navigation_startup_tests')) {
+        $check = $nativeTest
+        Write-Output "Verifying Windows native contract: $check"
         $nativeSource=[Security.SecurityElement]::Escape((Join-Path $repo ('tests/'+$nativeTest+'.cpp')))
         $nativeOutput=[Security.SecurityElement]::Escape((Join-Path $work 'native'))
         $nativeProject=Join-Path $work 'startup-tests.vcxproj'
@@ -82,12 +87,18 @@ try {
   <Import Project="`$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
 "@)
-        & $msbuild $nativeProject /p:Configuration=Release /p:Platform=x64 /nologo /verbosity:minimal
-        if ($LASTEXITCODE -ne 0) { throw "Native check compilation failed: $nativeTest" }
+        & $msbuild $nativeProject /p:Configuration=Release /p:Platform=x64 /nologo /verbosity:minimal 2>&1 | Tee-Object -Variable compileOutput
+        if ($LASTEXITCODE -ne 0) { throw ("Native check compilation failed: $nativeTest`n" + ($compileOutput | Select-Object -Last 12 | Out-String)) }
         $nativeArgument = if ($nativeTest -eq 'navigation_startup_tests') { Join-Path $repo 'tests/fixtures' } else { $work }
-        & (Join-Path $work ('native/'+$nativeTest+'.exe')) $nativeArgument
-        if ($LASTEXITCODE -ne 0) { throw "Native contract failed: $nativeTest" }
+        & (Join-Path $work ('native/'+$nativeTest+'.exe')) $nativeArgument 2>&1 | Tee-Object -Variable contractOutput
+        if ($LASTEXITCODE -ne 0) { throw ("Native contract failed: $nativeTest (exit $LASTEXITCODE)`n" + ($contractOutput | Select-Object -Last 12 | Out-String)) }
     }
+    }
+    if ($NativeOnly) {
+        Write-Output 'Windows native production checks passed.'
+        return
+    }
+    $check = 'controlled game launcher'
     $game=Join-Path $work ('Game & caf' + [char]0xe9 + ' ' + [char]0x6e2c + [char]0x8a66)
     $fixtureExecutable=Join-Path $game 'It Steals.exe'
     $null=[IO.Directory]::CreateDirectory((Join-Path $game 'It Steals_Data/Managed'))
@@ -165,7 +176,12 @@ public class ControlledGame {
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'summary.json') -Encoding UTF8
     Write-Output 'Windows native launcher smoke tests passed (controlled game, not Unity).'
 } catch {
-    Write-Output ("Launcher check failed: " + $_.Exception.Message)
+    $failure = "${check}: " + $_.Exception.Message
+    Write-Output ("Launcher check failed: " + $failure)
+    # Public Actions pages expose annotations even when console logs require
+    # sign-in. Preserve the exact failed contract and its compiler/assert output.
+    $annotation = $failure.Replace('%','%25').Replace("`r",'%0D').Replace("`n",'%0A')
+    Write-Output "::error title=Windows launcher verification::$annotation"
     throw
 } finally {
     foreach($process in $owned) {
