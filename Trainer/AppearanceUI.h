@@ -53,37 +53,70 @@ inline void AppearanceFont(const char *label, int &selected, int slot)
         auto &query = queries[slot];
         ImGui::SetNextItemWidth(-1);
         ImGui::InputTextWithHint("##FontSearch", "Search installed fonts...", query.data(), query.size());
-        ImGui::BeginChild("Font list", {0, 260 * g_dpiScale});
-        for (int f = 0; f < kSuiteFontCount; ++f)
+        struct Filter
         {
-            if (suite_fonts::Fold(kSuiteFonts[f]).find(suite_fonts::Fold(query.data())) == std::string::npos)
-                continue;
-            ImGui::PushID(f);
-            ImGui::BeginDisabled(!suite_ui::fontAvailable[f]);
-            if (ImGui::Selectable(kSuiteFonts[f], id.empty() && selected == f))
-            {
-                selected = f;
-                id.clear();
-                suite_ui::fontsDirty = true;
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndDisabled();
-            ImGui::PopID();
+            std::string query;
+            std::vector<int> rows;
+            const suite_fonts::Face *data = nullptr;
+            size_t count = 0;
+            uint64_t revision = ~uint64_t(0);
+        };
+        static std::array<Filter, 3> filters;
+        auto &filter = filters[slot];
+        const auto &catalog = suite_fonts::catalog;
+        if (filter.query != query.data() || filter.revision != catalog.revision ||
+            filter.data != catalog.faces.data() || filter.count != catalog.faces.size())
+        {
+            filter.query = query.data();
+            filter.revision = catalog.revision;
+            filter.data = catalog.faces.data();
+            filter.count = catalog.faces.size();
+            filter.rows.clear();
+            auto folded = suite_fonts::Fold(filter.query);
+            for (int f = 0; f < kSuiteFontCount; ++f)
+                if (suite_fonts::Fold(kSuiteFonts[f]).find(folded) != std::string::npos)
+                    filter.rows.push_back(-f - 1);
+            for (size_t f = 0; f < catalog.faces.size(); ++f)
+                if (suite_fonts::Matches(catalog.faces[f], folded))
+                    filter.rows.push_back(int(f));
         }
-        for (const auto &entry : suite_fonts::catalog.faces)
+        ImGui::BeginChild("Font list", {0, 260 * g_dpiScale});
+        ImGuiListClipper clipper;
+        clipper.Begin(int(filter.rows.size()));
+        while (clipper.Step())
+        for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
         {
-            if (!suite_fonts::Matches(entry, query.data()))
-                continue;
-            ImGui::PushID(entry.id.c_str());
-            auto name = entry.name + " (" + entry.source + ")";
-            if (ImGui::Selectable(name.c_str(), id == entry.id))
+            int f = filter.rows[row];
+            if (f < 0)
             {
-                id = entry.id;
-                suite_ui::fontsDirty = true;
-                ImGui::CloseCurrentPopup();
+                f = -f - 1;
+                ImGui::PushID(f);
+                ImGui::BeginDisabled(!suite_ui::fontAvailable[f]);
+                if (ImGui::Selectable(kSuiteFonts[f], id.empty() && selected == f))
+                {
+                    selected = f;
+                    id.clear();
+                    suite_ui::fontsDirty = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndDisabled();
+                ImGui::PopID();
             }
-            Help(suite_fonts::Utf8(entry.path.filename()).c_str());
-            ImGui::PopID();
+            else
+            {
+                const auto &entry = catalog.faces[size_t(f)];
+                ImGui::PushID(entry.id.c_str());
+                auto name = entry.name + " (" + entry.source + ")";
+                if (ImGui::Selectable(name.c_str(), id == entry.id))
+                {
+                    id = entry.id;
+                    suite_ui::fontsDirty = true;
+                    ImGui::CloseCurrentPopup();
+                }
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                    ImGui::SetTooltip("%s", suite_fonts::Utf8(entry.path.filename()).c_str());
+                ImGui::PopID();
+            }
         }
         ImGui::EndChild();
         ImGui::EndCombo();
@@ -98,10 +131,9 @@ inline void AppearanceFont(const char *label, int &selected, int slot)
 inline void AppearancePreview()
 {
     float u = g_dpiScale;
-    ImGui::BeginChild("Style preview", {0, 100 * u}, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
-    ImGui::TextColored(g_headerCol, "MAKE IT YOURS");
-    ImGui::TextUnformatted("A clear route. Your own style.");
-    suite_ui::Button("Hover to preview");
+    ImGui::BeginChild("Style preview", {0, 74 * u}, ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
+    ImGui::TextColored(g_headerCol, "YOUR WORKSPACE");
+    ImGui::TextUnformatted("Clear, calm and ready for the next run.");
     Help("Live button, text, outline and hover colors. This sample has no game action.");
     ImGui::EndChild();
 }
@@ -109,18 +141,35 @@ inline void AppearancePreview()
 inline void RenderAppearanceSettings()
 {
     AppearancePreview();
-    if (AppearanceTable("Interface palette"))
-    {
-        TrainerPreferences defaults;
-        AppearanceColor("Background", &g_mainBgCol.x, defaults.background);
-        AppearanceColor("Text", &g_textCol.x, defaults.text);
-        AppearanceColor("Headings", &g_headerCol.x, defaults.header);
-        AppearanceColor("Highlights", &g_accentCol.x, defaults.accent);
-        AppearanceColor("Buttons", AppearancePreferences::Button);
-        AppearanceColor("Hover / animation", AppearancePreferences::Animation);
-        AppearanceColor("Outlines", AppearancePreferences::Outline);
-        ImGui::EndTable();
-    }
+    ImGui::Spacing();
+    ImGui::TextColored(g_headerCol, "Fonts");
+    AppearanceFont("Interface font", suite_ui::appearance.menuFont, 0);
+    AppearanceFont("HUD font", suite_ui::appearance.hudFont, 1);
+    AppearanceFont("Timer font", suite_ui::appearance.timerFont, 2);
+    if (suite_ui::SmallButton("Refresh font list"))
+        suite_fonts::scan.Refresh();
+    Help("Rescan Windows fonts and the Fonts folder beside the trainer after installing or copying a font. TrueType (.ttf), OpenType (.otf) and collection (.ttc) faces are supported.");
+    ImGui::TextDisabled("%zu installed font faces", suite_fonts::catalog.faces.size());
+    auto fontStatus = suite_fonts::scan.Status();
+    if (fontStatus.phase == suite_fonts::ScanPhase::Pending)
+        ImGui::TextDisabled("Refreshing fonts...");
+    else if (fontStatus.phase == suite_fonts::ScanPhase::Failed)
+        ImGui::TextWrapped("%s", fontStatus.error.c_str());
+    ImGui::Spacing();
+    suite_ui::Section("Interface colors", 0, [&] {
+        if (AppearanceTable("Interface palette"))
+        {
+            TrainerPreferences defaults;
+            AppearanceColor("Background", &g_mainBgCol.x, defaults.background);
+            AppearanceColor("Text", &g_textCol.x, defaults.text);
+            AppearanceColor("Headings", &g_headerCol.x, defaults.header);
+            AppearanceColor("Highlights", &g_accentCol.x, defaults.accent);
+            AppearanceColor("Buttons", AppearancePreferences::Button);
+            AppearanceColor("Hover / animation", AppearancePreferences::Animation);
+            AppearanceColor("Outlines", AppearancePreferences::Outline);
+            ImGui::EndTable();
+        }
+    });
     AppearancePreferences::RGB bg{g_mainBgCol.x, g_mainBgCol.y, g_mainBgCol.z},
         fg{g_textCol.x, g_textCol.y, g_textCol.z};
     if (AppearancePreferences::Contrast(bg, fg) < 4.5f)
@@ -135,18 +184,6 @@ inline void RenderAppearanceSettings()
             g_textCol = AppearancePreferences::Luminance(bg) > .18f ? ImVec4(0, 0, 0, 1) : ImVec4(1, 1, 1, 1);
         ImGui::PopStyleColor();
     }
-    ImGui::Spacing();
-    ImGui::TextColored(g_headerCol, "Typography");
-    AppearanceFont("Interface font", suite_ui::appearance.menuFont, 0);
-    AppearanceFont("HUD font", suite_ui::appearance.hudFont, 1);
-    AppearanceFont("Timer font", suite_ui::appearance.timerFont, 2);
-    if (suite_ui::SmallButton("Refresh font list"))
-    {
-        suite_fonts::RefreshInstalled();
-        suite_ui::fontsDirty = true;
-    }
-    Help("Rescan Windows fonts and the Fonts folder beside the trainer after installing or copying a font. TrueType (.ttf), OpenType (.otf) and collection (.ttc) faces are supported.");
-    ImGui::TextDisabled("%zu installed font faces", suite_fonts::catalog.faces.size());
     if (suite_ui::SmallButton("Restore original style"))
     {
         TrainerPreferences defaults;

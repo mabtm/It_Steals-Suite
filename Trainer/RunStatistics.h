@@ -83,6 +83,7 @@ struct Dashboard
     void Update(const GameData *data, int wantedFilter, double now)
     {
         bool refresh = data && (!available || data->pid != snapshot.pid ||
+                                data->statsCategory != snapshot.statsCategory ||
                                 data->modeStatsSinceUtc != snapshot.modeStatsSinceUtc ||
                                 data->modeStatsRevision != snapshot.modeStatsRevision ||
                                 now - refreshed >= 1 || now < refreshed);

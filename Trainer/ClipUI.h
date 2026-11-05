@@ -1287,7 +1287,7 @@ inline void TimeRail(bool busy)
 
 inline std::string WindowTitle()
 {
-    return std::string("Clip Studio / PracticeSuite ") + suite_brand::Version + " / mab";
+    return std::string("Clip Studio / Elite-Suite ") + suite_brand::Version + " / mab";
 }
 
 inline void Render()
@@ -1524,7 +1524,7 @@ inline void Render()
     else
     {
         ImGui::BeginDisabled(!invalid.empty() || !backendAvailable);
-        if (suite_ui::Button(narrow ? "Export" : "Export clip"))
+        if (suite_ui::PrimaryButton(narrow ? "Export" : "Export clip"))
         {
             startRequested = true;
             testRequested = fullRunRequested = false;

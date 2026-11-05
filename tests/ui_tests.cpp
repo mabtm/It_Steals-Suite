@@ -47,8 +47,8 @@ double SnapshotAge()
     return .008;
 }
 
-ImVec4 g_mainBgCol(.048f, .063f, .074f, 1), g_textCol(.91f, .95f, .95f, 1), g_headerCol(.37f, .83f, .77f, 1),
-    g_accentCol(1, .69f, .38f, 1);
+ImVec4 g_mainBgCol(.055f, .067f, .086f, 1), g_textCol(.94f, .96f, .98f, 1), g_headerCol(.48f, .83f, 1.f, 1),
+    g_accentCol(.98f, .74f, .46f, 1);
 GameData data{};
 GameData *g_pShared = &data;
 TrainerCommands g_commands;
@@ -262,7 +262,9 @@ void ExperienceCases(const std::string &output)
     assert(!value && changes == 0 && suite_ui::ConsumeTone() == suite_ui::Tone::None);
     io.AddMousePosEvent(toggle.x, toggle.y);
     controls();
-    assert(suite_ui::ConsumeTone() == suite_ui::Tone::None);
+    assert(suite_ui::ConsumeTone() == suite_ui::Tone::Hover);
+    controls();
+    assert(suite_ui::ConsumeTone() == suite_ui::Tone::None); // Entry cue, not a per-frame sound.
     io.AddMouseButtonEvent(0, true);
     controls();
     controls();
@@ -554,6 +556,12 @@ void AppearanceCases(const std::string &output)
     data.runAssisted = data.practiceModeActive = 0;
     data.runWarnings = data.runUsedFeatures = data.trainerFeatures = 0;
     data.seedKind = 1;
+    data.runCategory = data.statsCategory = 0;
+    data.seedActive = 0;
+    data.selectedRunSeed = 0;
+    data.externalScanStatus = 1;
+    std::strcpy(data.gameAssemblyHash,
+                "ead3f5f861ad7988ad5fdb6f188bb3f77639927dd496b73066860d6c853f0dd8");
     for (bool follows : {false, true})
         for (float opacity : {.25f, 1.f})
         {
@@ -1213,6 +1221,13 @@ void FinishVerificationCases(const std::string &output)
         auto *popup = GImGui->OpenPopupStack.back().Window;
         assert(popup && popup->Size.x <= 480 && popup->Size.y <= 360);
         inspector = inspectorOf(popup);
+        if (!inspector || inspector->ScrollMax.y >= 1)
+            std::cerr << "Technical inspector bounds at DPI " << dpi << ": popup "
+                      << popup->Size.x << ',' << popup->Size.y << "; child "
+                      << (inspector ? inspector->Size.x : 0) << ','
+                      << (inspector ? inspector->Size.y : 0) << "; content "
+                      << (inspector ? inspector->ContentSize.y : 0) << "; scroll "
+                      << (inspector ? inspector->ScrollMax.y : 0) << '\n';
         assert(inspector && inspector->ScrollMax.y < 1);
         ImGui::ActivateItemByID(inspector->GetID("Copy report"));
         render();
@@ -2008,6 +2023,8 @@ static void SeedSearchStopUICases()
 }
 
 #include "font_ui_cases.inl"
+#include "elite_ui_benchmark.inl"
+#include "elite_design_ui_cases.inl"
 
 int main(int argc, char **argv)
 {
@@ -2017,6 +2034,18 @@ int main(int argc, char **argv)
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr;
     io.DeltaTime = 1.f / 60;
+    if (argc > 2 && std::string(argv[2]) == "--ui-benchmark")
+    {
+        EliteUiBenchmark();
+        ImGui::DestroyContext();
+        return 0;
+    }
+    if (argc > 2 && std::string(argv[2]) == "--finish-only")
+    {
+        FinishVerificationCases(argv[1]);
+        ImGui::DestroyContext();
+        return 0;
+    }
     if (argc > 2 && std::string(argv[2]) == "--fonts-only")
     {
         FontSelectionCases();
@@ -2026,6 +2055,13 @@ int main(int argc, char **argv)
     if (argc > 2 && std::string(argv[2]) == "--design-only")
     {
         DesignInteractionCases();
+        EliteDesignCases(argv[1]);
+        ImGui::DestroyContext();
+        return 0;
+    }
+    if (argc > 2 && std::string(argv[2]) == "--gallery-only")
+    {
+        DesignGallery(argv[1]);
         ImGui::DestroyContext();
         return 0;
     }
@@ -2317,8 +2353,14 @@ int main(int argc, char **argv)
     data.runValidity = 1;
     data.observedFromStart = data.seedKnown = data.seedSourcesVerified = data.rngPatchComplete = 1;
     data.seedKind = 1;
+    data.runCategory = data.statsCategory = 0;
+    data.seedActive = 0;
+    data.selectedRunSeed = 0;
     data.practiceModeActive = data.runAssisted = 0;
     data.trainerFeatures = data.runUsedFeatures = data.runWarnings = 0;
+    data.externalScanStatus = 1;
+    std::strcpy(data.gameAssemblyHash,
+                "ead3f5f861ad7988ad5fdb6f188bb3f77639927dd496b73066860d6c853f0dd8");
     for (float opacity : {.25f, .86f})
     {
         g_speedrunLayout.opacity = opacity;
@@ -2461,7 +2503,7 @@ int main(int argc, char **argv)
     data.timerMonsterCount = 0;
     data.seedKind = 2;
     data.seedKnown = 1;
-    assert(std::string(SeedTypeLabel(data)) == "SET SEED");
+    assert(std::string(SeedTypeLabel(data)) == "SET-SEED");
     data.seedKnown = 0;
     assert(std::string(SeedTypeLabel(data)) == "SEED: UNKNOWN");
     // Menu-aborted runs keep a stopped timer and cannot look like completions.
@@ -3264,6 +3306,7 @@ int main(int argc, char **argv)
     PersistentFeedbackCases(argc > 1 ? argv[1] : "");
     FinishVerificationCases(argc > 1 ? argv[1] : "");
     DesignInteractionCases();
+    EliteDesignCases(argc > 1 ? argv[1] : "");
     DesignGallery(argc > 1 ? argv[1] : "");
     ReplayInputCases(argc > 1 ? argv[1] : ".");
     if (argc > 1)

@@ -6,6 +6,7 @@ inline HudRegion g_validityBadgeBounds{};
 #include "TelemetryPresentation.h"
 #include "SuiteAppearance.h"
 #include "HudEditorModel.h"
+#include "RunExperienceModel.h"
 #include <cstdio>
 #include <ctime>
 
@@ -24,7 +25,7 @@ inline const char *SeedTypeLabel(const GameData &data)
 {
     if (!data.seedKnown || data.seedKind == 0)
         return "SEED: UNKNOWN";
-    return data.seedKind == 2 ? "SET SEED" : "RANDOM SEED";
+    return data.seedKind == 2 ? "SET-SEED" : "RANDOM SEED";
 }
 
 inline const char *OutcomeLabel(byte outcome)
@@ -267,12 +268,12 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
     auto wanted = [&](OverlayField f) {
         return layout.enabled && layout.visible[int(f)] && HudFieldAllowed(f, !compact, clean);
     };
-    label(speedrun ? (d.practiceModeActive ? "PRACTICE" : "SPEEDRUN") : "PRACTICE HUD", accent);
+    label(speedrun ? (d.practiceModeActive ? "PRACTICE" : d.runCategory == 1 ? "SET-SEED" : "RANDOM SEED") : "PRACTICE HUD", accent);
     if (speedrun)
     {
-        bool valid = d.runValidity == 1 && age < .5 && d.seedSourcesVerified && d.rngPatchComplete &&
-                     d.observedFromStart && d.seedKind == 1 && d.seedKnown && !d.practiceModeActive &&
-                     !d.runAssisted && !d.trainerFeatures && !d.runUsedFeatures && !(d.runWarnings & ~64u);
+        const auto allowed = d.runCategory == 1 ? 2u : 0u;
+        bool valid = age < .5 && suite_run::FinalValid(d) &&
+                     !(uint32_t(d.trainerFeatures) & ~allowed) && !(d.runWarnings & ~64u);
         const char *text = valid ? "VALID" : "UNVALID";
         auto *font = suite_ui::labelFont ? suite_ui::labelFont : ImGui::GetFont();
         float size = std::max(16 * g_dpiScale * preview, font->FontSize * ratio);
@@ -345,7 +346,7 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
             ImGui::TextColored(ink, "Seed  %s", OverlayValue(OverlayField::Seed, d, mode, age).c_str());
     }
     if (speedrun && (!d.seedKnown || d.seedKind == 2) && !wanted(OverlayField::SeedType))
-        label(!d.seedKnown ? "SEED UNKNOWN" : "SET SEED / PRACTICE", ImVec4(1, .69f, .38f, 1));
+        label(!d.seedKnown ? "SEED UNKNOWN" : d.runCategory == 1 ? "SET-SEED" : "SET-SEED / PRACTICE", ImVec4(1, .69f, .38f, 1));
     bool coordinatesShown = false;
     if (wanted(OverlayField::Coordinates) &&
         viewport.y - 24 * preview - (ImGui::GetCursorScreenPos().y - start.y) - layout.padding * u > 135 * u)

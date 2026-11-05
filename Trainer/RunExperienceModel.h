@@ -64,16 +64,32 @@ struct Check
     CheckState state;
 };
 
+inline const char *CategoryName(byte category)
+{
+    return category == 1 ? "Set-Seed" : category == 2 ? "Practice" : category == 0 ? "Random Seed" : "Unknown";
+}
+
+inline bool CategoryFeaturesAllowed(const GameData &d)
+{
+    return !d.runAssisted && !d.practiceModeActive &&
+           (d.runCategory == 1 ? d.runUsedFeatures == 2 : d.runCategory == 0 && !d.runUsedFeatures);
+}
+
 inline std::array<Check, 7> Checks(const GameData &d)
 {
     auto pass = [](bool ok) { return ok ? CheckState::Pass : CheckState::Fail; };
     uint32_t w = uint32_t(d.runWarnings);
+    const bool setSeed = d.runCategory == 1;
+    const bool features = CategoryFeaturesAllowed(d);
+    const bool seed = d.seedKnown && d.seedSourcesVerified && d.rngPatchComplete &&
+                      !(w & 16384u) &&
+                      (setSeed ? d.seedKind == 2 && d.runSeed == d.selectedRunSeed : d.seedKind == 1);
     return {
-        {{"Trainer features", pass(!d.runUsedFeatures && !d.runAssisted && !d.practiceModeActive)},
-         {"Seed / RNG", pass(d.seedKnown && d.seedKind == 1 && d.seedSourcesVerified && d.rngPatchComplete)},
+        {{"Trainer features", pass(features)},
+         {"Seed / RNG", pass(seed)},
          {"Run observation", pass(d.observedFromStart && !(w & (1u | 2u | 4u | 8u | 32u)))},
          {"Timing / player state", pass(!(w & (16u | 512u | 1024u)))},
-         {"Build / hooks", (w & (256u | 2048u | ~16383u)) ? CheckState::Fail
+         {"Build / hooks", (w & (256u | 2048u | ~32767u)) ? CheckState::Fail
                            : !d.gameAssemblyHash[0] || std::strncmp(d.gameAssemblyHash, "UNKNOWN",
                                                                     sizeof(d.gameAssemblyHash)) == 0
                                ? CheckState::Unknown
@@ -130,7 +146,7 @@ inline EvidenceRows Evidence(const GameData &d)
          tool = CapturedText(d.externalTool);
     return {{{{"Used aids  " + Hex(uint32_t(d.runUsedFeatures)),
                std::string("Practice ") + (d.practiceModeActive ? "ON" : "OFF") + " / assisted " +
-                   (d.runAssisted ? "YES" : "NO"),
+                   (d.runAssisted ? "YES" : "NO") + " / " + CategoryName(d.runCategory),
                "Integrity flags  " + Hex(w)}},
              {{std::string(d.seedKind == 1   ? "RANDOM"
                            : d.seedKind == 2 ? "SET"
@@ -146,7 +162,7 @@ inline EvidenceRows Evidence(const GameData &d)
                "Player flags  " + Hex(w & 1024u)}},
              {{"SHA256  " + hash,
                "Game " + (game.empty() ? "--" : game) + " / Unity " + (unity.empty() ? "--" : unity),
-               "Build / hook flags  " + Hex(w & (256u | 2048u | ~16383u))}},
+               "Build / hook flags  " + Hex(w & (256u | 2048u | ~32767u))}},
              {{std::string("Recorded scan  ") + (w & 128u                    ? "flagged during run"
                                                  : d.externalScanStatus == 1 ? "complete"
                                                  : d.externalScanStatus == 2 ? "flagged"
@@ -174,7 +190,8 @@ inline TechnicalRows TechnicalEvidence(const GameData &d, uint32_t session)
         std::string("Captured freecam ") + flag(d.freecamActive) + " / hitboxes " + flag(d.hitboxEnabled);
     rows[0][5] = std::string("Captured fullbright ") + flag(d.brightnessEnabled) + " / SET active " +
                  flag(d.seedActive);
-    rows[1][3] = "Initial RNG seed  " + std::to_string(d.initialRngSeed);
+    rows[1][3] = "Initial RNG seed  " + std::to_string(d.initialRngSeed) +
+                 (d.runCategory == 1 ? " / selected " + std::to_string(d.selectedRunSeed) : "");
     rows[1][4] = std::string("Sources verified ") + flag(d.seedSourcesVerified) + " / hooks complete " +
                  flag(d.rngPatchComplete);
     rows[1][5] =
@@ -216,7 +233,7 @@ inline TechnicalRows TechnicalEvidence(const GameData &d, uint32_t session)
 inline std::string TechnicalReport(const GameData &d, uint32_t session)
 {
     std::ostringstream out;
-    out << "PracticeSuite " << suite_brand::Version << " / " << suite_brand::Author
+    out << "Elite-Suite " << suite_brand::Version << " / " << suite_brand::Author
         << "\nRun verification / captured evidence\nResult: " << (FinalValid(d) ? "VALID" : "INVALID")
         << "\nReplay ID: " << d.reviewRunId << "\n";
     out << "Evidence fields: " << TechnicalFieldCount
@@ -363,7 +380,7 @@ struct Presentation
     std::string Report()
     {
         std::ostringstream out;
-        out << "PracticeSuite run verification / captured evidence\nReplay ID: " << completed.reviewRunId
+        out << "Elite-Suite run verification / captured evidence\nReplay ID: " << completed.reviewRunId
             << "\nResult: " << (Valid() ? "VALID (local)" : "REVIEW REQUIRED")
             << "\nEvidence fields: " << TechnicalFieldCount
             << "\nGame file SHA256: " << CapturedText(completed.gameAssemblyHash) << "\n";

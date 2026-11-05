@@ -25,7 +25,7 @@ enum class Icon
     Magnifier
 };
 inline constexpr std::array<const char *, PageCount> PageNames = {
-    "Practice", "Seeds & routes", "Modes & runs", "Settings", "Replays & clips", "Diagnostics", "Inspector", "Updates"};
+    "Training tools", "Seeds & routes", "Modes & runs", "Settings", "Replays & clips", "Diagnostics", "Inspector", "Updates"};
 inline constexpr std::array<const char *, PageCount> PageDetails = {
     "Live training tools",    "Explore layouts and routes",  "Your progress across every mode",
     "Make the suite yours",   "Review every turn",           "Connection and system health",
@@ -179,20 +179,11 @@ inline void Motif(ImDrawList *d, ImVec2 a, ImVec2 b, float opacity = .07f)
 inline void Surface(ImDrawList *d, ImVec2 a, ImVec2 b, bool accent = false)
 {
     float u = Unit();
-    auto button = Color(AppearancePreferences::Button), edge = Color(AppearancePreferences::Outline);
-    d->AddRectFilled({a.x + 2 * u, a.y + 3 * u}, b, ImGui::GetColorU32(Alpha(background, .7f)), 9 * u);
-    ImVec2 end(b.x - 2 * u, b.y - 3 * u);
-    auto fill = Blend(background, button, .38f);
-    d->AddRectFilled(a, end, ImGui::GetColorU32(fill), 9 * u);
-    if (end.x - a.x > 16 * u && end.y - a.y > 12 * u)
-    {
-        auto top = ImGui::GetColorU32(Blend(fill, ink, .018f)), bottom = ImGui::GetColorU32(fill);
-        d->AddRectFilledMultiColor({a.x + 7 * u, a.y + 2 * u}, {end.x - 7 * u, end.y - 2 * u}, top, top,
-                                   bottom, bottom);
-    }
-    d->AddRect(a, end, ImGui::GetColorU32(Alpha(edge, .58f)), 9 * u, 0, u);
-    d->AddLine({a.x + 10 * u, a.y + u}, {end.x - 10 * u, a.y + u},
-               ImGui::GetColorU32(Alpha(accent ? heading : ink, accent ? .5f : .045f)), u);
+    ImVec2 end(b.x, b.y - 2 * u);
+    auto edge = Color(AppearancePreferences::Outline);
+    d->AddRectFilled(a, end, ImGui::GetColorU32(Panel(accent ? 1.25f : 1.f)), 10 * u);
+    d->AddRect(a, end, ImGui::GetColorU32(Alpha(accent ? heading : edge, accent ? .48f : .65f)),
+               10 * u, 0, u);
 }
 
 inline void TextAt(ImDrawList *d, ImVec2 p, const char *text, ImVec4 color, float size, ImVec4 clip)
@@ -203,20 +194,14 @@ inline void TextAt(ImDrawList *d, ImVec2 p, const char *text, ImVec4 color, floa
 inline void PageHeading(Page page)
 {
     float u = Unit(), w = ImGui::GetContentRegionAvail().x;
-    bool compact = ImGui::GetContentRegionAvail().y < 190 * u;
-    float h = (compact ? 34 : 58) * u;
+    bool compact = page == Page::Replay || ImGui::GetContentRegionAvail().y < 260 * u;
+    float h = (compact ? 32 : 66) * u;
     auto a = ImGui::GetCursorScreenPos();
     auto *d = ImGui::GetWindowDrawList();
-    Motif(d, a, {a.x + w, a.y + h});
-    DrawIcon(d,
-             page == Page::Updates     ? Icon::Update
-             : page == Page::Inspector ? Icon::Magnifier
-                                       : Icon(int(page)),
-             {a.x, a.y + 3 * u}, 25 * u, ImGui::GetColorU32(heading));
-    ImVec4 clip(a.x + 37 * u, a.y, a.x + w, a.y + h);
-    TextAt(d, {a.x + 37 * u, a.y}, PageNames[int(page)], ink, 23 * u, clip);
+    ImVec4 clip(a.x, a.y, a.x + w, a.y + h);
+    TextAt(d, {a.x, a.y + 2 * u}, PageNames[int(page)], ink, (compact ? 20 : 27) * u, clip);
     if (!compact)
-        TextAt(d, {a.x + 37 * u, a.y + 29 * u}, PageDetails[int(page)], Blend(ink, background, .36f), 15 * u,
+        TextAt(d, {a.x + u, a.y + 39 * u}, PageDetails[int(page)], Muted(), 15 * u,
                clip);
     ImGui::Dummy({w, h});
 }
@@ -241,15 +226,19 @@ inline void Sidebar(float height)
         if (item.group)
         {
             if (wide)
+            {
+                ImGui::Dummy({0, 3 * u});
                 ImGui::TextDisabled("%s", item.group);
+            }
             else
                 ImGui::Separator();
         }
         ImGui::PushID(i);
         auto a = ImGui::GetCursorScreenPos();
-        float h = (wide ? 44 : 52) * u;
+        float h = (wide ? 46 : 44) * u;
         bool selected = navigation.Is(Page(i));
         bool click = ImGui::InvisibleButton("##Navigate", {width, h}, ImGuiButtonFlags_EnableNav);
+        HoverCue();
         if (click && navigation.Select(Page(i), ImGui::GetTime()))
             Request(Tone::Tab);
         float active = Animate(ImGui::GetItemID() ^ 0x947bfu, navigation.Is(Page(i)) ? 1.f : 0.f),
@@ -258,11 +247,11 @@ inline void Sidebar(float height)
         if (active > 0 || hover > 0)
             d->AddRectFilled(
                 a, {a.x + width, a.y + h},
-                ImGui::GetColorU32(Alpha(Blend(background, Color(AppearancePreferences::Button), .8f),
-                                         std::max(active, hover * .55f))),
+                ImGui::GetColorU32(Alpha(Blend(Panel(), heading, active * .10f),
+                                         std::max(active, hover * .7f))),
                 7 * u);
         if (active > 0)
-            d->AddLine({a.x + u, a.y + 10 * u}, {a.x + u, a.y + h - 10 * u},
+            d->AddLine({a.x + 2 * u, a.y + 13 * u}, {a.x + 2 * u, a.y + h - 13 * u},
                        ImGui::GetColorU32(Alpha(Color(AppearancePreferences::Animation), active)), 3 * u);
         DrawIcon(d,
                  i == int(Page::Updates)     ? Icon::Update
@@ -271,7 +260,7 @@ inline void Sidebar(float height)
                  {a.x + (wide ? 11 * u : (width - 22 * u) * .5f), a.y + (wide ? 10 : 4) * u},
                  22 * u, ImGui::GetColorU32(Blend(Blend(ink, background, .36f), heading, active)));
         if (wide)
-            TextAt(d, {a.x + 43 * u, a.y + 13 * u}, PageNames[i],
+            TextAt(d, {a.x + 43 * u, a.y + 14 * u}, PageNames[i],
                    selected ? ink : Blend(ink, background, .25f), 16 * u,
                    {a.x + 43 * u, a.y, a.x + width, a.y + h});
         else
@@ -297,30 +286,82 @@ inline void Sidebar(float height)
         }
         ImGui::PopID();
     }
-    if (wide && height > 490 * u)
+    if (wide && height > 540 * u)
     {
         float y = std::max(ImGui::GetCursorScreenPos().y + 20 * u, origin.y + height - 49 * u);
         ImGui::SetCursorScreenPos({origin.x, y});
         auto *d = ImGui::GetWindowDrawList();
         d->AddLine({origin.x, y}, {origin.x + width, y},
                    ImGui::GetColorU32(Alpha(Color(AppearancePreferences::Outline), .5f)), u);
-        TextAt(d, {origin.x + 7 * u, y + 12 * u}, suite_brand::Credit, Blend(ink, background, .42f), 14 * u,
+        TextAt(d, {origin.x + 7 * u, y + 12 * u}, suite_brand::Credit, Muted(), 12 * u,
                {origin.x, y, origin.x + width, y + 43 * u});
         ImGui::Dummy({width, 44 * u});
     }
+}
+
+inline int CompactNavigationColumns(float width)
+{
+    return width < 360 * Unit() && ImGui::GetIO().DisplaySize.y >= 360 * Unit() ? 4 : PageCount;
+}
+
+inline float CompactNavigationHeight(float width)
+{
+    return (CompactNavigationColumns(width) == 4 ? 90.f : 48.f) * Unit();
+}
+
+inline void CompactNavigation()
+{
+    float u = Unit(), width = ImGui::GetContentRegionAvail().x;
+    int columns = CompactNavigationColumns(width);
+    float gap = 3 * u, cell = (width - gap * (columns - 1)) / columns, height = 42 * u;
+    auto origin = ImGui::GetCursorScreenPos();
+    for (int index = 0; index < PageCount; ++index)
+    {
+        const auto &item = NavigationItems[index];
+        int i = int(item.page);
+        auto a = ImVec2(origin.x + (index % columns) * (cell + gap),
+                        origin.y + (index / columns) * (height + 4 * u));
+        ImGui::SetCursorScreenPos(a);
+        ImGui::PushID(i);
+        bool click = ImGui::InvisibleButton("##Navigate", {cell, height}, ImGuiButtonFlags_EnableNav);
+        HoverCue();
+        if (click && navigation.Select(item.page, ImGui::GetTime()))
+            Request(Tone::Tab);
+        float active = Animate(ImGui::GetItemID() ^ 0x947bfu, navigation.Is(item.page) ? 1.f : 0.f),
+              hover = Animate(ImGui::GetItemID() ^ 0x84ab1u, ImGui::IsItemHovered() ? 1.f : 0.f);
+        auto *d = ImGui::GetWindowDrawList();
+        d->AddRectFilled(a, {a.x + cell, a.y + height},
+                         ImGui::GetColorU32(Blend(background, Panel(1.6f), std::max(active, hover * .7f))), 6 * u);
+        auto color = Blend(Muted(), heading, active);
+        DrawIcon(d, item.page == Page::Updates ? Icon::Update : item.page == Page::Inspector ? Icon::Magnifier : Icon(i),
+                 {a.x + (cell - 17 * u) * .5f, a.y + 4 * u}, 17 * u, ImGui::GetColorU32(color));
+        float size = (width < 360 * u && columns == PageCount ? 8 : 10) * u;
+        float tw = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0, item.compact).x;
+        TextAt(d, {a.x + std::max(0.f, (cell - tw) * .5f), a.y + 27 * u}, item.compact,
+               navigation.Is(item.page) ? ink : Muted(), size, {a.x, a.y, a.x + cell, a.y + height});
+        if (active > .01f || ImGui::IsItemFocused())
+            d->AddLine({a.x + 8 * u, a.y + height - u}, {a.x + cell - 8 * u, a.y + height - u},
+                       ImGui::GetColorU32(Alpha(heading, ImGui::IsItemFocused() ? 1.f : active)), 2 * u);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            ImGui::SetTooltip("%s", PageNames[i]);
+        ImGui::PopID();
+    }
+    ImGui::SetCursorScreenPos({origin.x, origin.y + CompactNavigationHeight(width)});
+    ImGui::Dummy({width, 0});
 }
 
 inline bool FeatureCard(const char *label, Icon icon, bool *value, const char *detail, const char *help,
                         bool readOnly = false, const char *shortcut = nullptr)
 {
     float u = Unit(), width = ImGui::GetContentRegionAvail().x;
-    bool compact = width < 280 * u;
-    float h = (compact ? 91 : 76) * u;
+    bool compact = width < 260 * u;
+    float h = (compact ? 88 : 84) * u;
     auto a = ImGui::GetCursorScreenPos();
     auto *d = ImGui::GetWindowDrawList();
     ImGui::PushID(label);
     auto id = ImGui::GetID("##Feature");
     bool clicked = ImGui::InvisibleButton("##Feature", {width, h}, ImGuiButtonFlags_EnableNav);
+    HoverCue();
     if (clicked && !readOnly)
     {
         *value = !*value;
@@ -332,13 +373,13 @@ inline bool FeatureCard(const char *label, Icon icon, bool *value, const char *d
     Surface(d, a, {a.x + width, a.y + h}, *value);
     DrawIcon(d, disabled ? Icon::Lock : icon, {a.x + 14 * u, a.y + (compact ? 14 : 21) * u}, 29 * u,
              ImGui::GetColorU32(disabled ? Blend(ink, background, .4f) : heading));
-    float reserve = readOnly ? 65 * u : 56 * u;
+    float reserve = readOnly ? 65 * u : 58 * u;
     ImVec4 clip(a.x + (compact ? 14 : 57) * u, a.y, a.x + width - (compact ? 12 * u : reserve), a.y + h);
     const char *name = compact && std::strcmp(label, "Actual colliders") == 0 ? "Colliders" : label;
-    TextAt(d, {a.x + (compact ? 14 : 57) * u, a.y + (compact ? 57 : 14) * u}, name, ink, 18 * u, clip);
+    TextAt(d, {a.x + (compact ? 14 : 57) * u, a.y + (compact ? 57 : 17) * u}, name, ink, 18 * u, clip);
     if (!compact)
-        TextAt(d, {a.x + 57 * u, a.y + 42 * u}, disabled ? "Locked for this session" : detail,
-               Blend(ink, background, .35f), 14 * u, clip);
+        TextAt(d, {a.x + 57 * u, a.y + 46 * u}, disabled ? "Locked for this session" : detail,
+               Muted(), 14 * u, clip);
     if (readOnly)
     {
         const char *tag = shortcut ? shortcut : (*value ? "ON" : "OFF");
@@ -348,11 +389,14 @@ inline bool FeatureCard(const char *label, Icon icon, bool *value, const char *d
     }
     else
     {
-        float x = a.x + width - 48 * u, y = a.y + (compact ? 18 : 27) * u;
+        float x = a.x + width - 48 * u, y = a.y + (compact ? 15 : 19) * u;
         d->AddRectFilled({x, y}, {x + 32 * u, y + 19 * u},
                          ImGui::GetColorU32(Blend(Color(AppearancePreferences::Button), heading, on * .7f)),
                          10 * u);
         d->AddCircleFilled({x + (9.5f + 13.f * on) * u, y + 9.5f * u}, 6 * u, ImGui::GetColorU32(ink), 16);
+        const char *state = disabled ? "LOCK" : *value ? "ON" : "OFF";
+        TextAt(d, {x + 3 * u, y + 25 * u}, state, *value && !disabled ? heading : Muted(), 10 * u,
+               {x, y, a.x + width - 10 * u, a.y + h});
     }
     if (ImGui::IsItemHovered() || ImGui::IsItemFocused())
         d->AddRect(a, {a.x + width - 2 * u, a.y + h - 3 * u},

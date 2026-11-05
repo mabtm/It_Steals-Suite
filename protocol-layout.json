@@ -857,10 +857,22 @@
       "count": 1
     },
     {
-      "name": "_pad_stats",
+      "name": "runCategory",
       "offset": 5618,
       "type": "byte",
-      "count": 6
+      "count": 1
+    },
+    {
+      "name": "statsCategory",
+      "offset": 5619,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "selectedRunSeed",
+      "offset": 5620,
+      "type": "int",
+      "count": 1
     },
     {
       "name": "runStartedUtc",

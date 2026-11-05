@@ -19,7 +19,10 @@ public sealed class RunReviewData
     public double Seconds;
     public bool Reduced;
     public bool ValidationChecked, Valid, ObservedFromStart, SeedKnown, MonstersReduced;
-    public int SeedKind;
+    public int SeedKind, SelectedSeed, RunSeed;
+    public RunCategory Category;
+    public bool RawSpawnSeed;
+    public uint InitialAids;
     public uint Aids, Warnings;
     public string ValidityReason = "Recorded by an older version; validation unavailable";
     public uint LightSources;
@@ -326,6 +329,11 @@ public static class RunReviewRecorder
         active.Review.ObservedFromStart = record.ObservedFromStart;
         active.Review.SeedKnown = record.SeedKnown;
         active.Review.SeedKind = (int)record.SeedType;
+        active.Review.Category = record.Category;
+        active.Review.SelectedSeed = record.SelectedSeed;
+        active.Review.RunSeed = record.Seed;
+        active.Review.RawSpawnSeed = record.RawSpawnSeed;
+        active.Review.InitialAids = (uint)record.InitialAids;
         active.Review.Aids = (uint)record.Aids;
         active.Review.Warnings = (uint)record.Warnings;
         active.Review.ValidityReason = RunValidity.Reason(record);

@@ -1,6 +1,53 @@
 #pragma once
 #include "DiagnosticScan.h"
+#include "NavigationCapture.h"
 DiagnosticInputs CaptureDiagnosticInputs();
+
+inline void RenderNavigationCapture()
+{
+    namespace capture = suite_navigation_capture;
+    auto result = capture::service.Poll();
+    auto search = g_seedSearch.Get();
+    auto selected = g_mapWorker.Get(g_plannerOptions.level);
+    bool searching = search->Busy();
+    auto source = capture::Source(searching, search->source ? search->source->data : nullptr,
+                                  selected ? selected->data : nullptr);
+    ImGui::BeginDisabled(result.phase == capture::Phase::Pending || !source || source->bytes.empty());
+    if (suite_ui::Button("Save navigation capture"))
+    {
+        capture::Metadata metadata;
+        metadata.trainerVersion = suite_brand::Version;
+        metadata.modVersion = g_pShared ? g_pShared->version : "disconnected";
+        metadata.source = searching ? "Exact active search input" : "Selected map packet";
+        metadata.phase = searching ? "Active" : "Inactive";
+        if (searching)
+        {
+            metadata.phase = search->phase == practice::SearchPhase::Preparing ? "Preparing"
+                             : search->phase == practice::SearchPhase::Generating ? "Generating"
+                                                                                 : "Searching";
+            metadata.step = search->preparationStep;
+            metadata.prepared = search->prepared;
+            metadata.total = search->prepareTotal;
+        }
+        capture::service.Begin(std::move(source), std::move(metadata));
+        result = capture::service.View();
+    }
+    ImGui::EndDisabled();
+    Help("Save the exact geometry and navigation packet used by an active seed search, plus its progress and version details. The original .ismap packet and a short text report are written locally in the background. Share both files when reporting a stuck search.");
+    if (result.phase == capture::Phase::Pending)
+        suite_ui::Busy("Saving navigation capture...");
+    else if (result.phase == capture::Phase::Saved)
+    {
+        ImGui::TextWrapped("Navigation capture saved.");
+        auto path = result.folder.u8string();
+        std::string utf8(reinterpret_cast<const char *>(path.data()), path.size());
+        ImGui::TextWrapped("%s", utf8.c_str());
+        if (suite_ui::SmallButton("Copy navigation capture path"))
+            suite_ui::CopyText(utf8.c_str());
+    }
+    else if (result.phase == capture::Phase::Failed)
+        ImGui::TextWrapped("Navigation capture failed: %s", result.error.c_str());
+}
 
 inline void RenderDiagnosticScan()
 {
@@ -84,4 +131,6 @@ inline void RenderDiagnosticScan()
             suite_ui::CopyText(BuildDiagnostics().c_str());
         RenderDiagnosticSections(BuildDiagnostics());
     }
+    ImGui::Separator();
+    RenderNavigationCapture();
 }

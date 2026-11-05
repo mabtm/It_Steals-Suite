@@ -145,7 +145,7 @@ class Service
         auto bytes = loaded ? LockResource(loaded) : nullptr;
         auto size = resource ? SizeofResource(nullptr, resource) : 0;
         if (!bytes || !size || size > 1024 * 1024)
-            throw std::runtime_error("Embedded update components are missing. Reinstall PracticeSuite.");
+            throw std::runtime_error("Embedded update components are missing. Reinstall Elite-Suite.");
         return {static_cast<const char *>(bytes), size};
     }
 
@@ -175,7 +175,7 @@ class Service
 
     template <class Sink> void Receive(std::string url, bool binary, uint64_t limit, Sink sink)
     {
-        auto agent = Wide(std::string("PracticeSuite/") + suite_brand::Version);
+        auto agent = Wide(std::string("Elite-Suite/") + suite_brand::Version);
         Internet session(WinHttpOpen(agent.c_str(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
         WinHttpSetTimeouts(session.h, 5000, 8000, 8000, 8000);
@@ -520,6 +520,15 @@ class Service
             Receive(std::string(ApiRoot) + "/releases?per_page=100", false, 4 * 1024 * 1024,
                     [&](const char *data, DWORD size) { bytes.append(data, size); });
             auto releases = Releases(bytes);
+            // Frequent preview builds can fill the first metadata page. GitHub's
+            // latest endpoint still selects the stable channel in that case.
+            if (releases.empty())
+            {
+                bytes.clear();
+                Receive(std::string(ApiRoot) + "/releases/latest", false, 4 * 1024 * 1024,
+                        [&](const char *data, DWORD size) { bytes.append(data, size); });
+                releases = Releases("[" + bytes + "]");
+            }
             if (releases.empty())
                 throw std::runtime_error("No published stable releases are available yet.");
             auto next = std::make_shared<Snapshot>();
@@ -528,10 +537,11 @@ class Service
                 next->latest = next->releases.front();
             Secret secret{Credential()};
             next->credential = !secret.value.empty();
-            bool available = Newer(next->latest, suite_brand::Version);
+            bool available = Newer(next->latest, suite_brand::Version, suite_brand::Preview);
             next->phase = available ? Phase::Available : Phase::Current;
-            next->message = available ? "A new PracticeSuite update is available."
-                                      : "You are using the latest stable version.";
+            next->message = available ? "A new Elite-Suite update is available."
+                                      : suite_brand::Preview ? "Preview build. No newer stable release is available."
+                                                             : "You are using the latest stable version.";
             if (available && !next->latest.Installable())
                 next->message =
                     "A newer release exists, but its verified update package is not ready. Try again later.";
@@ -545,7 +555,7 @@ class Service
     bool DownloadLatest()
     {
         auto current = View();
-        if (running.load() || Busy(current->phase) || !Newer(current->latest, suite_brand::Version) ||
+        if (running.load() || Busy(current->phase) || !Newer(current->latest, suite_brand::Version, suite_brand::Preview) ||
             !current->latest.Installable())
             return false;
         received.store(0);

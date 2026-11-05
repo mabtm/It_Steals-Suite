@@ -13,7 +13,7 @@ inline ExperiencePreferences preferences;
 inline MotionTable motion;
 inline Lifecycle lifecycle;
 inline bool menu = false, run = false;
-inline ImVec4 tint(.37f, .83f, .77f, 1);
+inline ImVec4 tint(.48f, .83f, 1.f, 1);
 inline Tone requested = Tone::None;
 inline double requestedAt = -10;
 inline std::string notice;
@@ -81,13 +81,7 @@ inline Tone ConsumeGameTone(bool allowed)
 
 inline int Priority(Tone t)
 {
-    return t == Tone::PersonalBest           ? 6
-           : t == Tone::Complete             ? 5
-           : t == Tone::Confirm              ? 4
-           : t == Tone::On || t == Tone::Off ? 3
-           : t == Tone::Tab                  ? 2
-           : t == Tone::Click                ? 1
-                                             : 0;
+    return ToneImportance(t);
 }
 
 inline void Request(Tone tone)
@@ -131,14 +125,21 @@ inline float Animate(ImGuiID id, float target, bool appear = false, float durati
                         duration);
 }
 
+// Hover cues belong to an entered, enabled item. The audio engine applies
+// a shared cooldown, so moving across a dense table stays quiet.
+inline void HoverCue()
+{
+    if (ImGui::IsItemHovered() && GImGui->HoveredIdPreviousFrame != ImGui::GetItemID())
+        Request(Tone::Hover);
+}
+
 inline void Notify(const char *message, bool error = false, ImGuiID source = 0, Tone tone = Tone::Confirm)
 {
     notice = message ? std::string(message).substr(0, 160) : "";
     noticeError = error;
     noticeAt = ImGui::GetTime();
     noticeSource = source;
-    if (!error)
-        Request(tone);
+    Request(error ? Tone::Warning : tone);
 }
 
 inline bool RecentSource(ImGuiID id)
@@ -172,6 +173,7 @@ inline bool Button(const char *label, const ImVec2 &requestedSize = ImVec2(0, 0)
         ImGui::PushStyleColor(ImGuiCol_Text, hidden);
     }
     bool clicked = ImGui::Button(label, size);
+    HoverCue();
     if (confirmed)
         ImGui::PopStyleColor();
     ImGui::PopStyleColor(3);
@@ -196,6 +198,18 @@ inline bool Button(const char *label, const ImVec2 &requestedSize = ImVec2(0, 0)
     return clicked;
 }
 
+inline bool PrimaryButton(const char *label, const ImVec2 &size = ImVec2(0, 0))
+{
+    auto accent = Color(AppearancePreferences::Animation);
+    ImGui::PushStyleColor(ImGuiCol_Button, Blend(Color(AppearancePreferences::Button), accent, .28f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Blend(Color(AppearancePreferences::Button), accent, .42f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, Blend(Color(AppearancePreferences::Button), accent, .52f));
+    ImGui::PushStyleColor(ImGuiCol_Border, Alpha(accent, .50f));
+    bool pressed = Button(label, size);
+    ImGui::PopStyleColor(4);
+    return pressed;
+}
+
 inline bool SmallButton(const char *label)
 {
     auto pad = ImGui::GetStyle().FramePadding;
@@ -218,6 +232,7 @@ inline bool Checkbox(const char *label, bool *value)
     bool clicked =
         ImGui::InvisibleButton(label, ImVec2(w + (text.x > 0 ? style.ItemInnerSpacing.x + text.x : 0), h),
                                ImGuiButtonFlags_EnableNav);
+    HoverCue();
     if (clicked)
     {
         *value = !*value;
@@ -277,6 +292,7 @@ inline void EndTabItem()
 inline bool CollapsingHeader(const char *label, ImGuiTreeNodeFlags flags = 0)
 {
     bool open = ImGui::CollapsingHeader(label, flags);
+    HoverCue();
     if (ImGui::IsItemToggledOpen())
         Request(Tone::Tab);
     return open;
@@ -374,31 +390,39 @@ inline void BrandHeader(const char *mode, bool connected, const char *status)
 {
     auto p = ImGui::GetCursorScreenPos();
     float width = ImGui::GetContentRegionAvail().x, u = Unit();
-    ImGui::InvisibleButton("##SuiteDrag", ImVec2(width, 38 * u));
+    bool compact = width < 650 * u;
+    float h = (compact ? 32 : 38) * u;
+    ImGui::InvisibleButton("##SuiteDrag", ImVec2(width, h));
     if (ImGui::IsItemActivated() && ImGui::IsMouseDown(ImGuiMouseButton_Left))
         ImGui::StartMouseMovingWindow(ImGui::GetCurrentWindow());
     auto *draw = ImGui::GetWindowDrawList();
-    Logo(draw, ImVec2(p.x + 1 * u, p.y + 1 * u), 34 * u);
-    draw->AddText(ImGui::GetFont(), 17 * u, ImVec2(p.x + 47 * u, p.y), ImGui::GetColorU32(ImGuiCol_Text),
-                  "PRACTICE SUITE");
-    std::string sub = std::string(mode ? mode : "") + "  /  " +
-                      (connected ? "Connected"
-                       : status  ? status
-                                 : "Waiting for game");
-    auto clip = ImVec4(p.x + 47 * u, p.y + 19 * u, p.x + width, p.y + 38 * u);
-    draw->AddText(ImGui::GetFont(), 14 * u, ImVec2(p.x + 47 * u, p.y + 21 * u),
-                  ImGui::GetColorU32(ImGuiCol_TextDisabled), sub.c_str(), nullptr, 0, &clip);
-    auto version = ImGui::CalcTextSize(suite_brand::Credit);
-    if (width > 330 * u)
-        draw->AddText(ImVec2(p.x + width - version.x, p.y + 1 * u), ImGui::GetColorU32(ImGuiCol_TextDisabled),
-                      suite_brand::Credit);
-    else
-    {
-        draw->AddRectFilled({p.x + 46 * u, p.y + 19 * u}, {p.x + width, p.y + 38 * u},
-                            ImGui::GetColorU32(ImGuiCol_WindowBg));
-        draw->AddText(ImGui::GetFont(), 11 * u, {p.x + 47 * u, p.y + 22 * u},
-                      ImGui::GetColorU32(ImGuiCol_TextDisabled), suite_brand::Credit);
-    }
+    float mark = compact ? 28 : 34;
+    draw->AddRectFilled(p, {p.x + mark * u, p.y + mark * u},
+                        ImGui::GetColorU32(Blend(background, heading, .13f)), 8 * u);
+    Logo(draw, {p.x + 4 * u, p.y + 4 * u}, (mark - 8) * u, 1, 1, &heading);
+    float titleX = p.x + (mark + 12) * u;
+    float badgeWidth = (compact ? 85 : 132) * u;
+    ImVec4 clip(titleX, p.y, p.x + width - badgeWidth - 12 * u, p.y + h);
+    draw->AddText(ImGui::GetFont(), (compact ? 18 : 22) * u,
+                  {titleX, p.y + (compact ? 5 : 0) * u}, ImGui::GetColorU32(ink),
+                  suite_brand::Title, nullptr, 0, &clip);
+    if (!compact)
+        draw->AddText(ImGui::GetFont(), 12 * u, {titleX + u, p.y + 28 * u},
+                      ImGui::GetColorU32(Muted()), "IT STEALS  /  TRAIN. EXPLORE. REVIEW.", nullptr, 0, &clip);
+    ImVec2 badge(p.x + width - badgeWidth, p.y + (compact ? 2 : 7) * u);
+    float badgeHeight = (compact ? 26 : 29) * u;
+    draw->AddRectFilled(badge, {p.x + width, badge.y + badgeHeight}, ImGui::GetColorU32(Panel()), 7 * u);
+    auto state = connected ? heading : ImVec4(.98f, .74f, .46f, 1);
+    draw->AddCircleFilled({badge.x + 12 * u, badge.y + badgeHeight * .5f}, 3 * u,
+                          ImGui::GetColorU32(state), 12);
+    ImVec4 badgeClip(badge.x + 23 * u, badge.y, p.x + width - 6 * u, badge.y + badgeHeight);
+    draw->AddText(ImGui::GetFont(), (compact ? 12 : 13) * u,
+                  {badge.x + 23 * u, badge.y + 7 * u}, ImGui::GetColorU32(ink),
+                  connected ? (compact ? "LIVE" : (mode ? mode : "Connected")) : "OFFLINE", nullptr, 0,
+                  &badgeClip);
+    if (ImGui::IsItemHovered() && ImGui::IsMouseHoveringRect(badge, {p.x + width, badge.y + badgeHeight}))
+        ImGui::SetTooltip("%s", connected ? "Game connected. Live tools are available."
+                                         : status ? status : "Waiting for game");
 }
 
 inline float MenuAlpha()

@@ -59,6 +59,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $root 'CHANGELOG.md') -Destination (Join-Path $payload 'CHANGELOG.md')
     $buildInfo = [ordered]@{
         version = $version
+        channel = $(if ($header -match '#define SUITE_PREVIEW 1') { 'preview' } else { 'stable' })
         author = 'mab'
         sourceCommit = $SourceCommit
         modVersion = $modVersion
@@ -84,12 +85,12 @@ try {
     $null = [IO.Directory]::CreateDirectory($portable)
     Copy-Item -Path (Join-Path $payload '*') -Destination $portable -Recurse
     $quickstart = @'
-IT STEALS PRACTICESUITE
+ELITE-SUITE / IT STEALS
 Portable installation:
 1. Install MelonLoader for It Steals using its official installer.
 2. Copy ItStealsHelper.dll into the game's Mods folder.
 3. Keep ItStealsTrainer.exe, PracticeSuiteEncoder.exe, and Encoder together.
-4. Open PracticeSuite; it starts the game. Press F3 to open the menu.
+4. Open Elite-Suite; it starts the game. Press F3 to open the menu.
 Optional automatic game launch: create installation.ini beside the trainer:
 gameExecutable=C:\Your game folder\It Steals.exe
 Use --no-launch to skip automatic launch once.
@@ -114,7 +115,8 @@ Documentation: https://github.com/mabtm/It_Steals-Suite
     Push-Location $PSScriptRoot
     try {
         $prefix = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { '/' } else { '-' }
-        & $compiler ($prefix + 'V2') ($prefix + "DVERSION=$version") ($prefix + "DPAYLOAD=$payload") ($prefix + "DOUTPUT=$setup") 'Setup.nsi'
+        $channel = if ($header -match '#define SUITE_PREVIEW 1') { ' Preview' } else { '' }
+        & $compiler ($prefix + 'V2') ($prefix + "DVERSION=$version") ($prefix + "DCHANNEL=$channel") ($prefix + "DPAYLOAD=$payload") ($prefix + "DOUTPUT=$setup") 'Setup.nsi'
         if ($LASTEXITCODE -ne 0) { throw 'NSIS Setup build failed.' }
     } finally { Pop-Location }
     foreach ($name in @('ItStealsTrainer.exe', 'PracticeSuiteEncoder.exe', 'ItStealsHelper.dll', 'build-info.json')) {

@@ -65,6 +65,17 @@ int main(int argc, char **argv)
     assert(releases.size() == 2 && releases[0].version == "7.12.10");
     assert(releases[0].Installable() && releases[0].date == "2026-10-21");
     assert(Newer(releases[0], "7.12.9") && !Newer(releases[1], "7.12.10"));
+    // Preview builds are never offered to stable clients, even if their base
+    // version is higher. A later stable build can replace an installed preview
+    // with the same numeric version.
+    auto channel = Releases("[" + row("v7.22.0-preview.1", "false", "true") + "," +
+                            row("v7.22.0", "false", "true") + "," + row("v7.21.0") + "]");
+    assert(channel.size() == 1 && channel.front().version == "7.21.0");
+    assert(!Newer(channel.front(), "7.21.0"));
+    auto promoted = Releases("[" + row("v7.22.0") + "]");
+    assert(promoted.size() == 1 && !Newer(promoted.front(), "7.22.0"));
+    assert(Newer(promoted.front(), "7.22.0", true));
+    assert(!Newer(channel.front(), "7.22.0", true));
     auto bad = releases[0];
     bad.sha256.clear();
     assert(!bad.Installable());

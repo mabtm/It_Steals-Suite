@@ -1,10 +1,18 @@
 #pragma once
 #include <algorithm>
+#include <atomic>
 #include <cctype>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <mutex>
+#include <optional>
+#include <stdexcept>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 #ifdef _WIN32
 #include <windows.h>
@@ -13,6 +21,25 @@
 namespace suite_fonts
 {
 inline constexpr size_t MaximumBytes = 64 * 1024 * 1024;
+struct ScanLimits
+{
+    size_t entries = 65536, files = 16384, faces = 65536;
+    uint64_t bytes = uint64_t{2} * 1024 * 1024 * 1024;
+};
+
+struct ScanBudget
+{
+    ScanLimits limits;
+    size_t entries = 0, files = 0;
+    uint64_t bytes = 0;
+    std::function<bool()> canceled;
+
+    void Check() const
+    {
+        if (canceled && canceled())
+            throw std::runtime_error("Font refresh canceled.");
+    }
+};
 struct Face
 {
     std::string id, name, source;
@@ -202,18 +229,44 @@ struct Catalog
 {
     std::vector<Face> faces;
     bool scanned = false;
-    void AddDirectory(const std::filesystem::path &directory, const std::string &source)
+    uint64_t revision = 0;
+    void AddDirectory(const std::filesystem::path &directory, const std::string &source,
+                      ScanBudget *budget = nullptr)
     {
         std::error_code error;
         for (std::filesystem::directory_iterator it(directory, error), end; it != end && !error; it.increment(error))
         {
+            if (budget)
+            {
+                budget->Check();
+                if (++budget->entries > budget->limits.entries)
+                    throw std::runtime_error("The font folders contain too many files to refresh.");
+            }
             auto extension = Fold(Utf8(it->path().extension()));
             if (extension != ".ttf" && extension != ".otf" && extension != ".ttc")
                 continue;
+            if (budget)
+            {
+                if (++budget->files > budget->limits.files)
+                    throw std::runtime_error("The installed font collection is too large to refresh.");
+                std::error_code sizeError;
+                auto size = std::filesystem::file_size(it->path(), sizeError);
+                if (sizeError || size < 12 || size > MaximumBytes)
+                    continue;
+                if (budget->bytes > budget->limits.bytes || size > budget->limits.bytes - budget->bytes)
+                    throw std::runtime_error("The installed font collection is too large to refresh.");
+                budget->bytes += size;
+            }
             auto bytes = Read(it->path());
             auto offsets = Offsets(bytes);
             for (size_t face = 0; face < offsets.size(); ++face)
             {
+                if (budget)
+                {
+                    budget->Check();
+                    if (faces.size() >= budget->limits.faces)
+                        throw std::runtime_error("The installed font collection has too many font faces to refresh.");
+                }
                 auto name = Name(bytes, offsets[face]);
                 if (name.empty())
                     name = Utf8(it->path().stem()) + (offsets.size() > 1 ? " #" + std::to_string(face + 1) : "");
@@ -229,6 +282,7 @@ struct Catalog
             return first != second ? first < second : a.id < b.id;
         });
         scanned = true;
+        ++revision;
     }
     const Face *Find(const std::string &id) const
     {
@@ -240,21 +294,188 @@ struct Catalog
 };
 inline Catalog catalog;
 
-inline void RefreshInstalled()
+struct FontDirectory
 {
-    catalog.faces.clear();
+    std::filesystem::path path;
+    std::string source;
+};
+
+inline std::vector<FontDirectory> InstalledDirectories()
+{
+    std::vector<FontDirectory> result;
 #ifdef _WIN32
     wchar_t directory[32768]{};
     auto count = GetWindowsDirectoryW(directory, 32768);
     if (count && count < 32768)
-        catalog.AddDirectory(std::filesystem::path(directory) / L"Fonts", "Windows");
+        result.push_back({std::filesystem::path(directory) / L"Fonts", "Windows"});
     count = GetEnvironmentVariableW(L"LOCALAPPDATA", directory, 32768);
     if (count && count < 32768)
-        catalog.AddDirectory(std::filesystem::path(directory) / L"Microsoft/Windows/Fonts", "User");
+        result.push_back({std::filesystem::path(directory) / L"Microsoft/Windows/Fonts", "User"});
     count = GetModuleFileNameW(nullptr, directory, 32768);
     if (count && count < 32768)
-        catalog.AddDirectory(std::filesystem::path(directory).parent_path() / L"Fonts", "Suite");
+        result.push_back({std::filesystem::path(directory).parent_path() / L"Fonts", "Suite"});
 #endif
-    catalog.Sort();
+    return result;
 }
+
+inline Catalog ScanDirectories(const std::vector<FontDirectory> &directories, ScanBudget &budget)
+{
+    Catalog result;
+    // Production has three locations. Keep custom scan requests bounded too.
+    if (directories.size() > 16)
+        throw std::runtime_error("Too many font folders were requested.");
+    for (const auto &directory : directories)
+    {
+        budget.Check();
+        result.AddDirectory(directory.path, directory.source, &budget);
+    }
+    budget.Check();
+    result.Sort();
+    return result;
+}
+
+// Synchronous discovery is retained for command-line validation. Production
+// menu/startup code uses ScanService and publishes only from its UI thread.
+inline void RefreshInstalled()
+{
+    ScanBudget budget;
+    auto next = ScanDirectories(InstalledDirectories(), budget);
+    next.revision = catalog.revision + 1;
+    catalog = std::move(next);
+}
+
+enum class ScanPhase { Idle, Pending, Ready, Failed };
+struct ScanStatus
+{
+    ScanPhase phase = ScanPhase::Idle;
+    std::string error;
+};
+
+class ScanService
+{
+    struct Job
+    {
+        bool installed = true;
+        std::vector<FontDirectory> directories;
+        ScanLimits limits;
+    };
+    struct Result
+    {
+        Catalog catalog;
+        std::string error;
+    };
+
+    std::mutex gate;
+    std::condition_variable wake;
+    std::thread worker;
+    std::atomic_bool stopping{false};
+    std::optional<Job> job;
+    std::optional<Result> completed;
+    ScanStatus state;
+
+    void Work()
+    {
+        for (;;)
+        {
+            Job request;
+            {
+                std::unique_lock lock(gate);
+                wake.wait(lock, [&] { return stopping.load() || job.has_value(); });
+                if (stopping.load())
+                    return;
+                request = std::move(*job);
+                job.reset();
+            }
+            Result result;
+            try
+            {
+                ScanBudget budget{request.limits};
+                budget.canceled = [&] { return stopping.load(); };
+                result.catalog = ScanDirectories(request.installed ? InstalledDirectories()
+                                                                   : request.directories, budget);
+            }
+            catch (const std::exception &error)
+            {
+                result.error = error.what();
+            }
+            std::lock_guard lock(gate);
+            completed = std::move(result);
+        }
+    }
+
+    bool Begin(Job request)
+    {
+        std::lock_guard lock(gate);
+        // Repeated requests coalesce into the current scan, including the
+        // completed result awaiting publication. No file work happens here.
+        if (stopping.load() || state.phase == ScanPhase::Pending)
+            return false;
+        state = {ScanPhase::Pending, {}};
+        completed.reset();
+        try
+        {
+            if (!worker.joinable())
+                worker = std::thread(&ScanService::Work, this);
+            job = std::move(request);
+            wake.notify_one();
+            return true;
+        }
+        catch (const std::exception &error)
+        {
+            state = {ScanPhase::Failed, error.what()};
+            return false;
+        }
+    }
+
+  public:
+    ScanService() = default;
+    ScanService(const ScanService &) = delete;
+    ~ScanService() { Shutdown(); }
+
+    bool Refresh() { return Begin({}); }
+
+    bool RefreshDirectories(std::vector<FontDirectory> directories, ScanLimits limits = {})
+    {
+        return Begin({false, std::move(directories), limits});
+    }
+
+    ScanStatus Status()
+    {
+        std::lock_guard lock(gate);
+        return state;
+    }
+
+    // Call only on the UI thread. The worker owns a separate local catalog;
+    // readers of the published catalog never race a vector mutation.
+    bool Poll(Catalog &target = catalog)
+    {
+        std::lock_guard lock(gate);
+        if (!completed)
+            return false;
+        auto result = std::move(*completed);
+        completed.reset();
+        if (!result.error.empty())
+        {
+            state = {ScanPhase::Failed, std::move(result.error)};
+            return false;
+        }
+        result.catalog.revision = target.revision + 1;
+        target = std::move(result.catalog);
+        state = {ScanPhase::Ready, {}};
+        return true;
+    }
+
+    void Shutdown()
+    {
+        {
+            std::lock_guard lock(gate);
+            stopping = true;
+        }
+        wake.notify_one();
+        if (worker.joinable())
+            worker.join();
+    }
+};
+
+inline ScanService scan;
 } // namespace suite_fonts

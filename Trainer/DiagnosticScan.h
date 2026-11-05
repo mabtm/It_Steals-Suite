@@ -117,7 +117,8 @@ inline std::vector<DiagnosticFinding> Diagnose(const DiagnosticInputs &in)
         add(2, "REP-001", "A replay could not be read", in.replayError,
             "Keep the original recording; inspect the named file or available backup, then refresh the replay list.");
     if ((d.timerState == 1 || d.timerState == 2) &&
-        ((!d.practiceModeActive && d.runUsedFeatures) || (d.runWarnings & ~64u)))
+        ((!d.practiceModeActive &&
+          (uint32_t(d.runUsedFeatures) & ~(d.runCategory == 1 ? 2u : 0u))) || (d.runWarnings & ~64u)))
         add(2, "VAL-001", "The run contains a recorded integrity failure", d.validationDetail,
             "Open the completed replay / validation summary. A failed check is retained for that run.");
     if (in.recording)
@@ -146,7 +147,7 @@ inline std::vector<DiagnosticFinding> Diagnose(const DiagnosticInputs &in)
 inline std::string DiagnosticReport(const std::vector<DiagnosticFinding> &rows)
 {
     std::ostringstream out;
-    out << "PracticeSuite " << suite_brand::Version << " / " << suite_brand::Author
+    out << "Elite-Suite " << suite_brand::Version << " / " << suite_brand::Author
         << " - diagnostic scan\nSnapshot of observed state; not a stress test.\n";
     for (int severity = 3; severity >= 0; severity--)
         for (const auto &r : rows)

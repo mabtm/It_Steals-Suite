@@ -1,6 +1,7 @@
 #pragma once
 #include "ReplayMotion.h"
 #include "SuiteBranding.h"
+#include "SuiteUpdateModel.h"
 #include "ReplayAnnotations.h"
 #include <sstream>
 #include <iomanip>
@@ -150,9 +151,11 @@ inline std::string ReplayManifest(const MapData &d, bool inputs, bool validation
                                   bool annotations = false)
 {
     const auto &r = *d.review;
+    auto version = suite_update::Version::Parse(exporter);
+    bool categoryMetadata = version && version->parts >= std::array<unsigned, 3>{7, 22, 0};
     std::ostringstream o;
     o << std::setprecision(17) << "{\n  \"packageFormat\": " << (annotations ? 2 : 1)
-      << ",\n  \"exportedBy\": " << ReplayJson("PracticeSuite " + exporter + " / mab")
+      << ",\n  \"exportedBy\": " << ReplayJson((categoryMetadata ? "Elite-Suite " : "PracticeSuite ") + exporter + " / mab")
       << ",\n  \"runId\": " << ReplayJson(std::to_string(r.id)) << ",\n  \"scene\": " << d.scene
       << ",\n  \"mode\": " << ReplayJson(kMapLevelNames[MapLevelIndex(d.scene)])
       << ",\n  \"layoutSeed\": " << d.seed << ",\n  \"seconds\": " << r.seconds
@@ -161,6 +164,13 @@ inline std::string ReplayManifest(const MapData &d, bool inputs, bool validation
       << ",\n  \"gameAssemblyFileSha256\": " << ReplayJson(d.hash)
       << ",\n  \"inputsIncluded\": " << (inputs ? "true" : "false")
       << ",\n  \"originalValidationReportIncluded\": " << (validation ? "true" : "false");
+    if (categoryMetadata)
+        o << ",\n  \"speedrunCategory\": "
+          << ReplayJson(r.category == 1 ? "SET-SEED" : r.category == 2 ? "PRACTICE" : "RANDOM SEED")
+          << ",\n  \"selectedSeed\": " << (r.category == 1 ? std::to_string(r.selectedSeed) : "null")
+          << ",\n  \"seedRecipe\": "
+          << ReplayJson(r.category == 1 ? r.rawSpawnSeed ? "RAW-FIRST-SPAWN-V1" : "DERIVED-V1"
+                                       : "NOT A SET-SEED RUN");
     if (annotations)
         o << ",\n  \"annotationsIncluded\": true";
     if (r.motion)
@@ -183,6 +193,7 @@ struct ReplayPackageExporter
 };
 
 inline constexpr ReplayPackageExporter ReplayPackageExporters[] = {
+    {"7.21.0", true},
     {"7.20.2", true},
     {"7.20.1", true},
     {"7.20.0", true},

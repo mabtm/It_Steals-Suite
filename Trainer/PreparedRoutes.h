@@ -93,6 +93,49 @@ struct PreparedRoutes
             if (progress)
                 progress(from + 1, count * 2);
         }
+        // A captured floor can split at an openable door. Connecting each
+        // catalog point across that same split independently repeats the same
+        // obstacle search O(catalog^2) times. One checked bridge is sufficient:
+        // closure below reuses its real polyline and validates every shortcut.
+        // Preserve quality refinements within each original checked component.
+        std::vector<int> originalComponent(count);
+        for (int a = 0; a < count; a++)
+            originalComponent[a] = root(a);
+        // Timer catalogs contain repeated spawn transforms. Reuse the exact
+        // projected query, including an unsuccessful repair; retrying it under
+        // a different catalog index cannot add physical navigation evidence.
+        std::vector<int> equivalent(count);
+        for (int a = 0; a < count; a++)
+        {
+            equivalent[a] = a;
+            for (int b = 0; b < a; b++)
+                if (projected[a].triangle == projected[b].triangle &&
+                    projected[a].point.x == projected[b].point.x &&
+                    projected[a].point.y == projected[b].point.y &&
+                    projected[a].point.z == projected[b].point.z)
+                {
+                    equivalent[a] = equivalent[b];
+                    break;
+                }
+        }
+        std::map<std::pair<int, int>, NavPath> repairs;
+        auto repair = [&](int a, int b) {
+            if (canceled())
+                throw std::runtime_error("Canceled");
+            int from = equivalent[a], to = equivalent[b];
+            auto key = std::make_pair(std::min(from, to), std::max(from, to));
+            auto found = repairs.find(key);
+            if (found == repairs.end())
+            {
+                repairAttempts++;
+                auto tree = graph.Search(projected[key.first], canceled);
+                found = repairs.emplace(key, graph.Path(tree, projected[key.second], canceled, true)).first;
+            }
+            auto path = found->second;
+            if (from > to)
+                std::reverse(path.points.begin(), path.points.end());
+            return path;
+        };
         // Refine nearby missing corridors before closure. Local connections
         // improve route quality without repairing every O(catalog^2) pair.
         std::vector<uint8_t> attempted(size_t(count) * count);
@@ -122,14 +165,14 @@ struct PreparedRoutes
             }
             int a = candidate.second.first, b = candidate.second.second;
             size_t slot = Slot(a, b);
-            if (attempted[slot] || std::isfinite(lengths[a][b]))
+            if (attempted[slot] || std::isfinite(lengths[a][b]) ||
+                (originalComponent[a] != originalComponent[b] && root(a) == root(b)))
                 continue;
             if (refinements >= 512)
                 break;
             attempted[slot] = 1;
             refinements++;
-            repairAttempts++;
-            if (keep(a, b, graph.Path(graph.Search(projected[a], canceled), projected[b], canceled, true)))
+            if (keep(a, b, repair(a, b)))
                 checkedPairs++;
         }
 
@@ -149,6 +192,7 @@ struct PreparedRoutes
         std::sort(bridges.begin(), bridges.end(), [](const auto &a, const auto &b) {
             return a.lower < b.lower || (a.lower == b.lower && std::pair(a.a, a.b) < std::pair(b.a, b.b));
         });
+        int bridgeAttempts = 0;
         for (const auto &edge : bridges)
         {
             if (canceled())
@@ -159,14 +203,13 @@ struct PreparedRoutes
                 continue;
             if (attempted[Slot(edge.a, edge.b)])
                 continue;
-            if (repairAttempts - refinements >= std::min(256, count * 4))
+            if (bridgeAttempts >= std::min(256, count * 4))
             {
                 break;
             }
-            repairAttempts++;
+            bridgeAttempts++;
             attempted[Slot(edge.a, edge.b)] = 1;
-            auto tree = graph.Search(projected[edge.a], canceled);
-            if (keep(edge.a, edge.b, graph.Path(tree, projected[edge.b], canceled, true)))
+            if (keep(edge.a, edge.b, repair(edge.a, edge.b)))
                 checkedPairs++;
         }
         // Shortest-path closure reuses real, checked polylines. A missing

@@ -404,7 +404,10 @@ class PhysicalNavigation
             });
         };
         collect(a, b);
+        size_t candidates = 0;
         auto candidate = [&](Vec3 q) {
+            if ((candidates++ & 31) == 0 && canceled())
+                throw std::runtime_error("Canceled");
             double length = std::hypot(b.x - a.x, b.z - a.z),
                    at = length ? std::clamp(((q.x - a.x) * (b.x - a.x) + (q.z - a.z) * (b.z - a.z)) /
                                                 (length * length),
@@ -542,13 +545,11 @@ class PhysicalNavigation
                 std::reverse(result.begin(), result.end());
                 return result;
             }
-            // An unsuccessful round must discover exactly the same blockers
-            // as the exhaustive graph before growing its candidate set. This
-            // preserves the existing round/obstacle limits and unreachable
-            // results even for disconnected floors and nested obstacles.
-            for (size_t i = 0; i < nodes.size(); i++)
-                for (size_t j = i + 1; j < nodes.size(); j++)
-                    edge(i, j);
+            // A failed search has tested every edge from its reachable set
+            // to the remaining candidates. Only blockers on that frontier can
+            // extend reachability. Testing edges between unreachable corners
+            // expands unrelated obstacles across the entire level, repeatedly
+            // for each catalog pair (especially for a closed Timer vault).
         }
         return {};
     }

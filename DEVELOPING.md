@@ -24,7 +24,7 @@ Follow the owning component rather than adding a new layer for every change. Kee
 
 **PerformanceTiming.h** contains frame-cost and search-progress measurements. **MovementTiming.h** contains recorded movement analysis and travel-time estimates. Input colors live with their drawing helpers in **InputModules.h**.
 
-Map format 14 adds walkable collision-floor triangles alongside the existing NavMesh and obstacle capture. Input format 8 adds bounded snapshots for game UI, extra cameras and particles. All recording channels share the 128 MiB input-file budget; omitted observations remain visible in Recording check. Audio format 1 uses checksummed reserved header bytes for PCM gap timestamps and queue diagnostics. Both readers still accept previous formats; their original limits remain in place.
+Map format 15 adds explicit run-category and seed-recipe evidence; format 14 added walkable collision-floor triangles alongside the existing NavMesh and obstacle capture. Input format 8 adds bounded snapshots for game UI, extra cameras and particles. All recording channels share the 128 MiB input-file budget; omitted observations remain visible in Recording check. Audio format 1 uses checksummed reserved header bytes for PCM gap timestamps and queue diagnostics. Both readers still accept previous formats; their original limits remain in place.
 
 <details>
 <summary><strong>Where to find the main systems</strong></summary>
@@ -54,6 +54,16 @@ The script finds MSBuild and the loader/Harmony references, then builds both pro
 Game, Unity, MelonLoader, and Harmony assemblies are local build inputs. Keep them out of Git. Rebuild the encoder on Linux/WSL with **Encoder/build-encoder.sh**; update its identity and keep its source and licenses with any redistributed binary. See [Encoder/NOTICE.md](Encoder/NOTICE.md).
 
 ## Check a change
+
+### Elite-Suite preview: 7.22.0
+
+The development branch publishes tags of the form `v7.22.0-preview.RUN_NUMBER`, with GitHub's prerelease flag and latest=false. `SUITE_PREVIEW` also forces preview publication if this source is built from another ref. Stable update metadata rejects both prerelease rows and non-stable tag syntax. Promotion to a stable release is a separate change; an installed preview may accept the same numeric version once it is actually stable. File names, registry identities, IPC names, installation discovery, replay paths and credential bindings retain their existing identities.
+
+Timer's 59/1932 pause is the transition from source corridors to repair/refinement. The baked Timer navigation can separate duplicate bunker starts from the remaining catalog even after the movable door is omitted. Preparation now reuses checked component bridges and exact duplicate projection queries; physical repair expands the reachable frontier instead of unrelated unreachable corner pairs. Closure joins only real checked polylines and tests its shortcuts. Synthetic tests cover the full 59-node/1932-task preparation, one east bunker exit, closed-door rejection, cancellation/retry and preparation through CPU scoring. The supplied scene's baked/captured navigation was also reconstructed outside Git for end-to-end checks; this is not a live-game FPS measurement or proof of an unknown tester capture. Diagnostics can now save the exact active stage-2 packet and metadata without filesystem work on the render thread.
+
+Set-Seed is selected with Speedrun=1, Practice=0 and SeededPractice=1; the complete RNG hooks remain required and all other aids stay restricted. Category, seed and recipe are latched before the run and changes remain invalid even if reverted. Stats format 9 stores separate Set-Seed PBs/rows and makes a permanent exact pre-upgrade backup before replacing older data. Map/review format 15 records the declaration, selected/observed seed and recipe; old records never inherit the new validity exception. Three readonly fields occupy previous padding at 5618, 5619 and 5620, preserving payload size and all existing offsets. The history validity/category markers are separated from warning bits. Canonical replay manifests retain the old representation for historical exporters and add explicit category fields only from 7.22 onward.
+
+The new shell uses bounded time-based transitions, a compact navigation layout, explicit start actions and separate draft/category state. Font discovery runs on a bounded worker; filtered font indices are cached and visible rows clipped. Atlas rebuilding after a deliberate font/DPI change still happens between render frames. Menu scheduling targets 60 FPS, passive output 30 FPS, and hidden output does no rendering. Diagnostics report measured successful output cadence rather than claiming monitor refresh. The animation primitive benchmark and headless whole-UI benchmark exclude game/GPU/presentation work.
 
 ### Community fixes: 7.21.0
 

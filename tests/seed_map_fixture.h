@@ -131,6 +131,14 @@ inline std::vector<uint8_t> EncodeFixture(const practice::MapData &d, int format
                 value(r.aids);
                 value(r.warnings);
                 text(r.validityReason);
+                if (format >= 15)
+                {
+                    value(uint8_t(r.category));
+                    value(int32_t(r.selectedSeed));
+                    value(int32_t(r.runSeed));
+                    value(uint8_t(r.rawSpawnSeed));
+                    value(r.initialAids);
+                }
                 value(uint8_t(r.monstersReduced));
                 value(int32_t(r.monsters.size()));
                 for (const auto &m : r.monsters)

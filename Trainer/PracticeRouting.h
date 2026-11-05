@@ -511,7 +511,32 @@ class NavGraph
 
     NavPath Polish(NavPath path, const Cancel &canceled) const
     {
-        return Checked(std::move(path), canceled, false);
+        path = Checked(std::move(path), canceled, false);
+        if (!physical || !physical->Enabled() || path.points.size() < 3)
+            return path;
+        // Closure can revisit the same doorway on its way through a catalog
+        // anchor. Visibility is not monotone along that polyline: a later
+        // point can be visible even after an intervening corner is hidden.
+        // Keep the cheaper of both checked pulls instead of retaining a loop.
+        NavPath pulled;
+        pulled.length = 0;
+        pulled.points.push_back(path.points.front());
+        for (size_t at = 0; at + 1 < path.points.size();)
+        {
+            if (canceled())
+                throw std::runtime_error("Canceled");
+            size_t to = path.points.size() - 1;
+            while (to > at + 1 && !physical->Visible(path.points[at], path.points[to]))
+            {
+                if (canceled())
+                    throw std::runtime_error("Canceled");
+                --to;
+            }
+            pulled.length += Distance(path.points[at], path.points[to]);
+            pulled.points.push_back(path.points[to]);
+            at = to;
+        }
+        return pulled.length < path.length ? std::move(pulled) : std::move(path);
     }
 
     bool Visible(Vec3 a, Vec3 b) const

@@ -19,13 +19,14 @@ public sealed class ModeTotals
     public double FinishSeconds, PlaySeconds;
 }
 
-// Fixed, bounded lifetime counters. Categories are Normal, Clean and Practice;
-// normal play contributes time, while the existing run tracker owns attempts.
+// Bounded lifetime counters. Original Normal/Random Seed/Practice indexes stay
+// unchanged; eight Set-Seed rows are appended. The run tracker owns attempts.
 public sealed class ModeStatistics
 {
     public static readonly int[] Scenes = { 3, 4, 5, 7, 8, 14, 12, 13 };
-    public readonly ModeTotals[] Rows = new ModeTotals[24];
+    public readonly ModeTotals[] Rows = new ModeTotals[32];
     public readonly long[] BestUtc = new long[8];
+    public readonly long[] SetSeedBestUtc = new long[8];
     public long SinceUtc = DateTime.UtcNow.Ticks;
     public int Revision;
     private double previousAt = double.NaN;
@@ -41,7 +42,8 @@ public sealed class ModeStatistics
     public static int Row(int scene, int category)
     {
         int mode = Array.IndexOf(Scenes, scene);
-        return mode < 0 || category < 0 || category > 2 ? -1 : mode * 3 + category;
+        return mode < 0 || category < 0 || category > 3 ? -1 :
+               category == 3 ? 24 + mode : mode * 3 + category;
     }
 
     public void Clear()
@@ -62,7 +64,12 @@ public sealed class ModeStatistics
 
     public void Begin(int scene, bool practice)
     {
-        int row = Row(scene, practice ? 2 : 1);
+        BeginCategory(scene, practice ? 2 : 1);
+    }
+
+    public void BeginCategory(int scene, int category)
+    {
+        int row = Row(scene, category);
         if (row < 0)
             return;
         Increment(ref Rows[row].Attempts);
@@ -71,7 +78,12 @@ public sealed class ModeStatistics
 
     public void End(int scene, bool practice, RunOutcome outcome, double seconds, bool ignored)
     {
-        int row = Row(scene, practice ? 2 : 1);
+        EndCategory(scene, practice ? 2 : 1, outcome, seconds, ignored);
+    }
+
+    public void EndCategory(int scene, int category, RunOutcome outcome, double seconds, bool ignored)
+    {
+        int row = Row(scene, category);
         if (row < 0)
             return;
         var value = Rows[row];
@@ -129,6 +141,9 @@ public sealed class ModeStatistics
         for (int i = 0; i < BestUtc.Length; i++)
             if (BestUtc[i] > 0)
                 text.Append("pbAt.").Append(i).Append('=').Append(BestUtc[i]).Append('\n');
+        for (int i = 0; i < SetSeedBestUtc.Length; i++)
+            if (SetSeedBestUtc[i] > 0)
+                text.Append("setSeedPbAt.").Append(i).Append('=').Append(SetSeedBestUtc[i]).Append('\n');
     }
 
     public bool Read(string key, string value)
@@ -142,6 +157,14 @@ public sealed class ModeStatistics
             return true;
         }
         int index;
+        if (key.StartsWith("setSeedPbAt.", StringComparison.Ordinal))
+        {
+            if (!int.TryParse(key.Substring(12), out index) || index < 0 || index >= SetSeedBestUtc.Length ||
+                !long.TryParse(value, out ticks) || ticks < 0 || ticks > DateTime.MaxValue.Ticks)
+                throw new IOException("Invalid Set-Seed personal-best date.");
+            SetSeedBestUtc[index] = ticks;
+            return true;
+        }
         if (key.StartsWith("pbAt.", StringComparison.Ordinal))
         {
             if (!int.TryParse(key.Substring(5), out index) || index < 0 || index >= BestUtc.Length ||

@@ -2,6 +2,7 @@
 #include "TrainerPreferences.h"
 #include "FontRasterizer.h"
 #include <cassert>
+#include <chrono>
 #include <iostream>
 
 static void Put16(std::vector<unsigned char> &b, size_t at, uint16_t value)
@@ -43,6 +44,19 @@ static std::vector<unsigned char> Font(const std::string &name, size_t base = 0)
     return b;
 }
 
+static bool AwaitScan(suite_fonts::ScanService &service, suite_fonts::Catalog &target)
+{
+    auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < until)
+    {
+        bool published = service.Poll(target);
+        if (service.Status().phase != suite_fonts::ScanPhase::Pending)
+            return published;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    throw std::runtime_error("Font scan worker timed out");
+}
+
 int main()
 {
     auto bytes = Font("Test Display Bold");
@@ -66,7 +80,9 @@ int main()
     Put32(collection, 8, 257);
     assert(suite_fonts::Offsets(collection).empty());
 
-    auto folder = std::filesystem::temp_directory_path() / "it-steals-font-catalog-test";
+    auto folder = std::filesystem::temp_directory_path() /
+                  ("it-steals-font-catalog-test-" + std::to_string(
+                      std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(folder);
     auto write = [&](const std::filesystem::path &path, const std::vector<unsigned char> &data) {
         std::ofstream out(path, std::ios::binary);
@@ -101,6 +117,60 @@ int main()
     preferences.appearance.fontIds[0] = id;
     assert(TrainerPreferences::Decode(preferences.Encode()).appearance.fontIds[0] == id);
     assert(!suite_fonts::ValidId("invalid\nfont"));
+
+    // Real files are discovered off-thread. The currently published faces and
+    // stable IDs remain untouched until the UI explicitly polls a full result.
+    auto firstFolder = folder / "async-first", otherFolder = folder / "async-other";
+    std::filesystem::create_directories(firstFolder);
+    std::filesystem::create_directories(otherFolder);
+    write(firstFolder / "display.ttf", bytes);
+    write(otherFolder / "other.ttf", Font("Other request"));
+    suite_fonts::Catalog published = catalog;
+    auto oldRevision = published.revision;
+    auto oldFaceCount = published.faces.size();
+    suite_fonts::ScanService service;
+    assert(service.Status().phase == suite_fonts::ScanPhase::Idle);
+    assert(service.RefreshDirectories({{firstFolder, "Suite"}}));
+    assert(service.Status().phase == suite_fonts::ScanPhase::Pending);
+    assert(!service.RefreshDirectories({{otherFolder, "Other"}}));
+    assert(published.revision == oldRevision && published.faces.size() == oldFaceCount);
+    assert(AwaitScan(service, published));
+    auto stable = "Suite:display.ttf#0";
+    assert(published.revision == oldRevision + 1 && published.faces.size() == 1 &&
+           published.Find(stable) && !published.Find("Other:other.ttf#0"));
+    assert(service.Status().phase == suite_fonts::ScanPhase::Ready && service.Status().error.empty());
+    assert(!service.Poll(published)); // a result publishes once
+    write(firstFolder / "added.ttf", Font("Added after install"));
+    assert(service.RefreshDirectories({{firstFolder, "Suite"}}));
+    assert(AwaitScan(service, published));
+    assert(published.Find(stable) && published.Find(stable)->name == "Test Display Bold" &&
+           published.faces.size() == 2 && published.revision == oldRevision + 2);
+
+    // Exceed the actual file/byte/face budgets. Failed scans retain the last
+    // usable selection and report an error; the user can retry after cleanup.
+    for (int limit = 0; limit < 3; ++limit)
+    {
+        suite_fonts::ScanLimits budget;
+        if (limit == 0) budget.files = 1;
+        if (limit == 1) budget.bytes = bytes.size() - 1;
+        if (limit == 2) budget.faces = 1;
+        assert(service.RefreshDirectories({{firstFolder, "Suite"}}, budget));
+        assert(!AwaitScan(service, published));
+        assert(service.Status().phase == suite_fonts::ScanPhase::Failed &&
+               !service.Status().error.empty() && published.Find(stable) &&
+               published.faces.size() == 2 && published.revision == oldRevision + 2);
+    }
+    std::filesystem::remove(firstFolder / "display.ttf");
+    assert(service.RefreshDirectories({{firstFolder, "Suite"}}));
+    assert(AwaitScan(service, published) && !published.Find(stable) && published.faces.size() == 1);
+    // Closing while work is pending cancels/joins safely without mutating the
+    // published catalog or leaving a joinable worker behind.
+    auto beforeShutdown = published.revision;
+    assert(service.RefreshDirectories({{firstFolder, "Suite"}}));
+    service.Shutdown();
+    service.Shutdown();
+    assert(published.revision == beforeShutdown && !service.Refresh());
+    std::cout << "Async font scan publication, coalescing, stable selection, budgets, retry and shutdown: PASS\n";
 #ifdef _WIN32
     suite_fonts::RefreshInstalled();
     assert(suite_fonts::catalog.scanned && !suite_fonts::catalog.faces.empty());

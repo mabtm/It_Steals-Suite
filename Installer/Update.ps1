@@ -32,7 +32,7 @@ function Read-UpdateRequest([string]$File) {
     if ([IO.Path]::GetFileName($request.game) -ne 'It Steals.exe' -or
         -not (Test-GameFolder ([IO.Path]::GetDirectoryName($request.game)))) { throw 'The selected game is not a supported It Steals installation.' }
     $gameFolder=[IO.Path]::GetDirectoryName($request.game)
-    if ($request.application -eq $gameFolder -or $request.application.StartsWith($gameFolder.TrimEnd([char[]]'\/')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'PracticeSuite must be installed outside the game folder.' }
+    if ($request.application -eq $gameFolder -or $request.application.StartsWith($gameFolder.TrimEnd([char[]]'\/')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Elite-Suite must be installed outside the game folder.' }
     $trainer = Join-Path $request.application 'ItStealsTrainer.exe'
     if (-not (Test-Path -LiteralPath $trainer -PathType Leaf)) { throw 'The original trainer was moved. Run Setup before updating.' }
     return $request
@@ -164,14 +164,14 @@ function Invoke-UpdateApply([string]$File) {
     $trainer=$null; $game=$null
     try {
         try { $locked=$mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $locked=$true }
-        if (-not $locked) { throw 'Another PracticeSuite update is already being installed.' }
+        if (-not $locked) { throw 'Another Elite-Suite update is already being installed.' }
         Set-UpdateStatus $job 'Verifying package and process identities...'
         $null=Expand-UpdatePackage (Join-Path $job 'package.zip') $payload $request
         Assert-NoActiveEncoder $request.application
         $trainer=Get-UpdateProcess $request.trainerPid (Join-Path $request.application 'ItStealsTrainer.exe') $request.trainerCreated
         $game=Get-UpdateProcess $request.gamePid $request.game $request.gameCreated
         if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { Initialize-UpdateWindows }
-        Set-UpdateStatus $job 'Closing It Steals and PracticeSuite...'
+        Set-UpdateStatus $job 'Closing It Steals and Elite-Suite...'
         Close-UpdateProcess $game; $game=$null
         Close-UpdateProcess $trainer; $trainer=$null
         # Install-Suite owns the existing verified write journal and rollback.
@@ -183,10 +183,13 @@ function Invoke-UpdateApply([string]$File) {
             $registered=Get-ItemProperty -LiteralPath $uninstall
             if ($registered.PSObject.Properties['InstallLocation'] -and
                 [string]::Equals($registered.InstallLocation,$request.application,[StringComparison]::OrdinalIgnoreCase)) {
-                try { Set-ItemProperty -LiteralPath $uninstall -Name DisplayVersion -Value $request.version } catch { Write-Output "Installation succeeded; Windows display version could not be refreshed." }
+                try {
+                    Set-ItemProperty -LiteralPath $uninstall -Name DisplayVersion -Value $request.version
+                    Set-ItemProperty -LiteralPath $uninstall -Name DisplayName -Value 'Elite-Suite'
+                } catch { Write-Output "Installation succeeded; Windows display details could not be refreshed." }
             }
         }
-        Set-UpdateStatus $job ('Installed v'+$request.version+'. Restarting PracticeSuite and It Steals.')
+        Set-UpdateStatus $job ('Installed v'+$request.version+'. Restarting Elite-Suite and It Steals.')
     } finally {
         if ($trainer) { $trainer.Dispose() }
         if ($game) { $game.Dispose() }
@@ -231,11 +234,11 @@ function Invoke-UpdateController([string]$File) {
                 $null=Start-Process -FilePath $exe -WorkingDirectory $request.application -ArgumentList '--restart-after-update' -PassThru
             }
         } catch {
-            $message='The update helper could not restart PracticeSuite. Start the trainer manually. '+$_.Exception.Message
+            $message='The update helper could not restart Elite-Suite. Start the trainer manually. '+$_.Exception.Message
             Set-UpdateStatus $job $message
             [IO.File]::WriteAllText($result,$message,(New-Object Text.UTF8Encoding($false)))
             Add-Type -AssemblyName System.Windows.Forms
-            $null=[Windows.Forms.MessageBox]::Show($message,'PracticeSuite update')
+            $null=[Windows.Forms.MessageBox]::Show($message,'Elite-Suite update')
         } finally { if ($original) { $original.Dispose() } }
         if (Test-Path -LiteralPath (Join-Path $job 'package.zip')) { Remove-Item -LiteralPath (Join-Path $job 'package.zip') -Force }
     }

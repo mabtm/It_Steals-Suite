@@ -128,6 +128,14 @@ public struct TrainerCommands
             return PracticeModeActive == 1;
         }
     }
+    public bool SetSeed
+    {
+        get { return Speedrun && !Practice && SeededPractice == 1; }
+    }
+    public bool UsesControlledSeed
+    {
+        get { return (Practice || SetSeed) && SeededPractice == 1; }
+    }
     public bool Restricted
     {
         get {

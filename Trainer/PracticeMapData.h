@@ -95,7 +95,9 @@ struct RunReview
     int lightRejected = 0;
     bool validationChecked = false, valid = false, observedFromStart = false, seedKnown = false,
          monstersReduced = false;
-    int seedKind = 0;
+    int seedKind = 0, category = 0, selectedSeed = 0, runSeed = 0;
+    bool rawSpawnSeed = false;
+    uint32_t initialAids = 0;
     uint32_t aids = 0, warnings = 0;
     std::string validityReason = "Older recording; validation unavailable";
     std::vector<ReplayMonster> monsters;
@@ -409,7 +411,7 @@ inline std::shared_ptr<const MapData> DecodeMap(std::vector<uint8_t> bytes, std:
         if (r.Read<uint32_t>() != 0x504D5349u)
             throw std::runtime_error("Unsupported map format");
         int format = r.Read<int32_t>();
-        if (format < 1 || format > 14 || format == 5)
+        if (format < 1 || format > 15 || format == 5)
             throw std::runtime_error("Unsupported map format");
         auto d = std::make_shared<MapData>();
         for (int *value : {&d->pid, &d->scene, &d->epoch, &d->seed, &d->recipe, &d->sourceKind, &d->spawn,
@@ -583,10 +585,26 @@ inline std::shared_ptr<const MapData> DecodeMap(std::vector<uint8_t> bytes, std:
                     review->aids = r.Read<uint32_t>();
                     review->warnings = r.Read<uint32_t>();
                     review->validityReason = r.Text(1024);
+                    if (format >= 15)
+                    {
+                        review->category = r.Read<uint8_t>();
+                        review->selectedSeed = r.Read<int32_t>();
+                        review->runSeed = r.Read<int32_t>();
+                        review->rawSpawnSeed = r.Flag();
+                        review->initialAids = r.Read<uint32_t>();
+                        if (review->category > 2)
+                            throw std::runtime_error("Invalid recorded run category");
+                    }
+                    else
+                        review->category = (review->aids & 3u) ? 2 : 0;
                     // Exact local validation rule, preserved with the run.
                     constexpr uint32_t invalidWarnings = ~uint32_t{64};
+                    bool seedMatches = review->category == 0 ? review->seedKind == 1 && (review->aids | review->initialAids) == 0 :
+                                       review->category == 1 && review->seedKind == 2 && review->aids == 2 &&
+                                       review->initialAids == 2 &&
+                                       review->runSeed == review->selectedSeed;
                     bool valid = review->validationChecked && review->observedFromStart &&
-                                 review->seedKnown && review->seedKind == 1 && review->aids == 0 &&
+                                 review->seedKnown && seedMatches &&
                                  (review->warnings & invalidWarnings) == 0;
                     if (review->seedKind < 0 || review->seedKind > 2 || review->valid != valid)
                         throw std::runtime_error("Inconsistent recorded validation");

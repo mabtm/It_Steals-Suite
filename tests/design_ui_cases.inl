@@ -20,6 +20,7 @@ void DesignInteractionCases()
     g_compactMode = g_speedrunMode = g_practiceMode = g_runReviewOpen = false;
     g_selectRunReview = false;
     suite_ui::navigation = {};
+    suite_ui::navigation.Select(suite_ui::Page::Cheats, ImGui::GetTime());
     g_resetLayout = true;
     Frame();
     g_resetLayout = false;
@@ -34,7 +35,7 @@ void DesignInteractionCases()
     click.x += rail->Size.x * .5f;
     // Modes & runs is the first task under the Practice group. Click the
     // actual row, below its group heading, then exercise every stable page ID.
-    click.y += ImGui::GetTextLineHeightWithSpacing() + 22;
+    click.y += ImGui::GetTextLineHeightWithSpacing() + 3 + 23;
     io.AddMousePosEvent(click.x, click.y);
     Frame();
     assert(suite_ui::navigation.Is(suite_ui::Page::Cheats));
@@ -253,6 +254,7 @@ void DesignGallery(const std::string &output)
         CheckHudRegions();
     };
     suite_ui::navigation = {};
+    suite_ui::navigation.Select(suite_ui::Page::Cheats, ImGui::GetTime());
     g_resetLayout = true;
     menuFrame();
     g_resetLayout = false;

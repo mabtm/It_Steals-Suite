@@ -35,7 +35,17 @@ inline ImVec4 Alpha(ImVec4 c, float a)
     return c;
 }
 
-inline ImVec4 background(.048f, .063f, .074f, 1), ink(.91f, .95f, .95f, 1), heading(.37f, .83f, .77f, 1);
+inline ImVec4 background(.055f, .067f, .086f, 1), ink(.94f, .96f, .98f, 1), heading(.48f, .83f, 1.f, 1);
+
+inline ImVec4 Panel(float lift = 1)
+{
+    return Blend(background, Color(AppearancePreferences::Button), std::clamp(.48f * lift, 0.f, 1.f));
+}
+
+inline ImVec4 Muted()
+{
+    return Blend(ink, background, .34f);
+}
 
 inline ImVec4 HudBackground(float a = 1)
 {
@@ -68,12 +78,12 @@ inline void ApplyPalette(ImVec4 bg, ImVec4 text, ImVec4 header)
          outline = Color(AppearancePreferences::Outline);
     c[ImGuiCol_WindowBg] = bg;
     c[ImGuiCol_Text] = text;
-    c[ImGuiCol_TextDisabled] = Blend(text, bg, .42f);
+    c[ImGuiCol_TextDisabled] = Blend(text, bg, .34f);
     c[ImGuiCol_ChildBg] = {0, 0, 0, 0};
     c[ImGuiCol_PopupBg] = Alpha(Blend(bg, button, .28f), .99f);
     c[ImGuiCol_Border] = Alpha(outline, .8f);
     c[ImGuiCol_BorderShadow] = {0, 0, 0, 0};
-    c[ImGuiCol_FrameBg] = Blend(bg, button, .65f);
+    c[ImGuiCol_FrameBg] = Blend(bg, button, .9f);
     c[ImGuiCol_FrameBgHovered] = Blend(c[ImGuiCol_FrameBg], fade, .20f);
     c[ImGuiCol_FrameBgActive] = Blend(c[ImGuiCol_FrameBg], fade, .30f);
     c[ImGuiCol_Button] = button;
@@ -82,9 +92,9 @@ inline void ApplyPalette(ImVec4 bg, ImVec4 text, ImVec4 header)
     c[ImGuiCol_Header] = Blend(bg, button, .8f);
     c[ImGuiCol_HeaderHovered] = Blend(c[ImGuiCol_Header], fade, .20f);
     c[ImGuiCol_HeaderActive] = Blend(c[ImGuiCol_Header], fade, .30f);
-    c[ImGuiCol_Tab] = Blend(bg, button, .35f);
+    c[ImGuiCol_Tab] = Blend(bg, button, .20f);
     c[ImGuiCol_TabHovered] = Blend(button, fade, .24f);
-    c[ImGuiCol_TabSelected] = Blend(button, fade, .13f);
+    c[ImGuiCol_TabSelected] = Blend(button, fade, .10f);
     c[ImGuiCol_TabDimmed] = c[ImGuiCol_Tab];
     c[ImGuiCol_TabDimmedSelected] = c[ImGuiCol_TabSelected];
     c[ImGuiCol_TabSelectedOverline] = c[ImGuiCol_TabDimmedSelectedOverline] = fade;

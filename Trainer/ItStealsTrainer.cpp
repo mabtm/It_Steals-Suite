@@ -48,6 +48,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "SuiteExperience.h"
 #include "InterfaceAudio.h"
 #include "DiagnosticScan.h"
+#include "NavigationCapture.h"
 #include "RunExperienceModel.h"
 #include "IntroBackdrop.h"
 #include "RunReviewState.h"
@@ -90,6 +91,7 @@ CaptureOverlay g_captureOverlay;
 InterfaceAudio g_interfaceAudio;
 bool g_settingsFeedbackPending = false;
 FrameCost g_menuFrameCost, g_hudFrameCost;
+FrameCadence g_menuCadence, g_hudCadence;
 uint64_t g_lastHudBytes = 0;
 size_t g_lastHudSurfaces = 0;
 double g_lastHudUpload = 0;
@@ -136,10 +138,10 @@ std::string g_connectionStatus = "Waiting for ItStealsHelper";
 bool g_compactMode = false;
 bool g_showPlayerPanel = true, g_showCrystalPanel = true, g_showMonsterPanel = true;
 bool g_showVisualsPanel = true;
-ImVec4 g_mainBgCol = ImVec4(0.065f, 0.075f, 0.095f, 1.0f);
-ImVec4 g_textCol = ImVec4(0.9f, 0.9f, 0.9f, 1.0f);
-ImVec4 g_headerCol = ImVec4(0.34f, 0.70f, 0.95f, 1.0f);
-ImVec4 g_accentCol = ImVec4(1.0f, 0.64f, 0.29f, 1.0f);
+ImVec4 g_mainBgCol = ImVec4(.055f, .067f, .086f, 1);
+ImVec4 g_textCol = ImVec4(.94f, .96f, .98f, 1);
+ImVec4 g_headerCol = ImVec4(.48f, .83f, 1, 1);
+ImVec4 g_accentCol = ImVec4(.98f, .74f, .46f, 1);
 float g_minimapOpacity = 1.0f;
 int g_minimapWidth = 250, g_minimapHeight = 250;
 static bool minimapLockAspect = true;
@@ -1081,6 +1083,11 @@ std::string BuildDiagnostics()
     out << "\nMenu CPU/frame: mean " << g_menuFrameCost.Mean() << " ms; p95 " << g_menuFrameCost.P95()
         << " ms"
         << "\nHUD CPU/frame: mean " << g_hudFrameCost.Mean() << " ms; p95 " << g_hudFrameCost.P95() << " ms"
+        << "\nMenu output cadence: " << g_menuCadence.Fps() << " FPS; p95 interval " << g_menuCadence.P95()
+        << " ms; late " << g_menuCadence.LatePercent() << "% (" << g_menuCadence.Count() << " intervals)"
+        << "\nHUD output cadence: " << g_hudCadence.Fps() << " FPS; p95 interval " << g_hudCadence.P95()
+        << " ms; late " << g_hudCadence.LatePercent() << "% (" << g_hudCadence.Count() << " intervals)"
+        << "\nCadence measures successful outputs; monitor refresh is not measured."
         << "\nHUD readback: " << g_lastHudBytes << " bytes/frame; regions " << g_lastHudSurfaces
         << "; last upload " << g_lastHudUpload << " ms";
     if (g_pShared)
@@ -1254,8 +1261,8 @@ void InvalidateFontTexture()
 
 ImFont *LoadUiFont(float pixels, int choice = 0, const std::string &faceId = {})
 {
-    if (!suite_fonts::catalog.scanned)
-        suite_fonts::RefreshInstalled();
+    if (!suite_fonts::catalog.scanned && suite_fonts::scan.Status().phase == suite_fonts::ScanPhase::Idle)
+        suite_fonts::scan.Refresh();
     auto load = [&](const std::filesystem::path &path, int face, const std::string &name) -> ImFont * {
         auto bytes = suite_fonts::Read(path);
         auto offsets = suite_fonts::Offsets(bytes);
@@ -1530,6 +1537,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         return result;
     };
     ApplyPreferences(g_settings.Load());
+    suite_navigation_capture::service.SetDirectory(g_settings.Directory() / L"NavigationCaptures");
     inspector::reportFolder = g_settings.Directory() / L"Diagnostics" / L"Inspector";
     g_mapWorker.SetDirectory(g_settings.Directory());
     g_mapWorker.LoadCaches();
@@ -1588,7 +1596,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             if (!StartInstalledGame())
                 tray.LaunchWarning();
         }
-        suite_ui::lifecycleTime = GetTickCount64() / 1000.0;
+        suite_ui::lifecycleTime = std::chrono::duration<double>(Clock::now().time_since_epoch()).count();
         if (suite_keys::recording >= 0 || io.WantTextInput || ImGui::IsAnyItemActive() || suite_hud::active ||
             suite_clip::open)
             ReleaseHotkeys();
@@ -2018,6 +2026,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         PollExperienceFeedback();
         g_interfaceAudio.Submit(suite_ui::ConsumeTone());
         auto now = Clock::now();
+        if (!visible || !g_pd3dDevice || !g_surfaceInteractive)
+            g_menuCadence.Pause();
+        if (!visible || !g_pd3dDevice || g_surfaceInteractive)
+            g_hudCadence.Pause();
         if (visible && g_pd3dDevice && now >= nextFrame)
         {
             auto framePeriod = std::chrono::microseconds(
@@ -2048,6 +2060,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 pendingScale = desiredScale;
                 scaleAt = tick;
             }
+            if (suite_fonts::scan.Poll())
+                suite_ui::fontsDirty = true;
             if (std::fabs(dpi - g_dpiScale) > .01f || suite_ui::fontsDirty ||
                 (desiredScale != suite_ui::loadedHudScale && tick - scaleAt >= 120))
                 ApplyTheme(dpi);
@@ -2261,7 +2275,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                     // copy must keep producing frames for OBS and local input.
                     if (present == DXGI_STATUS_OCCLUDED && g_captureOverlay.enabled)
                         present = S_OK;
-                    suite_ui::CommitLifecycleFrame(present == S_OK, GetTickCount64() / 1000.0);
+                    auto presentedAt = std::chrono::duration<double>(Clock::now().time_since_epoch()).count();
+                    suite_ui::CommitLifecycleFrame(present == S_OK, presentedAt);
+                    auto &cadence = g_surfaceInteractive ? g_menuCadence : g_hudCadence;
+                    if (present == S_OK)
+                        cadence.Observe(presentedAt, std::chrono::duration<double, std::milli>(framePeriod).count());
+                    else
+                        cadence.Pause();
                     if (!g_surfaceInteractive && SUCCEEDED(present))
                     {
                         if (!gpuCapture)
@@ -2331,12 +2351,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                                     QS_ALLINPUT, MWMO_INPUTAVAILABLE);
     }
     g_interfaceAudio.Shutdown();
+    suite_fonts::scan.Shutdown();
     if (g_startupLogos.Pending())
         g_startupLogos.Restore();
     ClearTrainerCommands();
     CloseSharedMemory();
     SavePreferencesNow();
     g_settings.Shutdown();
+    suite_navigation_capture::service.Shutdown();
     practice::g_replayArchive.Shutdown();
     if (io.IniFilename)
         ImGui::SaveIniSettingsToDisk(io.IniFilename);

@@ -35,10 +35,10 @@ struct AppearancePreferences
     };
 
     using RGB = std::array<float, 3>;
-    std::array<RGB, Count> colors = {RGB{.10f, .18f, .20f},    RGB{.37f, .83f, .77f}, RGB{.20f, .29f, .32f},
-                                     RGB{.048f, .063f, .074f}, RGB{.91f, .95f, .95f}, RGB{.37f, .83f, .77f},
+    std::array<RGB, Count> colors = {RGB{.12f, .145f, .18f}, RGB{.48f, .83f, 1.f}, RGB{.23f, .28f, .34f},
+                                     RGB{.055f, .067f, .086f}, RGB{.94f, .96f, .98f}, RGB{.48f, .83f, 1.f},
                                      RGB{.045f, .065f, .08f},  RGB{.48f, .60f, .65f}, RGB{.55f, .92f, .94f},
-                                     RGB{.37f, .83f, .77f},    RGB{1, .72f, .39f}};
+                                     RGB{.48f, .83f, 1.f},    RGB{1, .72f, .39f}};
     bool hudFollowsTheme = true, introBlur = true;
     int menuFont = 0, hudFont = 0, timerFont = 8;
     std::array<std::string, 3> fontIds;

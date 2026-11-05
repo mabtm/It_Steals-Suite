@@ -484,10 +484,10 @@ inline bool Busy(Phase phase)
     return phase == Phase::Checking || phase == Phase::Downloading || phase == Phase::Installing;
 }
 
-inline bool Newer(const Release &r, std::string_view current)
+inline bool Newer(const Release &r, std::string_view current, bool installedPreview = false)
 {
     auto installed = Version::Parse(current), remote = Version::Parse(r.version);
-    return installed && remote && *remote > *installed;
+    return installed && remote && (*remote > *installed || (installedPreview && *remote == *installed));
 }
 
 struct Presentation

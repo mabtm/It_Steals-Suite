@@ -18,7 +18,7 @@
 
 struct TrainerPreferences
 {
-    static constexpr int FormatVersion = 20;
+    static constexpr int FormatVersion = 21;
     OverlayLayout hud{false}, speedrun{true};
     suite_input::Preferences input;
     MinimapOptions map;
@@ -38,10 +38,10 @@ struct TrainerPreferences
     int width = 250, height = 250, fps = 60, level = 0, seed = 0;
     int frameLimitMode = 0, gameFrameLimit = 240, vSyncMode = 0;
     float opacity = 1;
-    float background[4] = {.048f, .063f, .074f, 1};
-    float text[4] = {.91f, .95f, .95f, 1};
-    float header[4] = {.37f, .83f, .77f, 1};
-    float accent[4] = {1, .69f, .38f, 1};
+    float background[4] = {.055f, .067f, .086f, 1};
+    float text[4] = {.94f, .96f, .98f, 1};
+    float header[4] = {.48f, .83f, 1.f, 1};
+    float accent[4] = {.98f, .74f, .46f, 1};
 
     void Validate()
     {
@@ -240,6 +240,32 @@ struct TrainerPreferences
                     same &= std::abs(colors[k][i] - old[k][i]) < .00001f;
                 if (same)
                     std::copy(defaults[k], defaults[k] + 4, colors[k]);
+            }
+        }
+        if (version < 21)
+        {
+            // Upgrade only the complete untouched interface palette. A user
+            // who customized even one color keeps their entire chosen theme.
+            const float old[4][4] = {{.048f, .063f, .074f, 1}, {.91f, .95f, .95f, 1},
+                                     {.37f, .83f, .77f, 1}, {1, .69f, .38f, 1}};
+            const AppearancePreferences::RGB oldControls[] = {
+                {.10f, .18f, .20f}, {.37f, .83f, .77f}, {.20f, .29f, .32f}};
+            float *colors[] = {result.background, result.text, result.header, result.accent};
+            bool untouched = true;
+            for (int c = 0; c < 4; ++c)
+                for (int i = 0; i < 4; ++i)
+                    untouched &= std::abs(colors[c][i] - old[c][i]) < .00001f;
+            for (int c = 0; c < 3; ++c)
+                for (int i = 0; i < 3; ++i)
+                    untouched &= std::abs(result.appearance.colors[c][i] - oldControls[c][i]) < .00001f;
+            if (untouched)
+            {
+                TrainerPreferences fresh;
+                const float *defaults[] = {fresh.background, fresh.text, fresh.header, fresh.accent};
+                for (int c = 0; c < 4; ++c)
+                    std::copy(defaults[c], defaults[c] + 4, colors[c]);
+                for (int c = 0; c < 3; ++c)
+                    result.appearance.colors[c] = fresh.appearance.colors[c];
             }
         }
         if (version < 15)

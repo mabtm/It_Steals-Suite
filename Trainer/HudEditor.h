@@ -85,10 +85,14 @@ inline void Render()
     ImGui::Begin("HUD workspace", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
                      ImGuiWindowFlags_NoBringToFrontOnFocus);
+    const bool compactToolbar = display.x < 760 * unit || display.y < 480 * unit;
     ImGui::TextColored(g_headerCol, "HUD EDITOR");
-    SameLineIfFits(suite_brand::Credit);
-    ImGui::TextDisabled("%s", suite_brand::Credit);
-    SameLineIfFits("Apply layout");
+    if (!compactToolbar)
+    {
+        SameLineIfFits(suite_brand::Credit);
+        ImGui::TextDisabled("%s", suite_brand::Credit);
+        SameLineIfFits("Apply layout");
+    }
     if (suite_ui::Button("Apply layout"))
     {
         ImGui::End();
@@ -119,7 +123,8 @@ inline void Render()
         stable = draft;
     }
     ImGui::EndDisabled();
-    SameLineIfFits("Snap");
+    if (!compactToolbar)
+        SameLineIfFits("Snap");
     suite_ui::Checkbox("Snap", &snapping);
     SameLineIfFits("Light preview");
     suite_ui::Checkbox("Light preview", &light);

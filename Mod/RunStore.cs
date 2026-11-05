@@ -12,6 +12,7 @@ public sealed class RunStore : IDisposable
 {
     private readonly string path;
     private readonly Dictionary<int, double> best = new Dictionary<int, double>();
+    private readonly Dictionary<int, double> setSeedBest = new Dictionary<int, double>();
     private readonly SortedDictionary<int, int[]> days = new SortedDictionary<int, int[]>();
     public readonly List<RunRecord> History = new List<RunRecord>();
     public RunRecord Active;
@@ -38,8 +39,10 @@ public sealed class RunStore : IDisposable
     private bool stopping;
     private volatile bool writing, writingReport;
     private bool readOnly, preserveBackup;
+    private byte[] preUpgradeBytes;
     public volatile string LastError, LastReportError, ReportQueueWarning, LastMovementError;
     public string LoadWarning { get; private set; }
+    public string PreUpgradeBackupPath { get; private set; }
     public bool SavePending
     {
         get {
@@ -87,10 +90,12 @@ public sealed class RunStore : IDisposable
         }
     }
 
-    public double Best(int scene)
+    public double Best(int scene, RunCategory category = RunCategory.RandomSeed)
     {
+        if ((byte)category > 1)
+            return 0;
         double value;
-        return best.TryGetValue(scene, out value) ? value : 0;
+        return (category == RunCategory.SetSeed ? setSeedBest : best).TryGetValue(scene, out value) ? value : 0;
     }
 
     public long NextId(long utcTicks)
@@ -102,17 +107,17 @@ public sealed class RunStore : IDisposable
         return id;
     }
 
-    public bool RecordBest(int scene, double time)
+    public bool RecordBest(int scene, double time, RunCategory category = RunCategory.RandomSeed)
     {
-        if (!ValidTime(time))
+        if (!ValidTime(time) || (byte)category > 1)
             return false;
-        double old = Best(scene);
+        double old = Best(scene, category);
         if (old > 0 && time >= old)
             return false;
-        best[scene] = time;
+        (category == RunCategory.SetSeed ? setSeedBest : best)[scene] = time;
         int mode = Array.IndexOf(ModeStatistics.Scenes, scene);
         if (mode >= 0)
-            Modes.BestUtc[mode] = DateTime.UtcNow.Ticks;
+            (category == RunCategory.SetSeed ? Modes.SetSeedBestUtc : Modes.BestUtc)[mode] = DateTime.UtcNow.Ticks;
         Modes.Revision++;
         return true;
     }
@@ -254,7 +259,10 @@ public sealed class RunStore : IDisposable
                                         ToBase64(e.UnityVersion),
                                         ToBase64(e.GameHash),
                                         active ? VerificationReport.PackEvents(r.Events) : "",
-                                        r.ValidationChecked ? "1" : "0" });
+                                        r.ValidationChecked ? "1" : "0",
+                                        ((byte)r.Category).ToString(culture),
+                                        r.SelectedSeed.ToString(culture),
+                                        r.RawSpawnSeed ? "1" : "0" });
     }
 
     private static string ToBase64(string value)
@@ -273,7 +281,7 @@ public sealed class RunStore : IDisposable
     private static RunRecord Unpack(string text)
     {
         string[] a = text.Split('|');
-        if (a.Length != 15 && a.Length != 25 && a.Length != 26)
+        if (a.Length != 15 && a.Length != 25 && a.Length != 26 && a.Length != 29)
             return null;
         try
         {
@@ -303,12 +311,25 @@ public sealed class RunStore : IDisposable
                     new RunEnvironment { ToolVersion = FromBase64(a[20]), GameVersion = FromBase64(a[21]),
                                          UnityVersion = FromBase64(a[22]), GameHash = FromBase64(a[23]) };
                 r.Events = VerificationReport.UnpackEvents(a[24]);
-                if (a.Length == 26)
+                if (a.Length >= 26)
                 {
                     if (a[25] != "0" && a[25] != "1")
                         return null;
                     r.ValidationChecked = a[25] == "1";
                 }
+            }
+            if (a.Length == 29)
+            {
+                r.Category = (RunCategory)byte.Parse(a[26], culture);
+                r.SelectedSeed = int.Parse(a[27], culture);
+                if ((byte)r.Category > 2 || a[28] != "0" && a[28] != "1")
+                    return null;
+                r.RawSpawnSeed = a[28] == "1";
+            }
+            else
+            {
+                // Historical set seeds were practice aids, never category opt-ins.
+                r.Category = ((r.Aids | r.InitialAids) & (RunAids.Practice | RunAids.FixedSeed)) != 0 ? RunCategory.Practice : RunCategory.RandomSeed;
             }
             if (r.Id <= 0 || r.Number < 0 || r.Scene < 0 || r.StartedUtc <= 0 ||
                 r.StartedUtc > DateTime.MaxValue.Ticks || r.EndedUtc < 0 ||
@@ -372,11 +393,15 @@ public sealed class RunStore : IDisposable
     {
         Modes.Clear();
         Array.Clear(Modes.BestUtc, 0, Modes.BestUtc.Length);
+        Array.Clear(Modes.SetSeedBestUtc, 0, Modes.SetSeedBestUtc.Length);
         Runs = Finished = Deaths = Resets = TimedResets = 0;
         TotalFinishedTime = TotalResetTime = 0;
         FurthestProgress = 0;
         Active = null;
+        preUpgradeBytes = null;
+        PreUpgradeBackupPath = null;
         best.Clear();
+        setSeedBest.Clear();
         days.Clear();
         History.Clear();
     }
@@ -393,13 +418,19 @@ public sealed class RunStore : IDisposable
     {
         if (new FileInfo(candidate).Length > 262144)
             throw new IOException("Stats file exceeds 256 KiB.");
-        string text = File.ReadAllText(candidate);
+        byte[] loadedBytes = File.ReadAllBytes(candidate);
+        if (loadedBytes.Length > 256 * 1024)
+            throw new IOException("Stats file exceeds 256 KiB.");
+        string text;
+        using (var source = new MemoryStream(loadedBytes))
+        using (var reader = new StreamReader(source, Encoding.UTF8, true))
+            text = reader.ReadToEnd();
         string[] lines = text.Split('\n');
         int version = 0;
         foreach (string line in lines)
             if (line.StartsWith("version=", StringComparison.Ordinal))
                 int.TryParse(line.Substring(8).Trim(), out version);
-        if (version > 8)
+        if (version > 9)
             throw new NotSupportedException(
                 "Run data belongs to a newer suite; writes are disabled to preserve it.");
         if (version < 3)
@@ -490,6 +521,9 @@ public sealed class RunStore : IDisposable
                     TotalResetTime = time;
                 else if (key == "furthest")
                     FurthestProgress = (float)Math.Min(1, time);
+                else if (key.StartsWith("setSeedPb.", StringComparison.Ordinal) &&
+                         int.TryParse(key.Substring(10), out number) && ValidTime(time))
+                    setSeedBest[number] = time;
                 else if (key.StartsWith("pb.", StringComparison.Ordinal) &&
                          int.TryParse(key.Substring(3), out number) && ValidTime(time))
                     best[number] = time;
@@ -515,12 +549,19 @@ public sealed class RunStore : IDisposable
             }
             days.Remove(first);
         }
+        // Preserve the exact successfully loaded stable-format bytes. Ordinary
+        // .bak rotates on every save, so it cannot serve as a preview rollback.
+        if (version < 9)
+        {
+            preUpgradeBytes = loadedBytes;
+            PreUpgradeBackupPath = path + ".pre-v9-" + Guid.NewGuid().ToString("N") + ".bak";
+        }
     }
 
     private string Encode()
     {
         var text = new StringBuilder(4096);
-        text.Append("version=8\nruns=")
+        text.Append("version=9\nruns=")
             .Append(Runs)
             .Append("\nfinished=")
             .Append(Finished)
@@ -542,6 +583,10 @@ public sealed class RunStore : IDisposable
         keys.Sort();
         foreach (int key in keys)
             text.Append("pb.").Append(key).Append('=').Append(best[key].ToString("R", culture)).Append('\n');
+        keys = new List<int>(setSeedBest.Keys);
+        keys.Sort();
+        foreach (int key in keys)
+            text.Append("setSeedPb.").Append(key).Append('=').Append(setSeedBest[key].ToString("R", culture)).Append('\n');
         foreach (var day in days)
             text.Append("day.")
                 .Append(day.Key)
@@ -569,6 +614,31 @@ public sealed class RunStore : IDisposable
                 if (readOnly)
                     return;
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
+                if (preUpgradeBytes != null)
+                {
+                    // Each upgrade owns a new rollback file; never replace an
+                    // existing backup, including one from an earlier preview.
+                    string rollback = PreUpgradeBackupPath;
+                    bool created = false;
+                    try
+                    {
+                        using (var output = new FileStream(rollback, FileMode.CreateNew, FileAccess.Write,
+                                                           FileShare.Read))
+                        {
+                            created = true;
+                            output.Write(preUpgradeBytes, 0, preUpgradeBytes.Length);
+                            output.Flush(true);
+                        }
+                        preUpgradeBytes = null;
+                    }
+                    catch (Exception error)
+                    {
+                        if (created)
+                            try { File.Delete(rollback); } catch { }
+                        LastError = "Could not preserve pre-v9 run data; upgrade paused: " + error.Message;
+                        return; // The original file must remain untouched.
+                    }
+                }
                 if (preserveBackup)
                 {
                     File.Copy(path, path + ".corrupt-" + DateTime.UtcNow.Ticks, false);

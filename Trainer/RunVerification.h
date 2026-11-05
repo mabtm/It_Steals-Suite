@@ -14,6 +14,9 @@ template <class Data, class Visitor> void VerificationFields(Data &d, Visitor fi
     field("runUsedFeatures", d.runUsedFeatures);
     field("runAssisted", d.runAssisted);
     field("practiceModeActive", d.practiceModeActive);
+    field("runCategory", d.runCategory);
+    field("statsCategory", d.statsCategory);
+    field("selectedRunSeed", d.selectedRunSeed);
     field("seedKnown", d.seedKnown);
     field("seedKind", d.seedKind);
     field("seedSourcesVerified", d.seedSourcesVerified);
@@ -99,6 +102,8 @@ struct Verification
                std::abs(data.currentRunTimeSeconds - r.seconds) <= .000001 &&
                uint32_t(data.runUsedFeatures) == r.aids && uint32_t(data.runWarnings) == r.warnings &&
                bool(data.observedFromStart) == r.observedFromStart && data.seedKind == r.seedKind &&
+               data.runCategory == r.category && (r.category != 1 || data.selectedRunSeed == r.selectedSeed &&
+                                                                       data.runSeed == r.runSeed) &&
                bool(data.seedKnown) == r.seedKnown && CapturedText(data.gameAssemblyHash) == map.hash &&
                (data.runValidity != 1 || r.validationChecked && r.valid);
     }
@@ -165,6 +170,10 @@ inline Verification DecodeVerification(std::string_view bytes)
         throw std::runtime_error("Invalid verification trainer version");
     VerificationFields(v.data, [&](const char *name, auto &value) {
         const auto &field = json.At(name);
+        if (field.kind == suite_update::Json::Kind::Null &&
+            (std::string_view(name) == "runCategory" || std::string_view(name) == "statsCategory" ||
+             std::string_view(name) == "selectedRunSeed"))
+            return;
         using T = std::remove_cvref_t<decltype(value)>;
         if constexpr (std::is_array_v<T>)
         {
@@ -198,6 +207,8 @@ inline Verification DecodeVerification(std::string_view bytes)
             value = decoded;
         }
     });
+    if (json.At("runCategory").kind == suite_update::Json::Kind::Null)
+        v.data.runCategory = v.data.practiceModeActive || (v.data.runUsedFeatures & 3) ? 2 : 0;
     if (v.data.timerState != 2 || (v.data.runOutcome < 1 || v.data.runOutcome > 5) ||
         v.data.runValidity < 1 || v.data.runValidity > 2)
         throw std::runtime_error("Invalid finished run verification");
@@ -206,7 +217,7 @@ inline Verification DecodeVerification(std::string_view bytes)
         v.data.lastRunPb > 1 || v.data.reviewReady != 1 || v.data.reviewRetained != 1 ||
         v.data.menuInputOwned > 1 || v.data.freecamActive > 1 || v.data.hitboxEnabled > 1 ||
         v.data.brightnessEnabled > 1 || v.data.seedActive > 1 || v.data.externalScanStatus > 2 ||
-        v.data.seedKind > 2 || v.data.reviewSamples < 0 || v.data.rngReseedCount < 0)
+        v.data.seedKind > 2 || v.data.runCategory > 2 || v.data.statsCategory > 1 || v.data.reviewSamples < 0 || v.data.rngReseedCount < 0)
         throw std::runtime_error("Invalid verification flags");
     v.full = true;
     return v;
@@ -228,8 +239,12 @@ inline Verification HistoricalVerification(const practice::MapData &map,
     d.runOutcome = byte(r.outcome);
     d.runValidity = r.valid ? 1 : 2;
     d.runUsedFeatures = int(r.aids);
-    d.runAssisted = r.aids != 0;
+    d.runAssisted = (r.category == 1 ? r.aids & ~2u : r.aids) != 0;
     d.practiceModeActive = (r.aids & 1u) != 0;
+    d.runCategory = byte(r.category);
+    d.statsCategory = r.category == 1 ? 1 : 0;
+    d.selectedRunSeed = r.selectedSeed;
+    d.runSeed = r.runSeed;
     d.runWarnings = int(r.warnings);
     d.observedFromStart = r.observedFromStart;
     d.seedKnown = r.seedKnown;

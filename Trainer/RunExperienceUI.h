@@ -165,6 +165,12 @@ inline void RenderTechnicalScan(suite_run::Presentation &p, bool motion, float h
     ImGui::EndChild();
     if (suite_ui::resultDetailFont)
         ImGui::PopFont();
+    // Keep the two utility actions on one row in compact/high-DPI panels.
+    // The report body scrolls; its fixed footer must never be clipped.
+    auto actionPadding = ImGui::GetStyle().FramePadding;
+    if (ImGui::GetContentRegionAvail().x < 290 * u)
+        actionPadding.x = 6 * u;
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, actionPadding);
     if (suite_ui::Button("Copy report"))
         suite_ui::CopyText(p.Report().c_str());
     Help(
@@ -176,6 +182,7 @@ inline void RenderTechnicalScan(suite_run::Presentation &p, bool motion, float h
     ImGui::EndDisabled();
     Help(
         "Resume automatic selection. At completion, inspect the first failed check, or the build if all checks passed.");
+    ImGui::PopStyleVar();
     ImGui::PopStyleVar();
     ImGui::EndChild();
     ImGui::PopStyleColor();
@@ -255,7 +262,8 @@ inline void RenderRunExperience(suite_run::Presentation &p, double now, bool exp
             ImGui::SetCursorScreenPos({header.x, header.y + 54 * u});
             // Keep close and replay actions outside scrolling content, even
             // at 480x360 / 150% DPI.
-            float footerHeight = 80 * u,
+            float footerHeight = 40 * u + std::max(detailFont->FontSize, ImGui::GetFontSize()) +
+                                 4 * ImGui::GetStyle().ItemSpacing.y + 2 * u,
                   bodyHeight = std::max(24.f, ImGui::GetContentRegionAvail().y - footerHeight);
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {8 * u, 6 * u});
             ImGui::BeginChild("##RunResultDetails", {0, bodyHeight}, false, ImGuiWindowFlags_NoSavedSettings);

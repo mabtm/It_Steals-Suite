@@ -23,7 +23,8 @@ public enum RunWarnings : uint
     PlayerStateChanged = 1024,
     GamePatchesChanged = 2048,
     OverlayMissing = 4096,
-    ForbiddenCommand = 8192
+    ForbiddenCommand = 8192,
+    SelectionChanged = 16384
 }
 
 public sealed class RunEnvironment
@@ -188,6 +189,13 @@ public static class VerificationReport
             .Append(r.Scene)
             .Append(",\n  \"modeAtStart\": ")
             .Append(Quote((r.InitialAids & RunAids.Practice) != 0 ? "PRACTICE" : "SPEEDRUN"))
+            .Append(",\n  \"category\": ")
+            .Append(Quote(r.Category == RunCategory.SetSeed ? "SET-SEED" :
+                          r.Category == RunCategory.Practice ? "PRACTICE" : "RANDOM SEED"))
+            .Append(",\n  \"selectedSeed\": ")
+            .Append(r.SelectedSeed)
+            .Append(",\n  \"seedRecipe\": ")
+            .Append(Quote(r.RawSpawnSeed ? "RAW-FIRST-SPAWN-V1" : "DERIVED-V1"))
             .Append(",\n  \"toolVersion\": ")
             .Append(Quote(e.ToolVersion))
             .Append(",\n  \"gameReportedVersion\": ")
@@ -210,7 +218,7 @@ public static class VerificationReport
             .Append(r.SeedKnown ? r.Seed.ToString(culture) : "null")
             .Append(",\n  \"seedMeaning\": ")
             .Append(Quote(r.SeedType == SeedKind.Set
-                              ? "Helper practice base seed"
+                              ? "Helper base seed (see category and seedRecipe)"
                               : "First observed RNG seed; not a replayable world seed"))
             .Append(",\n  \"reseedsObserved\": ")
             .Append(r.Reseeds)

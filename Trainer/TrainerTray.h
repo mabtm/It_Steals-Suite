@@ -3,6 +3,8 @@
 #include <shellapi.h>
 #include <functional>
 #include <algorithm>
+#include <chrono>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include "SuiteBranding.h"
@@ -31,7 +33,7 @@ inline void ShowSuiteExitGraphic(bool enabled, bool motion, COLORREF background,
     int width = int(460 * scale), height = int(138 * scale);
     HWND window = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT, wc.lpszClassName,
-        L"PracticeSuite", WS_POPUP, work.left + (work.right - work.left - width) / 2,
+        L"Elite-Suite", WS_POPUP, work.left + (work.right - work.left - width) / 2,
         work.top + (work.bottom - work.top - height) / 2, width, height, nullptr, nullptr, instance, nullptr);
     if (window)
     {
@@ -43,16 +45,21 @@ inline void ShowSuiteExitGraphic(bool enabled, bool motion, COLORREF background,
                                  L"Segoe UI");
         SetLayeredWindowAttributes(window, 0, motion ? 0 : 255, LWA_ALPHA);
         ShowWindow(window, SW_SHOWNOACTIVATE);
-        ULONGLONG started = GetTickCount64();
-        constexpr ULONGLONG duration = 1650;
-        while (IsWindow(window) && GetTickCount64() - started < duration)
+        using Clock = std::chrono::steady_clock;
+        auto started = Clock::now(), nextFrame = started;
+        constexpr double duration = 1650;
+        auto period = std::chrono::microseconds(motion ? 16667 : 100000);
+        HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, 0x00000002, TIMER_ALL_ACCESS);
+        if (!timer)
+            timer = CreateWaitableTimerW(nullptr, FALSE, nullptr);
+        while (IsWindow(window) && Clock::now() - started < std::chrono::milliseconds(1650))
         {
-            auto elapsed = GetTickCount64() - started;
+            auto elapsed = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
             if (motion)
                 SetLayeredWindowAttributes(
                     window, 0,
                     BYTE(255 *
-                         std::clamp(std::min(elapsed / 100., (double(duration) - elapsed) / 180.), 0., 1.)),
+                         std::clamp(std::min(elapsed / 100., (duration - elapsed) / 180.), 0., 1.)),
                     LWA_ALPHA);
             HDC dc = GetDC(window);
             RECT bounds{0, 0, width, height}, stripe{0, 0, int(5 * scale), height};
@@ -62,7 +69,7 @@ inline void ShowSuiteExitGraphic(bool enabled, bool motion, COLORREF background,
             SetTextColor(dc, ink);
             auto original = SelectObject(dc, title);
             RECT line{int(28 * scale), int(25 * scale), width - int(20 * scale), int(66 * scale)};
-            DrawTextW(dc, L"PRACTICE SUITE", -1, &line, DT_SINGLELINE | DT_NOPREFIX);
+            DrawTextW(dc, L"ELITE-SUITE", -1, &line, DT_SINGLELINE | DT_NOPREFIX);
             SelectObject(dc, body);
             SetTextColor(dc, accent);
             line.top = int(77 * scale);
@@ -76,8 +83,24 @@ inline void ShowSuiteExitGraphic(bool enabled, bool motion, COLORREF background,
                 TranslateMessage(&message);
                 DispatchMessageW(&message);
             }
-            Sleep(16);
+            nextFrame += period;
+            if (nextFrame < Clock::now())
+                nextFrame = Clock::now() + period;
+            auto wait = nextFrame - Clock::now();
+            LARGE_INTEGER due{};
+            due.QuadPart = -std::max<int64_t>(
+                1, std::chrono::duration_cast<std::chrono::nanoseconds>(wait).count() / 100);
+            if (timer && SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE))
+                MsgWaitForMultipleObjectsEx(1, &timer, 100, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            else
+                MsgWaitForMultipleObjectsEx(
+                    0, nullptr,
+                    DWORD(std::clamp<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(wait).count() + 1,
+                                                1, 100)),
+                    QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         }
+        if (timer)
+            CloseHandle(timer);
         DestroyWindow(window);
         DeleteObject(title);
         DeleteObject(body);
@@ -98,7 +121,7 @@ class TrainerTray
     std::wstring tooltip;
     std::function<void()> open, quit, launch;
     std::wstring brand =
-        L"PracticeSuite v" +
+        L"Elite-Suite v" +
         std::wstring(suite_brand::Version, suite_brand::Version + sizeof(suite_brand::Version) - 1) +
         L" / mab";
     static constexpr UINT callback = WM_APP + 42;
@@ -162,8 +185,8 @@ class TrainerTray
                 if (menu)
                 {
                     AppendMenuW(menu, MF_STRING | (self->canOpen ? 0 : MF_GRAYED), 1,
-                                L"Open PracticeSuite menu");
-                    AppendMenuW(menu, MF_STRING, 2, L"Exit PracticeSuite");
+                                L"Open Elite-Suite menu");
+                    AppendMenuW(menu, MF_STRING, 2, L"Exit Elite-Suite");
                     if (!self->canOpen && self->launch)
                         AppendMenuW(menu, MF_STRING, 3, L"Start It Steals");
                     SetForegroundWindow(hwnd);
@@ -200,7 +223,7 @@ class TrainerTray
         type.lpszClassName = L"ItStealsPracticeControl.v6";
         if (RegisterClassW(&type))
         {
-            window = CreateWindowExW(WS_EX_TOOLWINDOW, type.lpszClassName, L"It Steals PracticeSuite",
+            window = CreateWindowExW(WS_EX_TOOLWINDOW, type.lpszClassName, L"Elite-Suite",
                                      WS_OVERLAPPED, 0, 0, 0, 0, nullptr, nullptr, type.hInstance, this);
             tooltip = brand + L" | waiting for It Steals";
             if (window)

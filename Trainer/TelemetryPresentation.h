@@ -93,7 +93,20 @@ struct HistoryRecord
 
     uint32_t Warnings() const
     {
-        return reserved & 0x7fffffffu;
+        return reserved & 0x3fffffffu;
+    }
+
+    byte Category() const
+    {
+        if (reserved & 0x40000000u)
+            return 1;
+        // Historical fixed-seed practice has no explicit category declaration.
+        return (aids & 3u) ? 2 : 0;
+    }
+
+    const char *CategoryLabel() const
+    {
+        return Category() == 1 ? "Set-Seed" : Category() == 2 ? "Practice" : "Random Seed";
     }
 };
 

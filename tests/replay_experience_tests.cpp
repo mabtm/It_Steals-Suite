@@ -209,6 +209,31 @@ int main(int argc, char **argv)
         auto encoded = suite_run::EncodeVerification(finish);
         auto restored = suite_run::DecodeVerification(encoded);
         assert(restored.Matches(*map) && suite_run::EncodeVerification(restored) == encoded);
+        auto legacySidecar = encoded;
+        for (const std::string field : {"runCategory", "statsCategory", "selectedRunSeed"})
+        {
+            auto start = legacySidecar.find(",\"" + field + "\":");
+            assert(start != std::string::npos);
+            auto end = legacySidecar.find(',', start + 1);
+            legacySidecar.erase(start, end - start);
+        }
+        assert(suite_run::DecodeVerification(legacySidecar).Matches(*map));
+        auto practiceMap = *map;
+        auto practiceReview = std::make_shared<RunReview>(*map->review);
+        practiceMap.review = practiceReview;
+        practiceReview->category = 2;
+        practiceReview->aids = 2;
+        practiceReview->seedKind = 2;
+        practiceReview->valid = false;
+        auto practiceSidecar = suite_run::EncodeVerification(suite_run::HistoricalVerification(practiceMap));
+        for (const std::string field : {"runCategory", "statsCategory", "selectedRunSeed"})
+        {
+            auto start = practiceSidecar.find(",\"" + field + "\":");
+            auto end = practiceSidecar.find(',', start + 1);
+            practiceSidecar.erase(start, end - start);
+        }
+        auto preservedPractice = suite_run::DecodeVerification(practiceSidecar);
+        assert(preservedPractice.data.runCategory == 2 && preservedPractice.Matches(practiceMap));
         auto mismatch = *map;
         mismatch.seed++;
         assert(!restored.Matches(mismatch));

@@ -554,6 +554,11 @@ public static class ReplayCapture
         var text = System.Text.Encoding.UTF8.GetBytes(r.ValidityReason ?? "");
         w.Write(text.Length);
         w.Write(text);
+        w.Write((byte)r.Category);
+        w.Write(r.SelectedSeed);
+        w.Write(r.RunSeed);
+        w.Write(r.RawSpawnSeed);
+        w.Write(r.InitialAids);
         w.Write(r.MonstersReduced);
         w.Write(r.Monsters.Count);
         foreach (var m in r.Monsters)

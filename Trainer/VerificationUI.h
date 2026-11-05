@@ -7,7 +7,7 @@
 
 inline std::string FeatureNames(uint32_t mask)
 {
-    const char *names[] = {"Practice", "Fixed seed", "Hitboxes", "Fullbright",    "Free camera",
+    const char *names[] = {"Practice", "Set-Seed", "Hitboxes", "Fullbright",    "Free camera",
                            "Teleport", "Minimap",    "Path",     "Spawn planner", "Live inspector"};
     std::string result;
     for (int i = 0; i < 10; i++)
@@ -32,16 +32,16 @@ inline std::string WarningNames(uint32_t mask)
                            "Process stopped",       "Invalid timing",         "Run interrupted",
                            "Event log truncated",   "Memory editor detected", "Integrity checks unavailable",
                            "Time scale changed",    "Player state changed",   "Game hooks changed",
-                           "Mandatory HUD missing", "Forbidden command"};
+                           "Mandatory HUD missing", "Forbidden command", "Seed or category changed"};
     std::string result;
-    for (int i = 0; i < 14; i++)
+    for (int i = 0; i < 15; i++)
         if (mask & (1u << i))
         {
             if (!result.empty())
                 result += ", ";
             result += names[i];
         }
-    if (mask & ~16383u)
+    if (mask & ~32767u)
     {
         if (!result.empty())
             result += ", ";
@@ -54,7 +54,7 @@ inline std::string VerificationSummary(const GameData &data)
 {
     std::ostringstream out;
     out.imbue(std::locale::classic());
-    out << "It Steals PracticeSuite - local verification summary\n"
+    out << "Elite-Suite - local verification summary\n"
         << "This is editable local evidence, not leaderboard approval.\n"
         << "Run: " << (data.currentRunNumber ? std::to_string(data.currentRunNumber) : "UNKNOWN")
         << "\nRun level: " << data.runSceneIndex << " (current scene " << data.currentSceneIndex

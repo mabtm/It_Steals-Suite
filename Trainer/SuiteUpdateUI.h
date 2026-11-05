@@ -108,14 +108,14 @@ inline void Notes(const std::string &body)
 inline void Versions(const suite_update::Snapshot &snapshot)
 {
     float u = suite_ui::Unit();
-    bool newer = suite_update::Newer(snapshot.latest, suite_brand::Version);
+    bool newer = suite_update::Newer(snapshot.latest, suite_brand::Version, suite_brand::Preview);
     if (ImGui::BeginTable("##ReleaseVersions", 2, ImGuiTableFlags_SizingStretchSame))
     {
         ImGui::TableNextColumn();
         ImGui::TextDisabled("CURRENT");
         if (suite_ui::introTitleFont)
             ImGui::PushFont(suite_ui::introTitleFont);
-        ImGui::Text("v%s", suite_brand::Version);
+        ImGui::Text("v%s", suite_brand::DisplayVersion);
         if (suite_ui::introTitleFont)
             ImGui::PopFont();
         ImGui::TableNextColumn();
@@ -169,7 +169,7 @@ inline void StartInstall()
 inline void Controls(const suite_update::Snapshot &snapshot, bool blocked)
 {
     auto &service = suite_update::service;
-    bool newer = suite_update::Newer(snapshot.latest, suite_brand::Version);
+    bool newer = suite_update::Newer(snapshot.latest, suite_brand::Version, suite_brand::Preview);
     bool busy = suite_update::Busy(snapshot.phase);
     ImGui::PushTextWrapPos();
     if (snapshot.phase == suite_update::Phase::Error)
@@ -231,7 +231,7 @@ inline void Page(const suite_update::Snapshot &snapshot, bool blocked)
 {
     auto &service = suite_update::service;
     ImGui::BeginChild("##UpdatesScroll", {0, 0});
-    suite_ui::Section("PracticeSuite / stable releases", ImGuiTreeNodeFlags_DefaultOpen, [&] {
+    suite_ui::Section("Elite-Suite / stable releases", ImGuiTreeNodeFlags_DefaultOpen, [&] {
         Versions(snapshot);
         Controls(snapshot, blocked);
         ImGui::Spacing();

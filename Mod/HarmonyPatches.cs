@@ -91,7 +91,7 @@ public static class PracticeRandom
                           : DeriveSeed(BaseSeed, scene, site, occurrence);
         UnityEngine.Random.InitState(applied);
         SeedMapPlanner.ObserveRng(site, applied, BaseSeed, true, RawSpawnSeed);
-        Evidence.Observe(originalSeed, applied, true, BaseSeed);
+        Evidence.Observe(originalSeed, applied, true, BaseSeed, RawSpawnSeed);
     }
 }
 

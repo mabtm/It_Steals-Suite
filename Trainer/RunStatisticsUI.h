@@ -6,27 +6,64 @@ namespace run_stats
 inline int viewFilter = 0;
 inline bool setupReady = false, setupPractice = false, setupFixed = false, setupSpawn = false;
 inline int setupSeed = 0;
+struct SetupSelection
+{
+    bool practice = false, fixed = false, spawn = false;
+    int seed = 0, level = 0;
+
+    bool operator==(const SetupSelection &) const = default;
+};
+inline SetupSelection observedSelection;
 inline std::array<std::string, 8> pbLabels;
 inline std::array<double, 8> pbFlash{};
 
+inline SetupSelection CurrentSelection()
+{
+    return {g_practiceMode, g_seededPractice, g_rawPracticeSpawn, g_practiceSeed,
+            g_selectedSpeedrunLevel};
+}
+
+inline void SyncSetupSelection()
+{
+    const auto current = CurrentSelection();
+    // Keep edits local until Start is pressed. A selection adopted elsewhere
+    // (for example a seed search result) replaces the draft on the next visit.
+    if (!setupReady || !(current == observedSelection))
+    {
+        setupReady = true;
+        setupPractice = current.practice;
+        setupFixed = current.fixed;
+        setupSpawn = current.spawn;
+        setupSeed = current.seed;
+        dashboard.selected = std::clamp(current.level, 0, kMapLevelCount - 1);
+    }
+    observedSelection = current;
+}
+
 inline bool CanStart()
 {
-    return g_pShared && !HasPendingRequest() &&
-           (!setupPractice || !setupFixed || g_pShared->rngPatchComplete);
+    const bool setSeed = setupFixed && !setupPractice;
+    auto version = g_pShared ? suite_update::Version::Parse(g_pShared->version) : std::nullopt;
+    const bool supportsCategory = version && *version >= suite_update::Version{{7, 22, 0}};
+    return g_pShared && !HasPendingRequest() && !suite_hud::active && !suite_clip::open &&
+           (!setupFixed || g_pShared->rngPatchComplete) && (!setSeed || supportsCategory);
 }
 
 inline bool StartSelected()
 {
+    SyncSetupSelection();
     if (!CanStart())
         return false;
     g_selectedSpeedrunLevel = dashboard.selected;
     g_practiceMode = setupPractice;
-    g_seededPractice = setupPractice && setupFixed;
+    g_seededPractice = setupFixed;
     g_practiceSeed = setupSeed;
     g_rawPracticeSpawn = setupSpawn;
     g_commands.practiceSeed = setupSeed;
     g_commands.setSeedCmd = g_seededPractice ? 1 : 0;
-    return SetSpeedrunMode(true);
+    const bool started = SetSpeedrunMode(true);
+    observedSelection = CurrentSelection();
+    return started;
 }
 
 inline void Card(int index, float width)
@@ -42,8 +79,6 @@ inline void Card(int index, float width)
     float selected = Animate(id ^ 0x4118u, dashboard.selected == index ? 1.f : 0.f);
     float hover = Animate(id ^ 0x4119u, ImGui::IsItemHovered() ? 1.f : 0.f);
     float entry = Animate(id ^ 0x411au, 1.f, true, .18f);
-    a.y += 6 * u * (1 - entry);
-    b.y += 6 * u * (1 - entry);
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * entry);
     float flash =
         preferences.motion ? float(std::clamp(1. - (ImGui::GetTime() - pbFlash[index]) / .8, 0., 1.)) : 0;
@@ -54,7 +89,9 @@ inline void Card(int index, float width)
                   9 * u, 0, (1 + selected * .35f) * u);
     ImVec4 clip(a.x + 13 * u, a.y, b.x - 12 * u, b.y);
     TextAt(draw, {a.x + 15 * u, a.y + 12 * u}, kMapLevelNames[index], ink, 16 * u, clip);
-    TextAt(draw, {a.x + 15 * u, a.y + 37 * u}, "CLEAN PERSONAL BEST", Blend(ink, background, .45f), 10 * u,
+    TextAt(draw, {a.x + 15 * u, a.y + 37 * u},
+           dashboard.snapshot.statsCategory == 1 ? "SET-SEED PERSONAL BEST" : "RANDOM-SEED PERSONAL BEST",
+           Blend(ink, background, .45f), 10 * u,
            clip);
     draw->AddText(g_timerFont ? g_timerFont : ImGui::GetFont(), 28 * u, {a.x + 14 * u, a.y + 49 * u},
                   ImGui::GetColorU32(mode.pb > 0 ? heading : Blend(ink, background, .55f)),
@@ -72,7 +109,7 @@ inline void Card(int index, float width)
     if (ImGui::IsItemFocused())
         draw->AddRect(a, b, ImGui::GetColorU32(heading), 9 * u, 0, 2 * u);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-        ImGui::SetTooltip("View %s statistics", kMapLevelNames[index]);
+        ImGui::SetTooltip("Select %s. Use Details to view its statistics, or Start to play.", kMapLevelNames[index]);
     ImGui::PopStyleVar();
     if (click)
     {
@@ -80,8 +117,6 @@ inline void Card(int index, float width)
         Request(Tone::Click);
     }
     ImGui::PopID();
-    if (click)
-        ImGui::OpenPopup("Mode statistics");
 }
 
 inline void Details()
@@ -98,11 +133,12 @@ inline void Details()
     const auto &mode = dashboard.modes[dashboard.selected];
     const auto &value = mode.totals;
     ImGui::TextColored(g_headerCol, "%s", kMapLevelNames[dashboard.selected]);
-    ImGui::TextDisabled("%s statistics", viewFilter == 1   ? "Clean"
-                                         : viewFilter == 2 ? "Practice"
-                                                           : "All-category");
+    ImGui::TextDisabled("%s statistics", viewFilter == 1
+                                           ? (dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed")
+                                           : viewFilter == 2 ? "Practice" : "Overview");
     ImGui::Separator();
-    ImGui::Text("Clean PB  %s", pbLabels[dashboard.selected].c_str());
+    ImGui::Text("%s PB  %s", dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed",
+                 pbLabels[dashboard.selected].c_str());
     if (mode.pb > 0)
         ImGui::TextDisabled("PB date: %s", mode.pbDate.c_str());
     if (ImGui::BeginTable("Mode totals", 2, ImGuiTableFlags_SizingStretchSame))
@@ -128,7 +164,7 @@ inline void Details()
     ImGui::Spacing();
     ImGui::TextDisabled("Recent attempts / all categories");
     int recent = 0;
-    if (ImGui::BeginTable("Recent mode runs", 3, ImGuiTableFlags_SizingStretchSame))
+    if (ImGui::BeginTable("Recent mode runs", 4, ImGuiTableFlags_SizingStretchSame))
     {
         for (int i = 0; i < dashboard.snapshot.historyCount && recent < 6; i++)
         {
@@ -139,6 +175,8 @@ inline void Details()
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(Date(run.startedUtc).c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(run.CategoryLabel());
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(outcomes[std::min(int(run.outcome), 5)]);
             ImGui::TableNextColumn();
@@ -156,33 +194,64 @@ inline void Details()
         ImGui::CloseCurrentPopup();
     SameLineIfFits("Start this mode");
     ImGui::BeginDisabled(!CanStart());
-    if (suite_ui::Button("Start this mode") && StartSelected())
+    if (suite_ui::PrimaryButton("Start this mode") && StartSelected())
         ImGui::CloseCurrentPopup();
     ImGui::EndDisabled();
     ImGui::EndPopup();
 }
 
+inline const char *SetupCategoryName()
+{
+    return setupPractice ? (setupFixed ? "Set-Seed Practice" : "Practice")
+                         : setupFixed ? "Set-Seed" : "Random Seed";
+}
+
+inline void CategorySetup()
+{
+    const char *categories[] = {"Random Seed", "Set-Seed", "Practice"};
+    int selected = setupPractice ? 2 : setupFixed ? 1 : 0;
+    const char *categoryLabel = ImGui::GetContentRegionAvail().x < 420 * suite_ui::Unit()
+                                    ? "Category" : "Run category";
+    ImGui::SetNextItemWidth(std::min(300 * suite_ui::Unit(),
+        std::max(100 * suite_ui::Unit(), ImGui::GetContentRegionAvail().x -
+            ImGui::CalcTextSize(categoryLabel).x - ImGui::GetStyle().ItemInnerSpacing.x)));
+    if (ImGui::Combo(categoryLabel, &selected, categories, 3))
+    {
+        setupPractice = selected == 2;
+        setupFixed = selected == 1;
+        if (selected == 0)
+            setupSpawn = false;
+    }
+    Help("Random Seed and Set-Seed are separate speedrun categories. Choose before starting. Set-Seed permits the selected seed; training aids remain locked. Practice permits aids and does not produce a clean speedrun.");
+    if (setupPractice)
+        suite_ui::Checkbox("Use Set-Seed in Practice", &setupFixed);
+    if (setupFixed)
+    {
+        ImGui::SetNextItemWidth(std::min(300 * suite_ui::Unit(),
+            std::max(100 * suite_ui::Unit(), ImGui::GetContentRegionAvail().x -
+                ImGui::CalcTextSize("Seed").x - ImGui::GetStyle().ItemInnerSpacing.x)));
+        if (ImGui::InputInt("Seed", &setupSeed))
+        {
+            int type = KnownPracticeSeedType(setupSeed, dashboard.selected);
+            if (type)
+                setupSpawn = type == 1;
+        }
+        suite_ui::Checkbox("Use captured spawn seed", &setupSpawn);
+        Help("Off uses the standard derived base-seed recipe. On reuses a captured spawn seed from Seeds & routes. Both deterministic recipes are supported in Set-Seed; changing the recipe during a run invalidates that attempt.");
+        if (g_pShared && !g_pShared->rngPatchComplete)
+            ImGui::TextWrapped("Set-Seed requires all RNG hooks to be ready before starting.");
+        if (!setupPractice && g_pShared)
+        {
+            auto version = suite_update::Version::Parse(g_pShared->version);
+            if (!version || *version < suite_update::Version{{7, 22, 0}})
+                ImGui::TextWrapped("Set-Seed speedruns require game mod 7.22.0 or newer. Update the mod and restart It Steals.");
+        }
+    }
+}
+
 inline void Settings()
 {
-    suite_ui::Section("Run setup", 0, [&]() {
-        suite_ui::Checkbox("Practice Mode", &setupPractice);
-        if (setupPractice)
-        {
-            suite_ui::Checkbox("Use fixed seed", &setupFixed);
-            if (setupFixed)
-            {
-                if (ImGui::InputInt("Seed", &setupSeed))
-                {
-                    int type = KnownPracticeSeedType(setupSeed, dashboard.selected);
-                    if (type)
-                        setupSpawn = type == 1;
-                }
-                suite_ui::Checkbox("Use captured spawn seed", &setupSpawn);
-                Help("Captured Seed Map seeds use the spawn seed option. These runs are SET PRACTICE.");
-                if (g_pShared && !g_pShared->rngPatchComplete)
-                    ImGui::TextWrapped("Fixed seeds require all RNG hooks to be ready before starting.");
-            }
-        }
+    suite_ui::Section("Run controls", 0, [&]() {
         ImGui::TextWrapped(
             "Setup applies when you start a mode. Configure Quick restart / reset in Settings > Shortcuts (default T).");
         ImGui::BeginDisabled(!g_pShared || !g_pShared->reviewReady || g_pShared->timerState == 1 ||
@@ -231,7 +300,7 @@ inline void Settings()
     {
         ImGui::TextColored(g_headerCol, "%s", SeedTypeLabel(*g_pShared));
         if (g_pShared->seedKnown)
-            ImGui::Text("%s: %d", g_pShared->seedKind == 2 ? "Practice base seed" : "Initial RNG seed",
+            ImGui::Text("%s: %d", g_pShared->seedKind == 2 ? "Selected base seed" : "Initial RNG seed",
                         g_pShared->runSeed);
         ImGui::TextDisabled("Reseed hooks: %s",
                             g_pShared->rngPatchComplete ? "22 / 22 ready" : "unavailable");
@@ -239,36 +308,8 @@ inline void Settings()
     }
 }
 
-inline void Render()
+inline void RefreshDashboard()
 {
-    float u = suite_ui::Unit();
-    if (!setupReady)
-    {
-        setupReady = true;
-        setupPractice = g_practiceMode;
-        setupFixed = g_seededPractice;
-        setupSpawn = g_rawPracticeSpawn;
-        setupSeed = g_practiceSeed;
-        dashboard.selected = g_selectedSpeedrunLevel;
-    }
-    bool compactFooter = ImGui::GetContentRegionAvail().y < 240 * u;
-    bool shortLabels = ImGui::GetContentRegionAvail().x < 420 * u;
-    float footer = ImGui::GetFrameHeightWithSpacing() + 8 * u +
-                   (compactFooter ? 0 : ImGui::GetTextLineHeightWithSpacing());
-    ImGui::BeginChild("SpeedrunScroll", {0, -footer});
-    const char *filters[] = {"All", "Clean", "Practice"};
-    for (int i = 0; i < 3; i++)
-    {
-        if (i)
-            ImGui::SameLine();
-        bool selected = viewFilter == i;
-        if (selected)
-            ImGui::PushStyleColor(ImGuiCol_Button, suite_ui::Alpha(g_headerCol, .25f));
-        if (suite_ui::Button(filters[i]))
-            viewFilter = i;
-        if (selected)
-            ImGui::PopStyleColor();
-    }
     std::array<double, 8> oldPb;
     for (int i = 0; i < 8; i++)
         oldPb[i] = dashboard.modes[i].pb;
@@ -283,6 +324,102 @@ inline void Render()
             if (hadData && mode.pb > 0 && (oldPb[i] == 0 || mode.pb < oldPb[i]))
                 pbFlash[i] = ImGui::GetTime();
         }
+}
+
+// Small/high-DPI windows use a compact mode picker instead of clipping an
+// eight-card dashboard. The whole panel scrolls, including setup and actions.
+inline void RenderCompact()
+{
+    ImGui::BeginChild("SpeedrunCompactScroll", {0, 0});
+    float startWidth = ImGui::CalcTextSize("Start").x + ImGui::GetStyle().FramePadding.x * 2;
+    ImGui::SetNextItemWidth(std::max(80 * suite_ui::Unit(), ImGui::GetContentRegionAvail().x -
+        startWidth - ImGui::GetStyle().ItemSpacing.x));
+    ImGui::Combo("##SelectedMode", &dashboard.selected, kMapLevelNames, kMapLevelCount);
+    Help("Select a game mode. This only changes the selection; Start mode loads it.");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!CanStart());
+    if (suite_ui::PrimaryButton("Start"))
+        StartSelected();
+    ImGui::EndDisabled();
+    CategorySetup();
+    SameLineIfFits("Details");
+    if (suite_ui::Button("Details"))
+        ImGui::OpenPopup("Mode statistics");
+    ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
+    if (g_speedrunMode)
+    {
+        SameLineIfFits("Stop mode");
+        if (suite_ui::Button("Stop mode"))
+            SetSpeedrunMode(false);
+    }
+    ImGui::EndDisabled();
+    const char *filters[] = {"Overview", dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed", "Practice"};
+    ImGui::SetNextItemWidth(-1);
+    ImGui::Combo("##StatisticsCategory", &viewFilter, filters, 3);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+        ImGui::SetTooltip("Overview includes normal play, Practice, and the displayed clean category. Random Seed and Set-Seed records are tracked separately.");
+    RefreshDashboard();
+    const auto &mode = dashboard.modes[std::clamp(dashboard.selected, 0, kMapLevelCount - 1)];
+    if (dashboard.snapshot.statsCategory == 1)
+        ImGui::TextWrapped("Set-Seed PB: %s / %s attempts / %s finishes",
+                           pbLabels[dashboard.selected].c_str(),
+                           mode.attempts.c_str(), mode.finished.c_str());
+    else
+        ImGui::TextWrapped("Random Seed PB: %s / %s attempts / %s finishes",
+                           pbLabels[dashboard.selected].c_str(), mode.attempts.c_str(), mode.finished.c_str());
+    Settings();
+    Details();
+    ImGui::EndChild();
+}
+
+inline void Render()
+{
+    float u = suite_ui::Unit();
+    SyncSetupSelection();
+    if (ImGui::GetContentRegionAvail().y < 240 * u)
+    {
+        RenderCompact();
+        return;
+    }
+    bool shortLabels = ImGui::GetContentRegionAvail().x < 420 * u;
+    const char *startLabel = shortLabels ? "Start mode" : "Start selected mode";
+    const char *disableLabel = shortLabels ? "Stop mode" : "Disable Speedrun";
+    auto buttonWidth = [](const char *label) {
+        return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2;
+    };
+    float buttonsWidth = buttonWidth(startLabel) + buttonWidth("Details") +
+                         ImGui::GetStyle().ItemSpacing.x;
+    if (g_speedrunMode)
+        buttonsWidth += buttonWidth(disableLabel) + ImGui::GetStyle().ItemSpacing.x;
+    const bool wrapFooter = buttonsWidth > ImGui::GetContentRegionAvail().x;
+    float footer = ImGui::GetTextLineHeightWithSpacing() + 8 * u +
+                   ImGui::GetFrameHeightWithSpacing() * (wrapFooter ? 2 : 1);
+    ImGui::BeginChild("SpeedrunScroll", {0, -footer});
+    CategorySetup();
+    ImGui::Spacing();
+    const char *filters[] = {"Overview", dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed", "Practice"};
+    for (int i = 0; i < 3; i++)
+    {
+        if (i)
+            ImGui::SameLine();
+        bool selected = viewFilter == i;
+        if (selected)
+            ImGui::PushStyleColor(ImGuiCol_Button, suite_ui::Alpha(g_headerCol, .25f));
+        if (suite_ui::Button(filters[i]))
+            viewFilter = i;
+        if (!i && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+            ImGui::SetTooltip("Normal play, Practice, and the displayed clean category. Random Seed and Set-Seed records are tracked separately.");
+        if (selected)
+            ImGui::PopStyleColor();
+    }
+    RefreshDashboard();
+    const char *cleanCategory = dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed";
+    if (!viewFilter)
+        ImGui::TextDisabled("%s + normal / Practice", cleanCategory);
+    else if (viewFilter == 1)
+        ImGui::TextDisabled("%s speedruns", cleanCategory);
+    else
+        ImGui::TextDisabled("Practice statistics");
     SameLineIfFits(dashboard.sinceLabel.c_str());
     ImGui::TextDisabled("%s", dashboard.sinceLabel.c_str());
     if (!g_pShared)
@@ -322,7 +459,6 @@ inline void Render()
         ImGui::EndTable();
     }
     ImGui::PopStyleVar();
-    Details();
     ImGui::Spacing();
     Settings();
     if (g_pShared && g_pShared->statsSaveStatus == 2)
@@ -331,21 +467,31 @@ inline void Render()
         ImGui::TextWrapped("Data recovery: %s", g_pShared->statsWarning);
     ImGui::EndChild();
     ImGui::Separator();
-    if (!compactFooter)
-        ImGui::Text("Selected: %s  /  %s", kMapLevelNames[dashboard.selected],
-                    setupPractice ? "Practice" : "Clean Speedrun");
+    std::string selected = std::string(kMapLevelNames[dashboard.selected]) + "  /  " +
+                           SetupCategoryName();
+    auto at = ImGui::GetCursorScreenPos();
+    float width = ImGui::GetContentRegionAvail().x;
+    float textWidth = ImGui::CalcTextSize(selected.c_str()).x;
+    float fontSize = ImGui::GetFontSize() * std::min(1.f, width / std::max(1.f, textWidth));
+    suite_ui::TextAt(ImGui::GetWindowDrawList(), at, selected.c_str(), suite_ui::ink, fontSize,
+                     {at.x, at.y, at.x + width, at.y + ImGui::GetTextLineHeight()});
+    ImGui::Dummy({width, ImGui::GetTextLineHeight()});
     ImGui::BeginDisabled(!CanStart());
-    if (suite_ui::Button(shortLabels ? "Start mode" : "Start selected mode"))
+    if (suite_ui::PrimaryButton(startLabel))
         StartSelected();
     ImGui::EndDisabled();
+    Help("Start the selected mode with the run setup above. Selecting a card does not load the game.");
+    SameLineIfFits("Details");
+    if (suite_ui::Button("Details"))
+        ImGui::OpenPopup("Mode statistics");
     ImGui::BeginDisabled(!g_pShared || HasPendingRequest());
     if (g_speedrunMode)
     {
-        const char *disable = shortLabels ? "Disable" : "Disable Speedrun";
-        SameLineIfFits(disable);
-        if (suite_ui::Button(disable))
+        SameLineIfFits(disableLabel);
+        if (suite_ui::Button(disableLabel))
             SetSpeedrunMode(false);
     }
     ImGui::EndDisabled();
+    Details();
 }
 } // namespace run_stats

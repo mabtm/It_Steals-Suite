@@ -39,7 +39,7 @@ public sealed class SpeedrunManager
     public bool Assisted
     {
         get {
-            return Record != null && Record.Aids != RunAids.None;
+            return Record != null && RunValidity.DisallowedAids(Record) != RunAids.None;
         }
     }
     public bool NeedsDeathReload { get; private set; }
@@ -57,6 +57,14 @@ public sealed class SpeedrunManager
     private double finalTime, nextCheckpoint;
     private RunAids currentFeatures;
     private TrainerCommands liveCommands;
+    private static RunCategory Category(TrainerCommands commands)
+    {
+        return commands.Practice ? RunCategory.Practice : commands.SetSeed ? RunCategory.SetSeed : RunCategory.RandomSeed;
+    }
+    private static bool RawSeed(TrainerCommands commands)
+    {
+        return commands.UsesControlledSeed && (commands.PlannerOptions & 2u) != 0;
+    }
     private ExternalToolSnapshot external = new ExternalToolSnapshot();
     private Vector3 lastAuditPosition;
     private bool haveAuditPosition;
@@ -218,6 +226,7 @@ public sealed class SpeedrunManager
 
     public void Configure(TrainerCommands commands)
     {
+        tracker.ObserveSelection(Category(commands), commands.PracticeSeed, RawSeed(commands));
         liveCommands = commands;
         RunReviewRecorder.ConfigureRetention(commands.ReplayMinSeconds, commands.ReplayMinCrystals);
         if (active && !commands.Speedrun && timerState == 1)
@@ -292,7 +301,8 @@ public sealed class SpeedrunManager
         if (PracticeRandom.Enabled)
             aids |= RunAids.FixedSeed;
         if (!tracker.Begin(runScene, DateTime.UtcNow.Ticks, aids, PracticeRandom.Evidence,
-                           build == null ? null : build.Snapshot(), exportReports, startObserved))
+                           build == null ? null : build.Snapshot(), exportReports, startObserved,
+                           Category(liveCommands), liveCommands.PracticeSeed, RawSeed(liveCommands)))
             return;
         started = Stopwatch.GetTimestamp();
         timerState = 1;
@@ -314,7 +324,9 @@ public sealed class SpeedrunManager
                        player.TotalObjectives > 0 && player.Objectives > 0 && Time.timeScale > 0 &&
                        Application.isFocused && !MenuCursor.OwnsInput && !Replay3D.Reserved &&
                        !ReplayGamePause.Frozen;
-        if (store.Modes.Observe(SceneManager.GetActiveScene().buildIndex, active ? (practice ? 2 : 1) : 0,
+        int category = tracker.Active != null ? RunTracker.StatisticsCategory(tracker.Active) :
+                       practice ? 2 : liveCommands.SetSeed ? 3 : 1;
+        if (store.Modes.Observe(SceneManager.GetActiveScene().buildIndex, active ? category : 0,
                                 playing, playNow) &&
             playNow >= nextPlaySave)
         {
@@ -436,9 +448,13 @@ public sealed class SpeedrunManager
     {
         data.Write(SharedLayout.ModeStatsSinceUtc, store.Modes.SinceUtc);
         data.Write(SharedLayout.ModeStatsRevision, store.Modes.Revision);
-        for (int i = 0; i < store.Modes.Rows.Length; i++)
+        // Fixed 24-row IPC remains compatible. Its clean slot reflects the
+        // applied selection, explicitly identified by StatsCategory.
+        RunCategory statsCategory = Category(commands) == RunCategory.SetSeed ? RunCategory.SetSeed : RunCategory.RandomSeed;
+        data.Write(SharedLayout.StatsCategory, (byte)statsCategory);
+        for (int i = 0; i < 24; i++)
         {
-            var row = store.Modes.Rows[i];
+            var row = store.Modes.Rows[i % 3 == 1 && statsCategory == RunCategory.SetSeed ? 24 + i / 3 : i];
             data.Write(SharedLayout.ModeAttempts + i * 4, row.Attempts);
             data.Write(SharedLayout.ModeFinished + i * 4, row.Finished);
             data.Write(SharedLayout.ModeResets + i * 4, row.Resets);
@@ -448,8 +464,8 @@ public sealed class SpeedrunManager
         }
         for (int i = 0; i < LevelIndices.Length; i++)
         {
-            data.Write(SharedLayout.ModePersonalBest + i * 8, store.Best(LevelIndices[i]));
-            data.Write(SharedLayout.ModePbUtc + i * 8, store.Modes.BestUtc[i]);
+            data.Write(SharedLayout.ModePersonalBest + i * 8, store.Best(LevelIndices[i], statsCategory));
+            data.Write(SharedLayout.ModePbUtc + i * 8, (statsCategory == RunCategory.SetSeed ? store.Modes.SetSeedBestUtc : store.Modes.BestUtc)[i]);
         }
         RunRecord record = timerState == 0 ? tracker.Active : Record;
         if (record != null && record.Environment != null && record.Environment.GameHash == "UNKNOWN" &&
@@ -473,7 +489,9 @@ public sealed class SpeedrunManager
         data.Write(SharedLayout.PracticeSeed, commands.PracticeSeed);
         data.Write(SharedLayout.TimerState, timerState);
         data.Write(SharedLayout.CurrentRunTimeSeconds, Elapsed);
-        data.Write(SharedLayout.PersonalBestSeconds, store.Best(runScene));
+        data.Write(SharedLayout.RunCategory, (byte)(record == null ? Category(commands) : record.Category));
+        data.Write(SharedLayout.SelectedRunSeed, record == null ? commands.PracticeSeed : record.SelectedSeed);
+        data.Write(SharedLayout.PersonalBestSeconds, store.Best(runScene, record == null ? statsCategory : record.Category));
         data.Write(SharedLayout.PreviousBestSeconds, record == null ? 0 : record.PreviousBestSeconds);
         data.Write(SharedLayout.TotalRuns, store.Runs);
         data.Write(SharedLayout.TotalFinishedRuns, store.Finished);
@@ -529,11 +547,11 @@ public sealed class SpeedrunManager
             data.Write(SharedLayout.RunSeed, record.Seed);
             data.Write(SharedLayout.InitialRngSeed, record.InitialRngSeed);
             data.Write(SharedLayout.RngReseedCount, record.Reseeds);
-            data.Write(SharedLayout.RunAssisted, record.Aids != RunAids.None);
+            data.Write(SharedLayout.RunAssisted, RunValidity.DisallowedAids(record) != RunAids.None);
             data.Write(SharedLayout.LastRunPb, record.PersonalBest);
             data.Write(SharedLayout.RunStartedUtc, record.StartedUtc);
             data.Write(SharedLayout.RunIntegrity,
-                       (byte)(record.Aids != RunAids.None || record.SeedType == SeedKind.Set ? 1 : 0));
+                       (byte)(RunValidity.DisallowedAids(record) != RunAids.None || !RunValidity.SeedMatchesCategory(record) ? 1 : 0));
         }
         else
         {
@@ -567,7 +585,8 @@ public sealed class SpeedrunManager
             data.Write(o + 52, unchecked((int)r.Aids));
             data.Write(o + 56, r.Reseeds);
             data.Write(o + 60,
-                       unchecked((int)((uint)r.Warnings | (RunValidity.Eligible(r) ? 0x80000000u : 0u))));
+                       unchecked((int)((uint)r.Warnings | (RunValidity.Eligible(r) ? 0x80000000u : 0u) |
+                                       (r.Category == RunCategory.SetSeed ? 0x40000000u : 0u))));
         }
     }
 

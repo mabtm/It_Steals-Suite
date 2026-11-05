@@ -32,6 +32,17 @@ public static class RestartContractTests
         currentTrainer.SpeedrunLoadLevelCmd = 1;
         Check(currentTrainer.Speedrun && currentTrainer.SpeedrunLoadLevelCmd == 1,
               "trainer restart uses the existing speedrun reload command");
+        var set = new TrainerCommands { SpeedrunModeActive = 1, SeededPractice = 1 };
+        Check(set.SetSeed && set.UsesControlledSeed && set.Restricted && !set.Practice,
+              "Set-Seed controls RNG while retaining all restricted speedrun safeguards");
+        set.PracticeModeActive = 1;
+        Check(!set.SetSeed && set.UsesControlledSeed && !set.Restricted && set.Practice,
+              "legacy seeded practice remains a separate assisted mode");
+        set.SeededPractice = 0;
+        Check(!set.UsesControlledSeed, "practice without a seed does not control RNG");
+        set.PracticeModeActive = 0;
+        Check(!set.SetSeed && !set.UsesControlledSeed && set.Restricted,
+              "Random Seed is the unchanged restricted category");
         Console.WriteLine("Restart ownership, old-trainer fallback, disconnected fallback and command compatibility: PASS");
         return 0;
     }

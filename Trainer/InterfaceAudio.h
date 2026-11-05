@@ -27,6 +27,7 @@ class InterfaceAudio
     std::thread worker;
     std::mutex gate;
     std::deque<Request> pending;
+    suite_ui::ToneCadence cadence;
     bool stopping = false, allowed = false;
     float volume = .16f;
     uint64_t epoch = 0;
@@ -174,6 +175,7 @@ class InterfaceAudio
     {
         std::lock_guard lock(gate);
         gain = std::isfinite(gain) ? std::clamp(gain, 0.f, 1.f) : 0;
+        enabled = enabled && gain > 0;
         if (stopping)
             return;
         bool changed = allowed != enabled || gain != volume;
@@ -183,6 +185,7 @@ class InterfaceAudio
         {
             epoch++;
             pending.clear();
+            cadence.Reset();
         }
         if (enabled && !worker.joinable())
         {
@@ -214,9 +217,22 @@ class InterfaceAudio
         if (!allowed || stopping || tone == suite_ui::Tone::None || !worker.joinable() ||
             !std::isfinite(gain) || gain <= 0)
             return;
+        int priority = suite_ui::ToneImportance(tone);
+        if (std::any_of(pending.begin(), pending.end(), [&](const Request &r) {
+                return suite_ui::ToneImportance(r.tone) > priority;
+            }))
+            return;
+        auto now = Clock::now();
+        if (!cadence.Accept(tone, std::chrono::duration<double>(now.time_since_epoch()).count()))
+            return;
+        // A click/confirmation replaces queued decorative cues, so fast pointer
+        // movement cannot delay a useful action sound behind a hover backlog.
+        pending.erase(std::remove_if(pending.begin(), pending.end(), [&](const Request &r) {
+                          return suite_ui::ToneImportance(r.tone) < priority;
+                      }), pending.end());
         if (pending.size() >= 2)
             pending.pop_front();
-        pending.push_back({tone, Clock::now(), epoch, std::clamp(gain, 0.f, 1.f)});
+        pending.push_back({tone, now, epoch, std::clamp(gain, 0.f, 1.f)});
         SetEvent(wake);
     }
 

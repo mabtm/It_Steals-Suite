@@ -132,6 +132,9 @@ public static class SharedLayout
     public const int RunProgress = 5612;
     public const int LastRunPb = 5616;
     public const int RunIntegrity = 5617;
+    public const int RunCategory = 5618;
+    public const int StatsCategory = 5619;
+    public const int SelectedRunSeed = 5620;
     public const int RunStartedUtc = 5624;
     public const int HistoryCount = 5632;
     public const int HistoryBytes = 5636;

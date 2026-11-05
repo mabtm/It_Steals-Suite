@@ -288,7 +288,7 @@ inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Conten
                                                : IM_COL32(255, 98, 103, 255);
         int mode = MapLevelIndex(map.scene);
         label(20, 12, 20, accent, "REPLAY  /  " + std::string(mode >= 0 ? kMapLevelNames[mode] : "Unknown"));
-        label(20, 43, 15, content.palette.muted, std::string("PracticeSuite ") + suite_brand::Version);
+        label(20, 43, 15, content.palette.muted, std::string("Elite-Suite ") + suite_brand::Version);
         label(1070, 14, 22, color, status);
         if (options.time)
             label(480, 12, 28, ink, FormatRunTime(seconds));

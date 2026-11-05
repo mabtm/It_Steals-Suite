@@ -27,6 +27,42 @@ static GameData CleanFinish()
 
 int main()
 {
+    // Set-Seed is an explicit category, not a blanket exception for assisted
+    // runs. Zero is a valid selected seed; the live result must match its latch.
+    auto setSeed = CleanFinish();
+    setSeed.runCategory = 1;
+    setSeed.seedKind = 2;
+    setSeed.runUsedFeatures = 2;
+    setSeed.runSeed = setSeed.selectedRunSeed = 0;
+    assert(suite_run::FinalValid(setSeed));
+    for (unsigned aid : {1u, 4u, 8u, 16u, 32u, 64u, 128u, 256u, 512u, 1024u})
+    {
+        auto assisted = setSeed;
+        assisted.runUsedFeatures |= int(aid);
+        assert(!suite_run::FinalValid(assisted));
+    }
+    for (auto warning : {1, 2, 4, 8, 16, 32, 128, 256, 512, 1024, 2048, 4096, 8192, 16384})
+    {
+        auto flagged = setSeed;
+        flagged.runWarnings = warning;
+        assert(!suite_run::FinalValid(flagged));
+    }
+    auto mismatch = setSeed;
+    mismatch.selectedRunSeed = 1;
+    assert(!suite_run::FinalValid(mismatch));
+    auto historical = setSeed;
+    historical.runCategory = 0;
+    assert(!suite_run::FinalValid(historical));
+    auto practice = setSeed;
+    practice.runCategory = 2;
+    assert(!suite_run::FinalValid(practice));
+    HistoryRecord history{};
+    history.aids = 2;
+    assert(history.Category() == 2 && !history.Valid());
+    history.reserved = 0xc0000000u;
+    assert(history.Category() == 1 && history.Valid() && history.Warnings() == 0);
+    history.reserved |= 16384u;
+    assert(history.Warnings() == 16384u);
     using suite_run::ScanTimeline;
     ScanTimeline scan;
     scan.Tick(10, false);

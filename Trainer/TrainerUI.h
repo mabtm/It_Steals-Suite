@@ -15,17 +15,20 @@ void ApplyTheme(float scale)
     auto &current = ImGui::GetStyle();
     current.ItemInnerSpacing = ImVec2(8, 6);
     current.WindowBorderSize = 1;
-    current.WindowPadding = ImVec2(16, 14);
-    current.FramePadding = ImVec2(10, 6);
-    current.ItemSpacing = ImVec2(10, 9);
-    current.WindowRounding = 12;
-    current.ChildRounding = 8;
-    current.FrameRounding = 6;
-    current.TabRounding = 5;
+    current.WindowPadding = ImVec2(18, 16);
+    current.FramePadding = ImVec2(12, 6);
+    current.ItemSpacing = ImVec2(12, 10);
+    current.WindowRounding = 14;
+    current.ChildRounding = 10;
+    current.FrameRounding = 7;
+    current.TabRounding = 6;
     current.GrabRounding = 4;
     current.PopupRounding = 8;
     current.ScrollbarRounding = 8;
     current.ScrollbarSize = 10;
+    current.TabBarBorderSize = 1;
+    current.FrameBorderSize = 1;
+    current.CellPadding = ImVec2(7, 2);
     suite_ui::ApplyPalette(g_mainBgCol, g_textCol, g_headerCol);
     current.ScaleAllSizes(g_dpiScale);
     ImGuiIO &io = ImGui::GetIO();
@@ -160,6 +163,9 @@ inline bool SetSpeedrunMode(bool enabled, bool currentLevel = false)
     }
     g_commands.speedrunModeActive = enabled;
     g_commands.practiceModeActive = g_practiceMode;
+    g_commands.seededPractice = g_seededPractice;
+    g_commands.practiceSeed = g_practiceSeed;
+    g_commands.setSeedCmd = enabled && g_seededPractice ? 1 : 0;
     suite_run::presentation.Mode(enabled, suite_ui::LifecycleNow());
     suite_ui::PostGameTone(enabled ? suite_ui::Tone::On : suite_ui::Tone::Off);
     suite_ui::requested = suite_ui::Tone::None;
@@ -347,7 +353,8 @@ inline void RenderMinimapSettings()
 inline void RenderSystemSettings()
 {
     ImGui::TextColored(g_headerCol, "Startup");
-    suite_ui::Checkbox("Start It Steals with PracticeSuite", &g_autoStartGame);
+    auto launchLabel = std::string("Start It Steals with ") + suite_brand::Title;
+    suite_ui::Checkbox(launchLabel.c_str(), &g_autoStartGame);
     Help(
         "Start the installed game once when the trainer opens. An existing game is reused. The trainer closes when that game exits. Use --no-launch to skip automatic startup once.");
     suite_ui::Checkbox("Skip game intro", &g_skipGameIntro);
@@ -381,9 +388,8 @@ inline void RenderSystemSettings()
         "Include the complete trainer UI, menus and HUD when OBS captures It Steals. DirectX 11 GPU sharing avoids CPU image copies. Native input stays active; if sharing is unavailable, the normal trainer window remains visible and HUD capture uses its fallback.");
     const char *rates[] = {"30 FPS", "60 FPS", "120 FPS"};
     int rate = g_renderFps == 30 ? 0 : g_renderFps == 120 ? 2 : 1;
-    if (ImGui::Combo("Overlay frame limit", &rate, rates, 3))
+    if (ImGui::Combo("Menu frame limit", &rate, rates, 3))
         g_renderFps = rate == 0 ? 30 : rate == 2 ? 120 : 60;
-    Help("Limits overlay rendering. Rendering pauses automatically outside the game.");
     Help(
         "Limits menu rendering; the passive HUD refreshes at 30 FPS and preserves panel opacity. Both rates are independent of game FPS.");
     const char *gameRates[] = {"Use game settings", "Unlimited", "Custom limit"};
@@ -473,6 +479,7 @@ inline void RenderShortcutSettings()
 inline void RenderSettingsPage()
 {
     ImGui::BeginChild("SettingsScroll", ImVec2(0, 0));
+    ImGui::TextDisabled("Changes save automatically");
     if (ImGui::BeginTabBar("SettingsPages", ImGuiTabBarFlags_FittingPolicyScroll))
     {
         if (suite_ui::BeginTabItem("Appearance"))
@@ -503,25 +510,25 @@ inline void RenderSettingsPage()
         ImGui::EndTabBar();
     }
     ImGui::Spacing();
-    if (suite_ui::Button("Reset layout"))
-        g_resetLayout = true;
-    SameLineIfFits("Restore display defaults");
-    if (suite_ui::Button("Restore display defaults"))
-    {
-        TrainerPreferences defaults;
-        defaults.level = g_selectedSpeedrunLevel;
-        defaults.seed = g_practiceSeed;
-        defaults.reports = g_reportsEnabled;
-        defaults.autoStartGame = g_autoStartGame;
-        defaults.skipGameIntro = g_skipGameIntro;
-        defaults.hotkeys = suite_keys::preferences;
-        ApplyPreferences(defaults);
-    }
-    if (suite_ui::Button("Save settings now"))
-        SavePreferencesNow(true);
-    ImGui::TextDisabled("Settings saved automatically");
-    Help(
-        "Display settings, selected level and seed are saved automatically. Training aids and run modes start disabled.");
+    suite_ui::Section("Maintenance & defaults", 0, [&] {
+        ImGui::TextWrapped("Restore the window layout or display preferences. Selected mode, seed and shortcuts are kept.");
+        if (suite_ui::Button("Reset layout"))
+            g_resetLayout = true;
+        SameLineIfFits("Restore display defaults");
+        if (suite_ui::Button("Restore display defaults"))
+        {
+            TrainerPreferences defaults;
+            defaults.level = g_selectedSpeedrunLevel;
+            defaults.seed = g_practiceSeed;
+            defaults.reports = g_reportsEnabled;
+            defaults.autoStartGame = g_autoStartGame;
+            defaults.skipGameIntro = g_skipGameIntro;
+            defaults.hotkeys = suite_keys::preferences;
+            ApplyPreferences(defaults);
+        }
+        if (suite_ui::Button("Save settings now"))
+            SavePreferencesNow(true);
+    });
     if (!g_settings.error.empty())
         ImGui::TextColored(g_accentCol, "%s", g_settings.error.c_str());
     if (!g_settings.loadWarning.empty())
@@ -578,9 +585,10 @@ void RenderMainWindow(const std::string &mode, int seed)
         return;
     }
     ImVec2 display = ImGui::GetIO().DisplaySize;
+    const bool tightShell = display.y < 480 * suite_ui::Unit();
     ImVec2 maximum(std::max(180.f, display.x - 24), std::max(160.f, display.y - 24));
     ImGui::SetNextWindowSize(
-        ImVec2(std::min(1000.f * g_dpiScale, maximum.x), std::min(840.f * g_dpiScale, maximum.y)),
+        ImVec2(std::min(1120.f * g_dpiScale, maximum.x), std::min(840.f * g_dpiScale, maximum.y)),
         g_resetLayout ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(20, std::min(72.f, std::max(12.f, display.y - 680.f * g_dpiScale))),
                             g_resetLayout ? ImGuiCond_Always : ImGuiCond_FirstUseEver);
@@ -598,6 +606,14 @@ void RenderMainWindow(const std::string &mode, int seed)
     ImGui::PushStyleColor(ImGuiCol_WindowBg, g_mainBgCol);
     ImGui::PushStyleColor(ImGuiCol_Text, g_textCol);
     ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * suite_ui::MenuAlpha());
+    // Replay dedicates its height to the map and timeline. Preserve the
+    // established canvas room while other workspaces keep the roomier shell.
+    auto shellPadding = ImGui::GetStyle().WindowPadding;
+    if (tightShell)
+        shellPadding = {10 * suite_ui::Unit(), 8 * suite_ui::Unit()};
+    else if (replayHeader)
+        shellPadding.y = std::max(0.f, shellPadding.y - 2 * suite_ui::Unit());
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, shellPadding);
     ImGui::Begin("It Steals | Practice Suite", nullptr,
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
     suite_ui::menu = true;
@@ -605,18 +621,36 @@ void RenderMainWindow(const std::string &mode, int seed)
     ImVec2 position = ImGui::GetWindowPos(), size = ImGui::GetWindowSize();
     ImGui::SetWindowPos(ImVec2(std::clamp(position.x, 0.f, std::max(0.f, display.x - size.x)),
                                std::clamp(position.y, 0.f, std::max(0.f, display.y - size.y))));
-    suite_ui::BrandHeader(replayHeader ? "Replay" : mode.c_str(), g_pShared != nullptr,
-                          g_connectionStatus.c_str());
-    if (!replayHeader && g_pShared && g_pShared->seedActive)
-        ImGui::TextColored(g_accentCol, "SET SEED | Practice seed: %d", seed);
+    if (tightShell)
+    {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(g_headerCol, "%s", suite_brand::Title);
+        if (suite_brand::Preview)
+        {
+            auto at = ImGui::GetItemRectMin();
+            at.y = ImGui::GetItemRectMax().y + suite_ui::Unit();
+            ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), 10 * suite_ui::Unit(), at,
+                ImGui::GetColorU32(suite_ui::Muted()), "PREVIEW");
+        }
+        ImGui::SameLine();
+    }
+    else
+        suite_ui::BrandHeader(replayHeader ? "Replay" : mode.c_str(), g_pShared != nullptr,
+                              g_connectionStatus.c_str());
+    if (!tightShell && !replayHeader && g_pShared && g_pShared->seedActive)
+        ImGui::TextColored(g_accentCol, "%s: %d",
+                           g_pShared->runCategory == 1 ? "Set-Seed" : "Practice seed", seed);
     bool narrow = ImGui::GetContentRegionAvail().x < 650 * suite_ui::Unit();
-    if (suite_ui::Button(suite_keys::Label(narrow ? "Back" : "Return to game", suite_keys::Menu).c_str()))
+    auto backLabel = tightShell ? std::string("Back")
+                               : suite_keys::Label(narrow ? "Back" : "Return to game", suite_keys::Menu);
+    if (suite_ui::Button(backLabel.c_str()))
     {
         g_overlayVisible = false;
         SetOverlayInteractive(false);
     }
     Help("Close the menu and pass mouse/keyboard input back to the game. The map and timer remain visible.");
-    auto hudLabel = suite_keys::Label(narrow ? "HUD" : "Compact HUD", suite_keys::Hud);
+    auto hudLabel = tightShell ? std::string("HUD")
+                              : suite_keys::Label(narrow ? "HUD" : "Compact HUD", suite_keys::Hud);
     SameLineIfFits(hudLabel.c_str());
     ImGui::BeginDisabled(!CompactHudAllowed(g_speedrunMode, g_practiceMode));
     if (suite_ui::Button(hudLabel.c_str()))
@@ -627,28 +661,43 @@ void RenderMainWindow(const std::string &mode, int seed)
     ImGui::EndDisabled();
     Help(
         "Compact HUD is available in Normal and Practice mode. Clean Speedrun uses only the Speedrun overlay.");
-    if (cheatRestricted)
+    if (cheatRestricted && !tightShell)
     {
         SameLineIfFits("Clean speedrun");
         ImGui::TextColored(g_headerCol, "Clean speedrun");
         Help("Training aids are locked while a clean speedrun is selected.");
     }
-    ImGui::Separator();
+    ImGui::Spacing();
     {
-        float u = suite_ui::Unit(), rail = ImGui::GetContentRegionAvail().x >= 730 * u ? 184 * u : 64 * u;
-        float bodyHeight = std::max(4.f, ImGui::GetContentRegionAvail().y);
-        ImGui::BeginChild("Navigation", ImVec2(rail, bodyHeight));
-        suite_ui::Sidebar(bodyHeight);
+        float u = suite_ui::Unit();
+        bool compactNavigation = ImGui::GetContentRegionAvail().x < 730 * u;
+        float rail = 204 * u;
+        float navigationHeight = compactNavigation
+                                     ? suite_ui::CompactNavigationHeight(ImGui::GetContentRegionAvail().x)
+                                     : std::max(4.f, ImGui::GetContentRegionAvail().y);
+        ImGui::BeginChild("Navigation", ImVec2(compactNavigation ? 0 : rail, navigationHeight),
+                          ImGuiChildFlags_None, compactNavigation ? ImGuiWindowFlags_NoScrollbar : 0);
+        if (compactNavigation)
+            suite_ui::CompactNavigation();
+        else
+            suite_ui::Sidebar(navigationHeight);
         ImGui::EndChild();
-        ImGui::SameLine();
-        ImGui::BeginChild("Workspace", ImVec2(0, bodyHeight), ImGuiChildFlags_None,
+        if (!compactNavigation)
+            ImGui::SameLine();
+        float bodyHeight = std::max(4.f, ImGui::GetContentRegionAvail().y);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, suite_ui::Panel(.24f));
+        ImGui::PushStyleColor(ImGuiCol_Border, suite_ui::Color(AppearancePreferences::Outline, .45f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                            ImVec2((compactNavigation || replayHeader ? 10 : 22) * u,
+                                   (suite_ui::navigation.Is(suite_ui::Page::Replay) ? 0 : tightShell ? 4 : compactNavigation ? 10 : 20) * u));
+        ImGui::BeginChild("Workspace", ImVec2(0, bodyHeight), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                           suite_ui::navigation.Is(suite_ui::Page::Replay)
                               ? ImGuiWindowFlags_None
                               : ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
         float reveal = suite_ui::Animate(
             ImGui::GetID(suite_ui::PageNames[int(suite_ui::navigation.page)]) ^ 0x78100u, 1, true, .17f);
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * (.72f + .28f * reveal));
-        if (!suite_ui::navigation.Is(suite_ui::Page::Replay) || !g_runReviewOpen)
+        if (!tightShell && (!suite_ui::navigation.Is(suite_ui::Page::Replay) || !g_runReviewOpen))
             suite_ui::PageHeading(suite_ui::navigation.page);
         if (suite_ui::navigation.Is(suite_ui::Page::Updates))
             suite_update_ui::Page(*suite_update::service.View(), (g_pShared && g_pShared->timerState == 1) ||
@@ -678,6 +727,8 @@ void RenderMainWindow(const std::string &mode, int seed)
             RenderDiagnosticsPage();
         ImGui::PopStyleVar();
         ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(2);
         bool expand = g_reviewTabActive && g_reviewWide;
         if (expand != reviewExpanded)
         {
@@ -701,6 +752,6 @@ void RenderMainWindow(const std::string &mode, int seed)
     }
     suite_ui::RenderNotice();
     ImGui::End();
-    ImGui::PopStyleVar();
+    ImGui::PopStyleVar(2);
     ImGui::PopStyleColor(2);
 }

@@ -377,7 +377,7 @@ function Install-Suite([string]$Game, [string]$Application, [string]$Package) {
     Assert-NoReparsePoint $Game
     Assert-NoReparsePoint $Application
     if ($Application -eq $Game -or $Application.StartsWith($Game.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Install PracticeSuite in its own folder outside the game directory.'
+        throw 'Install Elite-Suite in its own folder outside the game directory.'
     }
     Write-Output '[1/4] Checking package and game installation...'
     $manifest = Read-PackageManifest $Package
@@ -396,7 +396,7 @@ function Install-Suite([string]$Game, [string]$Application, [string]$Package) {
             Expand-LoaderArchive $archive $loader
             Assert-LoaderRepair $Game $loader
         } else { Write-Output '[2/4] Keeping the existing MelonLoader installation.' }
-        Write-Output '[3/4] Installing PracticeSuite, encoder, and game mod...'
+        Write-Output '[3/4] Installing Elite-Suite, encoder, and game mod...'
         if (-not $hasLoader) {
             foreach ($file in Get-ChildItem -LiteralPath $loader -Recurse -File) {
                 $relative = $file.FullName.Substring($loader.Length + 1)
@@ -423,7 +423,7 @@ function Install-Suite([string]$Game, [string]$Application, [string]$Package) {
         @{ version = $manifest.version; gameDirectory = $Game; files = $owned } | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath $receipt -Encoding UTF8
         Write-InstalledFile $receipt (Join-Path $Application 'installed-manifest.json') $work $journal
-        Write-Output '[4/4] Installation verified. PracticeSuite is ready.'
+        Write-Output '[4/4] Installation verified. Elite-Suite is ready.'
     } catch {
         $original = $_
         try { Restore-Installation $journal }
@@ -466,7 +466,7 @@ if ($MyInvocation.InvocationName -ne '.') {
             if ($DiscoveryFile) { "[Game]`r`nDirectory=$found" | Set-Content -LiteralPath $DiscoveryFile -Encoding Unicode }
             else { Write-Output $found }
         } else {
-            if (@(Get-Process -Name 'It Steals', 'ItStealsTrainer', 'PracticeSuiteEncoder' -ErrorAction SilentlyContinue).Count) { throw 'Close It Steals, PracticeSuite, and any active exports before continuing.' }
+            if (@(Get-Process -Name 'It Steals', 'ItStealsTrainer', 'PracticeSuiteEncoder' -ErrorAction SilentlyContinue).Count) { throw 'Close It Steals, Elite-Suite, and any active exports before continuing.' }
             if (-not $InstallDir) { throw 'An application folder is required.' }
             if ($Mode -eq 'Uninstall') { Uninstall-Suite $InstallDir }
             else {

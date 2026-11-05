@@ -41,7 +41,7 @@ inline constexpr std::array<NavigationItem, PageCount> NavigationItems = {{
 
 struct Navigation
 {
-    Page page = Page::Cheats;
+    Page page = Page::Speedrun;
     double changed = -1;
 
     bool Select(Page next, double now)

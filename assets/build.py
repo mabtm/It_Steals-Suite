@@ -15,12 +15,12 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 ROOT = Path(__file__).resolve().parent
-BACKGROUND = "#0b141a"
-PANEL = "#101f25"
-OUTLINE = "#294640"
-MINT = "#8ee5d1"
-WHITE = "#edf8f5"
-MUTED = "#a5bdb6"
+BACKGROUND = "#0e1116"
+PANEL = "#151c26"
+OUTLINE = "#304052"
+MINT = "#7ad4ff"
+WHITE = "#f0f5fa"
+MUTED = "#97a8bb"
 
 
 def font(size, bold=False):
@@ -69,7 +69,7 @@ def windows_artwork():
         draw.line((0, y, 328, y), fill="#17292c")
     mark = logo.resize((188, 188), Image.Resampling.LANCZOS)
     sidebar.paste(mark, (39, 69), mark)
-    draw.text((30, 303), "PRACTICE", font=font(32, True), fill=WHITE)
+    draw.text((30, 303), "ELITE", font=font(32, True), fill=WHITE)
     draw.text((30, 345), "SUITE", font=font(32, True), fill=MINT)
     draw.line((30, 416, 289, 416), fill=OUTLINE, width=2)
     for index, text in enumerate(("Practice.", "Understand.", "Improve.")):
@@ -84,7 +84,7 @@ def windows_artwork():
     small = logo.resize((82, 82), Image.Resampling.LANCZOS)
     header.paste(small, (200, 16), small)
     ImageDraw.Draw(header).text(
-        (14, 43), "PRACTICE SUITE", font=font(16, True), fill=MINT
+        (14, 43), "ELITE-SUITE", font=font(16, True), fill=MINT
     )
     header.save(ROOT / "setup-header.bmp")
     return logo
@@ -117,19 +117,19 @@ def paste_rounded(canvas, source, box, radius=16):
 
 def repository_artwork(folder, logo):
     # Crop only empty surrounding space or focus on a real UI region; never paint over UI values.
-    practice = capture(folder, "tour-01-tools", (105, 185, 1235, 595))
-    search = capture(folder, "tour-02-search-7", (310, 185, 1225, 985))
-    replay = capture(folder, "tour-03-replay-7", (450, 110, 1668, 1055))
+    practice = capture(folder, "tour-01-tools", (100, 80, 1240, 640))
+    search = capture(folder, "tour-02-search-7", (334, 194, 1222, 984))
+    replay = capture(folder, "tour-03-replay-7", (474, 124, 1662, 1054))
     clip = capture(folder, "751-studio-0", (5, 5, 1910, 1075))
-    inspect = capture(folder, "7115-summary-1920-dpi-100", (230, 180, 1010, 660))
-    route = capture(folder, "seed-route-full")
+    inspect = capture(folder, "7115-summary-1920-dpi-100", (254, 186, 1122, 700))
+    route = capture(folder, "seed-route-full", (430, 136, 850, 436))
     items = [
         ("Practice", "Explore layouts. Inspect the details.", practice),
         ("Routing", "Search seeds. Find your next route.", search),
         ("Replay", "Review the run, one move at a time.", replay),
         ("Clip Studio", "Shape the camera. Export the clip.", clip),
     ]
-    cards = Image.new("RGB", (1280, 1020), BACKGROUND)
+    cards = Image.new("RGB", (1280, 1044), BACKGROUND)
     draw = ImageDraw.Draw(cards)
     for index, (title, detail, image) in enumerate(items):
         x, y = 16 + (index % 2) * 632, 16 + (index // 2) * 500
@@ -140,12 +140,13 @@ def repository_artwork(folder, logo):
         draw.text((x + 68, y + 15), title, font=font(31, True), fill=WHITE)
         paste_rounded(cards, image, (x + 18, y + 70, 580, 340))
         draw.text((x + 24, y + 434), detail, font=font(22), fill=MUTED)
+    draw.text((28, 1012), "INTERFACE PREVIEW / TEST DATA", font=font(16), fill=MUTED)
     cards.save(ROOT / "features.png", optimize=True)
 
     comparison = Image.new("RGB", (1280, 570), BACKGROUND)
     draw = ImageDraw.Draw(comparison)
     draw.text((28, 22), "FROM A LAYOUT TO THE DETAILS", font=font(23, True), fill=WHITE)
-    draw.text((28, 58), "Actual interface / test data", font=font(17), fill=MUTED)
+    draw.text((28, 58), "INTERFACE PREVIEW / TEST DATA", font=font(17), fill=MUTED)
     for index, (title, image) in enumerate(
         (
             ("Plan the route", route),
@@ -164,9 +165,9 @@ def repository_artwork(folder, logo):
     for index, (title, detail, image) in enumerate(items):
         slide = Image.new("RGB", (1120, 710), BACKGROUND)
         d = ImageDraw.Draw(slide)
-        d.text((28, 20), "PRACTICE SUITE", font=font(17, True), fill=MINT)
+        d.text((28, 20), "ELITE-SUITE", font=font(17, True), fill=MINT)
         d.text((28, 51), title, font=font(32, True), fill=WHITE)
-        d.text((710, 62), "INTERFACE TOUR / TEST DATA", font=font(16), fill=MUTED)
+        d.text((710, 62), "INTERFACE PREVIEW / TEST DATA", font=font(16), fill=MUTED)
         paste_rounded(slide, image, (20, 108, 1080, 530))
         d.text((28, 665), detail, font=font(20), fill=MUTED)
         for chapter in range(4):
@@ -201,7 +202,7 @@ def repository_artwork(folder, logo):
     mark = logo.resize((110, 110), Image.Resampling.LANCZOS)
     social.paste(mark, (40, 40), mark)
     draw.text((40, 178), "IT STEALS", font=font(22), fill=MUTED)
-    draw.text((38, 219), "PRACTICE", font=font(54, True), fill=WHITE)
+    draw.text((38, 219), "ELITE", font=font(54, True), fill=WHITE)
     draw.text((38, 280), "SUITE", font=font(54, True), fill=MINT)
     for index, text in enumerate(("Practice.", "Understand.", "Improve.")):
         draw.text((42, 379 + index * 46), text, font=font(32), fill=WHITE)
@@ -210,7 +211,7 @@ def repository_artwork(folder, logo):
     paste_rounded(social, replay, (905, 317, 340, 285))
     draw.text((575, 523), "Seeds. Routes.", font=font(22, True), fill=MINT)
     draw.text((575, 556), "Replays. Clips.", font=font(22, True), fill=MINT)
-    draw.text((575, 603), "UI previews / test data", font=font(16), fill=MUTED)
+    draw.text((575, 603), "INTERFACE PREVIEW / TEST DATA", font=font(16), fill=MUTED)
     social_path = ROOT.parent / "build" / "branding" / "social-preview.png"
     social_path.parent.mkdir(parents=True, exist_ok=True)
     social.save(social_path, optimize=True)

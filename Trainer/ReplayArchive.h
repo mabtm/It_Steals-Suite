@@ -365,6 +365,8 @@ class ReplayArchive
         if (x.id != y.id || x.outcome != y.outcome || x.seconds != y.seconds || x.valid != y.valid ||
             x.validationChecked != y.validationChecked || x.observedFromStart != y.observedFromStart ||
             x.seedKnown != y.seedKnown || x.seedKind != y.seedKind || x.aids != y.aids ||
+            x.category != y.category || x.selectedSeed != y.selectedSeed || x.runSeed != y.runSeed ||
+            x.rawSpawnSeed != y.rawSpawnSeed || x.initialAids != y.initialAids ||
             x.warnings != y.warnings || x.validityReason != y.validityReason || x.reduced != y.reduced ||
             x.monstersReduced != y.monstersReduced || x.lightSources != y.lightSources ||
             x.lightRejected != y.lightRejected || x.collected != y.collected ||
@@ -940,6 +942,41 @@ class ReplayArchive
                         json.At("integrity").String() != (run.valid ? "VALID (LOCAL)" : "UNVALID"))
                         throw std::runtime_error(
                             "Original report disagrees with the recorded run observations");
+                    // Older format-1 reports have no category declaration.
+                    // Every v15 recording, or report with new category fields,
+                    // requires the whole declaration and the recorded latch.
+                    int32_t mapFormat = 0;
+                    if (original->bytes.size() >= 8)
+                        std::memcpy(&mapFormat, original->bytes.data() + 4, sizeof(mapFormat));
+                    bool categoryMetadata = json.fields.count("category") ||
+                                            json.fields.count("selectedSeed") ||
+                                            json.fields.count("seedRecipe");
+                    if (mapFormat >= 15 || categoryMetadata)
+                    {
+                        auto integerMatches = [&](const char *field, int expected) {
+                            const auto &value = json.At(field);
+                            int decoded = 0;
+                            auto [end, error] = std::from_chars(
+                                value.text.data(), value.text.data() + value.text.size(), decoded);
+                            return value.kind == suite_update::Json::Kind::Number &&
+                                   error == std::errc{} && end == value.text.data() + value.text.size() &&
+                                   decoded == expected;
+                        };
+                        const char *category = run.category == 1 ? "SET-SEED" :
+                                               run.category == 2 ? "PRACTICE" : "RANDOM SEED";
+                        const char *recipe = run.rawSpawnSeed ? "RAW-FIRST-SPAWN-V1" : "DERIVED-V1";
+                        const char *seedType = run.seedKind == 2 ? "SET" :
+                                               run.seedKind == 1 ? "RANDOM" : "UNKNOWN";
+                        bool seedMatches = run.seedKnown ? integerMatches("seed", run.runSeed) :
+                                           json.fields.count("seed") &&
+                                               json.At("seed").kind == suite_update::Json::Kind::Null;
+                        if (mapFormat < 15 || json.At("category").String() != category ||
+                            !integerMatches("selectedSeed", run.selectedSeed) ||
+                            json.At("seedRecipe").String() != recipe ||
+                            json.At("seedType").String() != seedType || !seedMatches)
+                            throw std::runtime_error(
+                                "Original report disagrees with the recorded category or seed recipe");
+                    }
                     result->reportChecked = true;
                     if (!result->verification->full)
                         result->verification = std::make_shared<suite_run::Verification>(

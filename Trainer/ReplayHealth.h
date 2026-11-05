@@ -74,7 +74,7 @@ inline const char *RecordingStatusName(RecordingStatus status)
 inline std::string RevalidationReport(const ReplayRevalidation &r)
 {
     std::ostringstream out;
-    out << "PracticeSuite replay recheck\nRun: " << r.run << " / checked UTC (Unix): " << r.checkedUtc
+    out << "Elite-Suite replay recheck\nRun: " << r.run << " / checked UTC (Unix): " << r.checkedUtc
         << "\nFiles: " << (r.filesOk ? "CHECKED" : "FAILED") << "\n"
         << r.error << "\nRun SHA-256: " << r.mapSha256 << "\nInput SHA-256: " << r.inputSha256
         << "\nAudio SHA-256: " << r.audioSha256 << "\nOriginal report SHA-256: " << r.reportSha256
@@ -384,7 +384,7 @@ inline std::string RecordingCheckReport(const ReplayMotion &m, const RecordingCh
 {
     std::ostringstream out;
     out.imbue(std::locale::classic());
-    out << std::fixed << std::setprecision(6) << "PracticeSuite recording check\nRun: " << m.id
+    out << std::fixed << std::setprecision(6) << "Elite-Suite recording check\nRun: " << m.id
         << " / scene: " << m.scene << " / seed: " << m.seed << " / seconds: " << m.seconds
         << " / input format: " << m.inputFormat
         << "\nRecording coverage at observed resolution; separate from run validity and origin verification.\n"

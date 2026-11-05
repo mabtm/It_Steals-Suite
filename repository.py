@@ -21,6 +21,11 @@ ASSETS = {
 VERSION = r"\d+\.\d+\.\d+"
 
 
+def preview_build():
+    header = (ROOT / "Trainer/SuiteBranding.h").read_text(encoding="utf-8")
+    return bool(re.search(r"^#define SUITE_PREVIEW 1$", header, re.MULTILINE))
+
+
 def current_version():
     header = (ROOT / "Trainer/SuiteBranding.h").read_text(encoding="utf-8")
     match = re.search(r'#define SUITE_VERSION "(' + VERSION + r')"', header)
@@ -60,10 +65,12 @@ def spotlight():
     if next(iter(changes), None) != version:
         raise ValueError("The first changelog must match SUITE_VERSION")
     bullets = "\n".join(changes[version].splitlines()[:3])
+    heading = (f"**[v{version} Preview](https://github.com/{REPOSITORY}/releases)**\n\n"
+               if preview_build() else
+               f"**[v{version}](https://github.com/{REPOSITORY}/releases/tag/v{version})**\n\n")
     return (
         "<!-- release:start -->\n"
-        f"**[v{version}](https://github.com/{REPOSITORY}/releases/tag/v{version})**\n\n"
-        f"{bullets}\n\n"
+        + heading + f"{bullets}\n\n"
         "[Full changelog](CHANGELOG.md)\n"
         "<!-- release:end -->"
     )
@@ -140,22 +147,30 @@ def check():
     print("Repository copy, versions, changelogs, assets, and local links: PASS")
 
 
-def release_notes(version):
+def release_notes(version, tag=None):
     changes = history()
     if version not in changes:
         raise ValueError(f"No changelog for {version}")
     base = f"https://github.com/{REPOSITORY}"
-    download = f"{base}/releases/download/v{version}"
+    tag = tag or f"v{version}"
+    if not re.fullmatch(r"v" + re.escape(version) + r"(?:-preview\.\d+)?", tag):
+        raise ValueError("Release tag does not match its version")
+    preview = "-preview." in tag
+    source_ref = tag if preview else "main"
+    download = f"{base}/releases/download/{tag}"
     table = "\n".join(
         f"| [{label}]({download}/{name}) | `{name}` |" for name, label in ASSETS.items()
     )
     if tuple(map(int, version.split("."))) >= (7, 12, 1):
-        updating = "For in-app updates, open **Updates → Check**. Private releases need a GitHub token with **Contents: read** access, saved in Windows Credential Manager."
+        updating = "For in-app updates, open **Updates → Check**. Public releases need no GitHub account or token. Private development releases can use a read-only credential stored in Windows Credential Manager."
     else:
         updating = f"To update, download Setup from the [latest release]({base}/releases/latest)."
-    return f"""![PracticeSuite — Practice. Understand. Improve.]({base}/blob/main/assets/release.svg?raw=true)
+    notice = ("> **Preview build:** for manual testing. Stable update checks ignore this release. "
+              "The last stable version remains available through the normal update channel.\n\n"
+              if preview else "")
+    return f"""![Elite-Suite — Practice. Understand. Improve.]({base}/blob/{source_ref}/assets/release.svg?raw=true)
 
-**[Download Setup]({download}/ItStealsSuite-Setup.exe)** · [Portable ZIP]({download}/ItStealsSuite-Portable.zip) · [Install guide]({base}#install)
+{notice}**[Download Setup]({download}/ItStealsSuite-Setup.exe)** · [Portable ZIP]({download}/ItStealsSuite-Portable.zip) · [Install guide]({base}/blob/{source_ref}/README.md#install)
 
 ### v{version} Changelog
 
@@ -187,7 +202,7 @@ Build and test logs are kept in [Actions](https://github.com/{REPOSITORY}/action
 
 </details>
 
-[Vibe-coded project & development credits]({base}#about-the-project) · [Full version history]({base}/blob/main/CHANGELOG.md)
+[Vibe-coded project & development credits]({base}#about-the-project) · [Full version history]({base}/blob/{source_ref}/CHANGELOG.md)
 """
 
 
@@ -220,7 +235,7 @@ def refresh_releases(repository):
                 "--repo",
                 repository,
                 "--title",
-                f"PracticeSuite v{version}",
+                f"{'Elite-Suite' if tuple(map(int, version.split('.'))) >= (7, 22, 0) else 'PracticeSuite'} v{version}",
                 "--notes-file",
                 str(path),
             ],
@@ -242,6 +257,7 @@ def main():
         "notes", help="Write the complete notes for one version"
     )
     notes.add_argument("version")
+    notes.add_argument("--tag")
     notes.add_argument("--output", type=Path, required=True)
     refresh = commands.add_parser(
         "refresh-releases", help="Update published release descriptions using gh"
@@ -254,7 +270,7 @@ def main():
         check()
     elif args.command == "notes":
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(release_notes(args.version), encoding="utf-8")
+        args.output.write_text(release_notes(args.version, args.tag), encoding="utf-8")
     else:
         refresh_releases(args.repository)
 

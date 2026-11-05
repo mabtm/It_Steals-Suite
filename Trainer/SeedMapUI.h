@@ -262,7 +262,7 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
     if (!filterError.empty())
         ImGui::TextColored(g_accentCol, "%s", filterError.c_str());
     ImGui::BeginDisabled(!verified || sampling || busy || !filterError.empty() || HasPendingRequest());
-    if (suite_ui::Button("Search seeds"))
+    if (suite_ui::PrimaryButton("Search seeds"))
     {
         BeginPlannerSearch(*source);
     }

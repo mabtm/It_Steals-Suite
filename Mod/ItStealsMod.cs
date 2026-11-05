@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.21.0";
+    public const string Version = "7.22.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -247,7 +247,7 @@ public sealed class ItStealsMod : MelonMod
             if (Replay3D.Reserved || request && commands.Replay3dCmd == 1)
                 fullbright.SetFullbright(false);
             Replay3D.Tick(commands, request, trainerConnected);
-            if ((!commands.Speedrun || !commands.Practice) && !Replay3D.Reserved)
+            if ((!commands.Speedrun || !commands.UsesControlledSeed) && !Replay3D.Reserved)
                 PracticeRandom.Disable();
             LiveInputCapture.Enabled = trainerConnected && commands.RequestsInputs;
             bool allowed = !commands.Restricted && !Replay3D.Reserved;
@@ -387,9 +387,8 @@ public sealed class ItStealsMod : MelonMod
                     Report(error);
                 }
             speedrun.BeforeReload(index);
-            PracticeRandom.Begin(commands.PracticeSeed, index,
-                                 commands.Practice && commands.SeededPractice == 1,
-                                 (commands.PlannerOptions & 2u) != 0);
+            PracticeRandom.Begin(commands.PracticeSeed, index, commands.UsesControlledSeed,
+                                 commands.UsesControlledSeed && (commands.PlannerOptions & 2u) != 0);
         }
         else
         {
@@ -466,7 +465,7 @@ public sealed class ItStealsMod : MelonMod
             if (nextPublish < now - period || nextPublish > now + period * 2)
                 nextPublish = now + period;
             snapshot.Clear();
-            snapshot.WriteString(SharedLayout.Title, "ItSteals Practice Suite", 64);
+            snapshot.WriteString(SharedLayout.Title, "Elite-Suite", 64);
             snapshot.WriteString(SharedLayout.Author, "mab", 64);
             snapshot.Write(SharedLayout.PlannerGenerationMs,
                            planner == null ? 0 : planner.GenerationMilliseconds);

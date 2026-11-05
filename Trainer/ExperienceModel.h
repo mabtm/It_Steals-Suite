@@ -54,7 +54,66 @@ enum class Tone
     InspectorOpen,
     InspectorSelect,
     InspectorPin,
-    InspectorClose
+    InspectorClose,
+    Hover,
+    Warning
+};
+
+inline int ToneImportance(Tone tone)
+{
+    switch (tone)
+    {
+    case Tone::PersonalBest: return 6;
+    case Tone::Complete: return 5;
+    case Tone::Confirm:
+    case Tone::Warning: return 4;
+    case Tone::On:
+    case Tone::Off:
+    case Tone::InspectorPin: return 3;
+    case Tone::Tab:
+    case Tone::InspectorOpen:
+    case Tone::InspectorClose: return 2;
+    case Tone::Click:
+    case Tone::InspectorSelect: return 1;
+    case Tone::Hover: return 0;
+    default: return -1;
+    }
+}
+
+// UI events can arrive more often than audio is useful. This clock-based gate
+// keeps pointer travel quiet and repeated warnings restrained at any frame rate.
+class ToneCadence
+{
+    Tone last = Tone::None;
+    double lastAt = -10, hoverAt = -10, actionAt = -10, warningAt = -10, bestAt = -10;
+
+  public:
+    bool Accept(Tone tone, double now)
+    {
+        if (ToneImportance(tone) < 0 || !std::isfinite(now) || now < 0)
+            return false;
+        if (now < lastAt)
+            Reset();
+        if (tone == last && now - lastAt < .035)
+            return false;
+        if ((tone == Tone::Warning && now - warningAt < .35) ||
+            (tone == Tone::PersonalBest && now - bestAt < .5))
+            return false;
+        if (tone == Tone::Hover && (now - hoverAt < .10 || now - actionAt < .08))
+            return false;
+        last = tone;
+        lastAt = now;
+        (tone == Tone::Hover ? hoverAt : actionAt) = now;
+        if (tone == Tone::Warning) warningAt = now;
+        if (tone == Tone::PersonalBest) bestAt = now;
+        return true;
+    }
+
+    void Reset()
+    {
+        last = Tone::None;
+        lastAt = hoverAt = actionAt = warningAt = bestAt = -10;
+    }
 };
 
 inline bool AudioAllowed(const ExperiencePreferences &p, bool menu, bool focused, bool running)
@@ -86,6 +145,11 @@ class MotionTable
     float Value(uint32_t id, float target, int frame, double now, bool enabled, bool appear = false,
                 float duration = .16f)
     {
+        // Invalid timing and reduced motion snap to the requested value. Keep
+        // that value as the next transition's origin when motion is re-enabled.
+        target = std::isfinite(target) ? target : 0;
+        bool animate = enabled && std::isfinite(now) && std::isfinite(duration) && duration > 0;
+        now = std::isfinite(now) ? now : 0;
         size_t base = (id % 128) * 4;
         Entry *slot = nullptr;
         for (size_t i = base; i < base + 4; i++)
@@ -100,17 +164,21 @@ class MotionTable
             for (size_t i = base; i < base + 4; i++)
                 if (!entries[i].used || entries[i].frame < slot->frame)
                     slot = &entries[i];
-            *slot = {id, frame, appear && enabled ? 0 : target, target, now, true};
+            *slot = {id, frame, appear && animate ? 0 : target, target, now, true};
         }
         auto &e = *slot;
-        if (frame < e.frame || frame > e.frame + 1)
+        if (!animate)
         {
-            e.from = appear && enabled ? 0 : target;
+            e = {id, frame, target, target, now, true};
+            return target;
+        }
+        if (frame < e.frame || int64_t(frame) > int64_t(e.frame) + 1 || now < e.began)
+        {
+            e.from = appear ? 0 : target;
             e.target = target;
             e.began = now;
         }
-        float current =
-            enabled ? e.from + (e.target - e.from) * Ease(float((now - e.began) / duration)) : e.target;
+        float current = e.from + (e.target - e.from) * Ease(float((now - e.began) / duration));
         if (e.target != target)
         {
             e.from = current;
@@ -118,7 +186,7 @@ class MotionTable
             e.began = now;
         }
         e.frame = frame;
-        return enabled ? e.from + (e.target - e.from) * Ease(float((now - e.began) / duration)) : target;
+        return e.from + (e.target - e.from) * Ease(float((now - e.began) / duration));
     }
 
     void Reset()
@@ -205,77 +273,95 @@ struct Lifecycle
     }
 };
 
-// Original quiet PCM cues. Gain is applied to these samples, never to the
-// system/game mixer. Smooth ends avoid artificial clicks from cut waveforms.
+// Original short, quiet PCM cues: a soft transient for actions, a light glass
+// accent for navigation and gently rising notes for completion. Gain affects
+// only these samples. No sound assets, system mixer changes or random noise.
 inline std::vector<int16_t> ToneSamples(Tone kind, float volume, int rate = 44100)
 {
-    if (kind == Tone::None || rate < 8000 || rate > 192000 || !std::isfinite(volume))
+    if (ToneImportance(kind) < 0 || rate < 8000 || rate > 192000 || !std::isfinite(volume))
         return {};
     volume = std::clamp(volume, 0.f, 1.f);
-    double duration = kind == Tone::InspectorOpen     ? .075
-                      : kind == Tone::InspectorSelect ? .045
-                      : kind == Tone::InspectorPin    ? .09
+    double duration = kind == Tone::Hover             ? .020
+                      : kind == Tone::InspectorOpen   ? .076
+                      : kind == Tone::InspectorSelect ? .040
+                      : kind == Tone::InspectorPin    ? .088
                       : kind == Tone::InspectorClose  ? .06
-                      : kind == Tone::PersonalBest    ? .185
-                      : kind == Tone::Complete        ? .115
-                      : kind == Tone::Confirm         ? .095
-                      : kind == Tone::Tab             ? .038
-                                                      : .028;
+                      : kind == Tone::PersonalBest    ? .195
+                      : kind == Tone::Complete || kind == Tone::Warning ? .128
+                      : kind == Tone::Confirm         ? .096
+                      : kind == Tone::On || kind == Tone::Off ? .064
+                      : kind == Tone::Tab             ? .048
+                                                      : .032;
     std::vector<int16_t> pcm(size_t(std::ceil(duration * rate)) + 1, 0);
     constexpr double pi = 3.14159265358979323846;
-    auto note = [&](double at, double frequency, double length, double gain) {
+    auto note = [&](double at, double frequency, double length, double gain, double glide = 0) {
         for (size_t i = size_t(at * rate); i < pcm.size(); i++)
         {
             double t = double(i) / rate - at;
             if (t < 0 || t >= length)
                 continue;
-            double envelope = std::pow(std::sin(pi * t / length), 2) * std::exp(-t * 20);
-            double wave = std::sin(2 * pi * frequency * t) + .14 * std::sin(2 * pi * frequency * 2 * t);
+            double edge = std::sin(pi * t / length);
+            double envelope = edge * edge * std::exp(-t * 11);
+            double phase = 2 * pi * (frequency * t + .5 * glide * t * t / length);
+            double wave = .78 * std::sin(phase) + .16 * std::sin(phase * 2) + .06 * std::sin(phase * 3);
             int sample = int(pcm[i]) + int(32767 * .16 * volume * gain * envelope * wave);
             pcm[i] = int16_t(std::clamp(sample, -32767, 32767));
         }
     };
-    if (kind == Tone::InspectorOpen)
+    if (kind == Tone::Hover)
+        note(0, 960, .019, .28, 90);
+    else if (kind == Tone::Click)
+        note(0, 390, .031, .82, 110);
+    else if (kind == Tone::Tab)
     {
-        note(0, 420, .055, .48);
-        note(.024, 680, .05, .34);
+        note(0, 600, .032, .64);
+        note(.017, 900, .030, .32);
+    }
+    else if (kind == Tone::On || kind == Tone::Off)
+    {
+        bool on = kind == Tone::On;
+        note(0, on ? 480 : 640, .037, .66);
+        note(.026, on ? 720 : 420, .037, .46);
+    }
+    else if (kind == Tone::Warning)
+    {
+        note(0, 350, .054, .58);
+        note(.068, 300, .059, .48);
+    }
+    else if (kind == Tone::InspectorOpen)
+    {
+        note(0, 440, .050, .48, 40);
+        note(.026, 720, .049, .34);
     }
     else if (kind == Tone::InspectorSelect)
     {
-        note(0, 780, .024, .6);
-        note(.016, 1040, .028, .28);
+        note(0, 780, .024, .60, 60);
+        note(.015, 1040, .024, .28);
     }
     else if (kind == Tone::InspectorPin)
     {
-        note(0, 660, .038, .55);
-        note(.032, 990, .055, .4);
+        note(0, 600, .038, .55);
+        note(.032, 900, .055, .40);
     }
     else if (kind == Tone::InspectorClose)
     {
-        note(0, 510, .035, .42);
-        note(.022, 340, .037, .3);
+        note(0, 540, .035, .42);
+        note(.022, 360, .037, .30);
     }
     else if (kind == Tone::PersonalBest)
     {
-        note(0, 610, .05, .7);
-        note(.04, 810, .05, .6);
-        note(.08, 970, .05, .5);
-        note(.125, 1220, .06, .4);
+        note(0, 430, .054, .70);
+        note(.041, 645, .054, .60);
+        note(.086, 860, .054, .50);
+        note(.131, 1075, .063, .40);
     }
     else if (kind == Tone::Confirm || kind == Tone::Complete)
     {
-        note(0, 610, .048, .8);
-        note(.038, 810, .05, .65);
+        note(0, 540, .051, .80);
+        note(.039, 810, .056, .65);
         if (kind == Tone::Complete)
-            note(.069, 970, .044, .45);
+            note(.079, 1080, .048, .45);
     }
-    else
-        note(0,
-             kind == Tone::Tab   ? 680
-             : kind == Tone::On  ? 610
-             : kind == Tone::Off ? 470
-                                 : 530,
-             duration, .8);
     pcm.front() = pcm.back() = 0;
     return pcm;
 }

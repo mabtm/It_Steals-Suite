@@ -1,9 +1,9 @@
-name: Build and publish PracticeSuite
+name: Build and publish Elite-Suite
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, dev/elite-suite]
     tags: ['v*']
     paths:
       - 'README.md'
@@ -45,7 +45,7 @@ jobs:
       - name: Test production logic, UI, and managed contracts
         run: python3 tests/run.py --ui --managed --jobs 2 --output build/verification
       - name: Check search memory and undefined behavior
-        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests navigation_visibility_tests navigation_startup_tests physical_repair_tests font_catalog_tests --sanitize --jobs 2 --output build/gpu-sanitizers
+        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests navigation_visibility_tests navigation_startup_tests physical_repair_tests timer_preparation_tests navigation_diagnostic_tests font_catalog_tests ui_motion_audio_tests performance_timing_tests milestone_tests replay_motion_tests --sanitize --jobs 2 --output build/gpu-sanitizers
       - name: Retain verification logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -132,7 +132,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
       - name: Refresh the supplied trainer from the verified Windows build
-        if: github.ref == 'refs/heads/main'
+        if: startsWith(github.ref, 'refs/heads/')
         run: |
           $ErrorActionPreference = 'Stop'
           python repository.py sync
@@ -140,9 +140,9 @@ jobs:
           git add -- bin/ItStealsTrainer.exe README.md
           git diff --cached --quiet -- bin/ItStealsTrainer.exe README.md
           if ($LASTEXITCODE -eq 1) {
-            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Update verified PracticeSuite trainer [skip ci]"
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Update verified Elite-Suite trainer [skip ci]"
             if ($LASTEXITCODE -ne 0) { throw 'Could not commit the verified trainer.' }
-            git push origin HEAD:main
+            git push origin "HEAD:refs/heads/$env:GITHUB_REF_NAME"
             if ($LASTEXITCODE -ne 0) { throw 'The source branch changed; inspect it before retrying publication.' }
           } elseif ($LASTEXITCODE -ne 0) {
             throw 'Could not compare the supplied trainer.'
@@ -155,7 +155,14 @@ jobs:
           $header = Get-Content .\Trainer\SuiteBranding.h -Raw
           $version = [regex]::Match($header, '#define SUITE_VERSION "(\d+\.\d+\.\d+)"').Groups[1].Value
           if (-not $version) { throw 'Release version is missing.' }
-          $tag = "v$version"
+          $preview = $env:GITHUB_REF -ne 'refs/heads/main' -or $header -match '#define SUITE_PREVIEW 1'
+          $tag = if ($preview) { "v$version-preview.$env:GITHUB_RUN_NUMBER" } else { "v$version" }
+          "SUITE_RELEASE_PREVIEW=$preview" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          if ($preview) {
+            $stableTag = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq '.tag_name'
+            if ($LASTEXITCODE -ne 0 -or $stableTag -notmatch '^v\d+\.\d+\.\d+$') { throw 'Could not establish the current stable release.' }
+            "STABLE_BASELINE_TAG=$stableTag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
           $existing = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100"
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect existing releases.' }
           $release = @($existing | ConvertFrom-Json) | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
@@ -167,10 +174,12 @@ jobs:
             throw 'A draft for this version belongs to another commit. Review it before reusing the version.'
           }
           $notesFile = Join-Path $env:RUNNER_TEMP 'practice-suite-release.md'
-          python repository.py notes $version --output $notesFile
+          python repository.py notes $version --tag $tag --output $notesFile
           if ($LASTEXITCODE -ne 0) { throw 'Could not generate the release notes.' }
           if (-not $release) {
-            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "PracticeSuite $tag" --notes-file $notesFile --draft
+            $create = @('release','create',$tag,'--repo',$env:GITHUB_REPOSITORY,'--target',$env:GITHUB_SHA,'--title',"Elite-Suite $tag",'--notes-file',$notesFile,'--draft')
+            if ($preview) { $create += @('--prerelease','--latest=false') }
+            & gh @create
             if ($LASTEXITCODE -ne 0) { throw 'Could not create release draft.' }
           }
           $names = @('ItStealsSuite-Setup.exe','ItStealsSuite-Portable.zip','ItStealsTrainer.exe','PracticeSuiteEncoder.exe','ItStealsHelper.dll','Encoder-Sources.zip','SHA256SUMS.txt')
@@ -181,9 +190,27 @@ jobs:
           })
           gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed; release remains a draft.' }
-          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($preview) {
+            gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease --latest=false
+          } else {
+            gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --prerelease=false --latest
+          }
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
+      - name: Verify preview publication leaves the stable update channel intact
+        if: env.SUITE_RELEASE_PREVIEW == 'True'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $latest = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $latest.prerelease -or $latest.tag_name -ne $env:STABLE_BASELINE_TAG) {
+            throw 'Preview publication changed the stable latest release.'
+          }
+          & .\build\windows-updater-tests\contract.exe --anonymous
+          if ($LASTEXITCODE -ne 0) { throw 'The production stable updater failed after preview publication.' }
+          Write-Output "Stable channel preserved: $($latest.tag_name)."
       - name: Refresh release pages
+        if: env.SUITE_RELEASE_PREVIEW == 'False'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

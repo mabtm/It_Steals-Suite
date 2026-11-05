@@ -17,13 +17,16 @@ SetCompressor /SOLID lzma
 !ifndef OUTPUT
 !define OUTPUT "..\build\release\ItStealsSuite-Setup.exe"
 !endif
-Name "It Steals PracticeSuite ${VERSION}"
+!ifndef CHANNEL
+!define CHANNEL ""
+!endif
+Name "Elite-Suite ${VERSION}${CHANNEL}"
 OutFile "${OUTPUT}"
-InstallDir "$PROGRAMFILES64\It Steals PracticeSuite"
+InstallDir "$PROGRAMFILES64\Elite-Suite"
 InstallDirRegKey HKLM "Software\mab\ItStealsPracticeSuite" "InstallDir"
 VIProductVersion "${VERSION}.0"
-VIAddVersionKey "ProductName" "It Steals PracticeSuite"
-VIAddVersionKey "FileDescription" "PracticeSuite Setup"
+VIAddVersionKey "ProductName" "Elite-Suite"
+VIAddVersionKey "FileDescription" "Elite-Suite Setup"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "CompanyName" "mab"
@@ -40,15 +43,15 @@ UninstallIcon "..\assets\suite.ico"
 !define MUI_TEXTCOLOR "E8F5F1"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "Ready for your next run."
-!define MUI_WELCOMEPAGE_TEXT "PracticeSuite v${VERSION}$\r$\n$\r$\nPractice. Understand. Improve.$\r$\n$\r$\nInstall the trainer, video encoder, and game mod. Setup finds your Steam installation, installs MelonLoader when needed, and creates your shortcuts.$\r$\n$\r$\nClose It Steals and PracticeSuite before continuing."
+!define MUI_WELCOMEPAGE_TEXT "Elite-Suite v${VERSION}${CHANNEL}$\r$\n$\r$\nPractice. Understand. Improve.$\r$\n$\r$\nInstall the trainer, video encoder, and game mod. Setup finds your Steam installation, installs MelonLoader when needed, and creates your shortcuts.$\r$\n$\r$\nClose It Steals and Elite-Suite before continuing."
 !insertmacro MUI_PAGE_WELCOME
 Page custom GamePage GameLeave
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_TITLE "PracticeSuite is ready."
-!define MUI_FINISHPAGE_TEXT "Start PracticeSuite from the desktop or Start menu. The trainer starts It Steals automatically; this is optional under Settings > System.$\r$\n$\r$\nPress F3 in the game to open the menu. Use windowed or borderless mode.$\r$\n$\r$\nExisting replays, settings, other mods, and a complete MelonLoader installation are preserved."
+!define MUI_FINISHPAGE_TITLE "Elite-Suite is ready."
+!define MUI_FINISHPAGE_TEXT "Start Elite-Suite from the desktop or Start menu. The trainer starts It Steals automatically; this is optional under Settings > System.$\r$\n$\r$\nPress F3 in the game to open the menu. Use windowed or borderless mode.$\r$\n$\r$\nExisting replays, settings, other mods, and a complete MelonLoader installation are preserved."
 !define MUI_FINISHPAGE_RUN
-!define MUI_FINISHPAGE_RUN_TEXT "Open the PracticeSuite folder"
+!define MUI_FINISHPAGE_RUN_TEXT "Open the Elite-Suite folder"
 !define MUI_FINISHPAGE_RUN_FUNCTION OpenSuiteFolder
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -63,11 +66,11 @@ Var GameHint
 
 Function .onInit
     ${IfNot} ${RunningX64}
-        MessageBox MB_ICONSTOP "PracticeSuite requires 64-bit Windows."
+        MessageBox MB_ICONSTOP "Elite-Suite requires 64-bit Windows."
         Abort
     ${EndIf}
     ${IfNot} ${AtLeastWin10}
-        MessageBox MB_ICONSTOP "PracticeSuite requires Windows 10 or later."
+        MessageBox MB_ICONSTOP "Elite-Suite requires Windows 10 or later."
         Abort
     ${EndIf}
     SetRegView 64
@@ -153,7 +156,7 @@ FunctionEnd
 Function OpenSuiteFolder
     ExecShell "open" "$INSTDIR"
 FunctionEnd
-Section "PracticeSuite" SEC_MAIN
+Section "Elite-Suite" SEC_MAIN
     SetOutPath "$PLUGINSDIR\payload"
     File /r "${PAYLOAD}\*"
     nsExec::ExecToLog '"$Powershell" -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "$PLUGINSDIR\Install.ps1" -Mode Install -GameDir "$GameDir" -InstallDir "$INSTDIR" -PayloadDir "$PLUGINSDIR\payload"'
@@ -164,15 +167,15 @@ Section "PracticeSuite" SEC_MAIN
     ${EndIf}
     SetOutPath "$INSTDIR"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
-    CreateDirectory "$SMPROGRAMS\It Steals PracticeSuite"
-    CreateShortcut "$SMPROGRAMS\It Steals PracticeSuite\PracticeSuite.lnk" "$INSTDIR\ItStealsTrainer.exe" "" "$INSTDIR\ItStealsTrainer.exe" 0
+    CreateDirectory "$SMPROGRAMS\Elite-Suite"
+    CreateShortcut "$SMPROGRAMS\Elite-Suite\Elite-Suite.lnk" "$INSTDIR\ItStealsTrainer.exe" "" "$INSTDIR\ItStealsTrainer.exe" 0
     ${If} $DesktopEnabled == ${BST_CHECKED}
-        CreateShortcut "$DESKTOP\It Steals PracticeSuite.lnk" "$INSTDIR\ItStealsTrainer.exe" "" "$INSTDIR\ItStealsTrainer.exe" 0
+        CreateShortcut "$DESKTOP\Elite-Suite.lnk" "$INSTDIR\ItStealsTrainer.exe" "" "$INSTDIR\ItStealsTrainer.exe" 0
     ${EndIf}
     WriteRegStr HKLM "Software\mab\ItStealsPracticeSuite" "InstallDir" "$INSTDIR"
     WriteRegStr HKLM "Software\mab\ItStealsPracticeSuite" "GameDir" "$GameDir"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "InstallLocation" "$INSTDIR"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayName" "It Steals PracticeSuite"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayName" "Elite-Suite"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayVersion" "${VERSION}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "Publisher" "mab"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ItStealsPracticeSuite" "DisplayIcon" "$INSTDIR\ItStealsTrainer.exe"
@@ -194,6 +197,9 @@ Section "Uninstall"
         MessageBox MB_ICONSTOP "Close the game and trainer, then retry. See the log for details."
         Abort
     ${EndIf}
+    Delete "$DESKTOP\Elite-Suite.lnk"
+    Delete "$SMPROGRAMS\Elite-Suite\Elite-Suite.lnk"
+    RMDir "$SMPROGRAMS\Elite-Suite"
     Delete "$DESKTOP\It Steals PracticeSuite.lnk"
     Delete "$SMPROGRAMS\It Steals PracticeSuite\PracticeSuite.lnk"
     RMDir "$SMPROGRAMS\It Steals PracticeSuite"

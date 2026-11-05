@@ -366,7 +366,7 @@ inline void RenderReplayImport()
     if (suite_ui::Button("Import package"))
         ImGui::OpenPopup("Import run package");
     Help(
-        "Import a PracticeSuite ZIP. Checksums, run identity and companion files are checked before preserving the recording in the archive.");
+        "Import a Suite ZIP. Checksums, run identity and companion files are checked before preserving the recording in the archive.");
     ImGui::SetNextWindowSize({std::min(600.f * suite_ui::Unit(), ImGui::GetIO().DisplaySize.x - 30), 0},
                              ImGuiCond_Appearing);
     if (ImGui::BeginPopup("Import run package"))

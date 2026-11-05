@@ -32,7 +32,16 @@ public static class ModeStatisticsTests
                           row.FinishSeconds == 10,
                       "independent mode/category accounting");
             }
-        Check(ModeStatistics.Row(-1, 0) == -1 && ModeStatistics.Row(3, 3) == -1, "catalog limits");
+        foreach (int scene in ModeStatistics.Scenes)
+        {
+            stats.BeginCategory(scene, 3);
+            stats.EndCategory(scene, 3, RunOutcome.Completed, 8, false);
+            Check(stats.Rows[ModeStatistics.Row(scene, 3)].Finished == 1 &&
+                      stats.Rows[ModeStatistics.Row(scene, 1)].Finished == 1,
+                  "Set-Seed uses appended independent rows without shifting older categories");
+        }
+        stats.SetSeedBestUtc[7] = DateTime.UtcNow.Ticks;
+        Check(ModeStatistics.Row(-1, 0) == -1 && ModeStatistics.Row(3, 4) == -1, "catalog limits");
         stats.Begin(-1, false);
         stats.End(-1, true, RunOutcome.Completed, 1, false);
         Check(!stats.Observe(3, 0, true, 1), "first observation");
@@ -67,7 +76,8 @@ public static class ModeStatisticsTests
                 Check(loaded.Read(line.Substring(0, at), line.Substring(at + 1)), "read known field");
         }
         Check(loaded.SinceUtc == stats.SinceUtc && loaded.BestUtc[7] == stats.BestUtc[7] &&
-                  loaded.Rows[0].PlaySeconds == .5 && loaded.Rows[23].Finished == 1,
+                  loaded.Rows[0].PlaySeconds == .5 && loaded.Rows[23].Finished == 1 &&
+                  loaded.Rows[31].Finished == 1 && loaded.SetSeedBestUtc[7] == stats.SetSeedBestUtc[7],
               "locale independent roundtrip");
         Check(!loaded.Read("unrelated", "1"), "other stats fields retained by owner");
         foreach (string value in new[] { "-1|0|0|0|0|0", "1|2|0|0|0|0", "1|0|0|1|0|0", "1|0|0|0|NaN|0",

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="224" viewBox="0 0 1280 224">
-<title>PracticeSuite — Practice. Understand. Improve.</title>
-<defs><linearGradient id="b" x2="1" y2=".5"><stop stop-color="#14282d"/><stop offset="1" stop-color="#0b141a"/></linearGradient><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#42615d" stroke-opacity=".13"/></pattern></defs>
+<title>Elite-Suite — Practice. Understand. Improve.</title>
+<defs><linearGradient id="b" x2="1" y2=".5"><stop stop-color="#14282d"/><stop offset="1" stop-color="#0e1116"/></linearGradient><pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#42615d" stroke-opacity=".13"/></pattern></defs>
 <rect width="1280" height="224" rx="20" fill="url(#b)"/><rect width="1280" height="224" rx="20" fill="url(#g)"/>
-<g transform="translate(44 42) scale(.28)" stroke="#83e6d2" fill="none" stroke-width="18"><path d="M61 399V123H230V287H435V61"/><circle cx="61" cy="399" r="30" fill="#14282d"/><path d="m230 99 24 24-24 24-24-24zm205 164 24 24-24 24-24-24zm0-226 24 24-24 24-24-24z" fill="#83e6d2" stroke="none"/></g>
-<g font-family="Segoe UI,DejaVu Sans,Arial,sans-serif"><text x="214" y="74" fill="#9cbeb6" font-size="18" letter-spacing="3">IT STEALS / RELEASE NOTES</text><text x="212" y="125" fill="#edf8f5" font-size="40" font-weight="700">PRACTICE SUITE</text><text x="214" y="169" fill="#83e6d2" font-size="25">Practice. Understand. Improve.</text><text x="1030" y="124" fill="#9cbeb6" font-size="18">WINDOWS x64</text></g>
+<g transform="translate(44 42) scale(.28)" stroke="#7ad4ff" fill="none" stroke-width="18"><path d="M61 399V123H230V287H435V61"/><circle cx="61" cy="399" r="30" fill="#14282d"/><path d="m230 99 24 24-24 24-24-24zm205 164 24 24-24 24-24-24zm0-226 24 24-24 24-24-24z" fill="#7ad4ff" stroke="none"/></g>
+<g font-family="Segoe UI,DejaVu Sans,Arial,sans-serif"><text x="214" y="74" fill="#97a8bb" font-size="18" letter-spacing="3">IT STEALS / RELEASE NOTES</text><text x="212" y="125" fill="#f0f5fa" font-size="40" font-weight="700">ELITE-SUITE</text><text x="214" y="169" fill="#7ad4ff" font-size="25">Practice. Understand. Improve.</text><text x="1030" y="124" fill="#97a8bb" font-size="18">WINDOWS x64</text></g>
 </svg>

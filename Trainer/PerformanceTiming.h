@@ -32,6 +32,11 @@ class FrameCost
         return count ? total / count : 0;
     }
 
+    size_t Count() const
+    {
+        return count;
+    }
+
     double P95() const
     {
         if (!count)
@@ -39,6 +44,68 @@ class FrameCost
         auto copy = samples;
         std::sort(copy.begin(), copy.begin() + count);
         return copy[(count - 1) * 95 / 100];
+    }
+};
+
+// Measures successful output submissions, not monitor refresh or GPU display
+// latency. Hidden/occluded periods only break the baseline, not add huge gaps.
+class FrameCadence
+{
+    FrameCost intervals;
+    std::array<bool, 128> late{};
+    size_t at = 0, count = 0, lateCount = 0;
+    double previous = -1, period = 0;
+
+  public:
+    void Observe(double seconds, double periodMs)
+    {
+        if (!std::isfinite(seconds) || seconds < 0 || !std::isfinite(periodMs) || periodMs <= 0)
+            return;
+        if (period != periodMs)
+        {
+            *this = {};
+            period = periodMs;
+        }
+        if (previous >= 0 && seconds > previous)
+        {
+            double ms = (seconds - previous) * 1000;
+            intervals.Observe(ms);
+            if (count == late.size())
+                lateCount -= late[at];
+            else
+                count++;
+            // A small scheduling tolerance avoids classifying normal sub-ms
+            // timer noise as a missed frame, while detecting visible stalls.
+            late[at] = ms > period * 1.25;
+            lateCount += late[at];
+            at = (at + 1) % late.size();
+        }
+        previous = seconds;
+    }
+
+    void Pause()
+    {
+        previous = -1;
+    }
+
+    size_t Count() const
+    {
+        return intervals.Count();
+    }
+
+    double Fps() const
+    {
+        return intervals.Mean() > 0 ? 1000. / intervals.Mean() : 0;
+    }
+
+    double P95() const
+    {
+        return intervals.P95();
+    }
+
+    double LatePercent() const
+    {
+        return count ? 100. * lateCount / count : 0;
     }
 };
 

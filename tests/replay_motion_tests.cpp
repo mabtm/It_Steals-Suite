@@ -314,6 +314,84 @@ int main(int argc, char **argv)
         Write(source / (prefix + ".validation.json"), ReplayText("{\"runId\":1}"));
         assert(!recheck(transport)->filesOk);
         Write(source / (prefix + ".validation.json"), reportBytes);
+        auto categoryReport = [](const MapData &recording, std::string metadata = {}) {
+            const auto &run = *recording.review;
+            std::ostringstream out;
+            out << std::setprecision(17) << "{\"reportFormat\":1,\"runId\":" << run.id
+                << ",\"scene\":" << recording.scene << ",\"observedSeconds\":" << run.seconds
+                << ",\"validationChecked\":" << (run.validationChecked ? "true" : "false")
+                << ",\"observedFromStart\":" << (run.observedFromStart ? "true" : "false")
+                << ",\"gameAssemblyFileSha256\":" << ReplayJson(recording.hash)
+                << ",\"integrity\":" << ReplayJson(run.valid ? "VALID (LOCAL)" : "UNVALID")
+                << metadata << "}";
+            return out.str();
+        };
+        // Historical format-1 reports remain supported without the new fields.
+        Write(source / (prefix + ".validation.json"), ReplayText(categoryReport(*map)));
+        checked = recheck(transport);
+        assert(checked->filesOk && checked->reportChecked);
+        auto categoryMap = *map;
+        auto categoryRun = std::make_shared<RunReview>(*map->review);
+        categoryMap.review = categoryRun;
+        categoryRun->category = 1;
+        categoryRun->seedKind = 2;
+        categoryRun->aids = categoryRun->initialAids = 2;
+        categoryRun->selectedSeed = categoryRun->runSeed = -123;
+        const std::string metadata =
+            ",\"category\":\"SET-SEED\",\"selectedSeed\":-123,\"seedRecipe\":\"DERIVED-V1\",\"seedType\":\"SET\",\"seed\":-123";
+        auto categoryWire = EncodeFixture(categoryMap, 15);
+        auto selectedCategory = DecodeMap(categoryWire, error);
+        assert(selectedCategory && selectedCategory->review->valid && motion->Matches(*selectedCategory));
+        Write(source / (prefix + ".isrun"), categoryWire);
+        const auto matchingReport = categoryReport(categoryMap, metadata);
+        Write(source / (prefix + ".validation.json"), ReplayText(matchingReport));
+        checked = recheck(selectedCategory);
+        assert(checked->filesOk && checked->reportChecked);
+        Write(source / (prefix + ".validation.json"), ReplayText(categoryReport(categoryMap)));
+        checked = recheck(selectedCategory);
+        assert(!checked->filesOk && !checked->reportChecked &&
+               checked->error.find("category or seed recipe") != std::string::npos);
+        auto rejectsChanged = [&](std::string from, std::string to) {
+            auto changed = matchingReport;
+            auto at = changed.find(from);
+            assert(at != std::string::npos);
+            changed.replace(at, from.size(), to);
+            Write(source / (prefix + ".validation.json"), ReplayText(changed));
+            auto result = recheck(selectedCategory);
+            assert(!result->filesOk && !result->reportChecked &&
+                   result->error.find("category or seed recipe") != std::string::npos);
+        };
+        rejectsChanged("\"category\":\"SET-SEED\"", "\"category\":\"RANDOM SEED\"");
+        rejectsChanged("\"selectedSeed\":-123", "\"selectedSeed\":0");
+        rejectsChanged("\"selectedSeed\":-123", "\"selectedSeed\":null");
+        rejectsChanged("\"selectedSeed\":-123", "\"selectedSeed\":\"-123\"");
+        rejectsChanged("\"selectedSeed\":-123", "\"selectedSeed\":2147483648");
+        rejectsChanged("\"seedRecipe\":\"DERIVED-V1\"", "\"seedRecipe\":\"RAW-FIRST-SPAWN-V1\"");
+        rejectsChanged("\"seed\":-123", "\"seed\":-124");
+        rejectsChanged("\"seed\":-123", "\"seed\":null");
+        rejectsChanged("\"seedType\":\"SET\"", "\"seedType\":\"RANDOM\"");
+        for (const auto &field : {",\"category\":\"SET-SEED\"", ",\"selectedSeed\":-123",
+                                  ",\"seedRecipe\":\"DERIVED-V1\"", ",\"seedType\":\"SET\"",
+                                  ",\"seed\":-123"})
+            rejectsChanged(field, "");
+        categoryRun->rawSpawnSeed = true;
+        categoryWire = EncodeFixture(categoryMap, 15);
+        selectedCategory = DecodeMap(categoryWire, error);
+        assert(selectedCategory);
+        Write(source / (prefix + ".isrun"), categoryWire);
+        auto rawMetadata = metadata;
+        rawMetadata.replace(rawMetadata.find("DERIVED-V1"), 10, "RAW-FIRST-SPAWN-V1");
+        Write(source / (prefix + ".validation.json"), ReplayText(categoryReport(categoryMap, rawMetadata)));
+        checked = recheck(selectedCategory);
+        assert(checked->filesOk && checked->reportChecked);
+        // Old replay formats cannot substantiate a newly declared category.
+        Write(source / (prefix + ".isrun"), map->bytes);
+        Write(source / (prefix + ".validation.json"), ReplayText(categoryReport(*map, metadata)));
+        checked = recheck(transport);
+        assert(!checked->filesOk && !checked->reportChecked);
+        Write(source / (prefix + ".validation.json"), reportBytes);
+        assert(recheck(transport)->filesOk);
+        std::cout << "Replay report recheck: historical metadata compatibility, complete v15 category evidence, signed seeds, both recipes and mismatched/missing field rejection: PASS\n";
         auto invalid = *map;
         auto invalidRun = std::make_shared<RunReview>(*map->review);
         invalidRun->valid = false;
@@ -443,7 +521,7 @@ int main(int argc, char **argv)
          {"7.3.0",  "7.3.1",  "7.3.2",  "7.3.3",  "7.3.4",  "7.3.5",  "7.4.0",  "7.5.0",  "7.5.1",  "7.5.2",
           "7.6.0",  "7.7.0",  "7.8.0",  "7.8.1",  "7.9.0",  "7.10.0", "7.10.1", "7.11.0", "7.11.1", "7.11.2",
           "7.11.3", "7.11.4", "7.11.5", "7.12.0", "7.12.1", "7.12.2", "7.12.3", "7.12.4", "7.12.5", "7.12.6",
-          "7.13.0", "7.13.1", "7.14.0", "7.14.1", "7.14.2", "7.15.0", "7.16.0", "7.16.1", "7.16.2", "7.17.0", "7.18.0", "7.18.1", "7.19.0", "7.20.0", "7.20.1", "7.20.2"})
+          "7.13.0", "7.13.1", "7.14.0", "7.14.1", "7.14.2", "7.15.0", "7.16.0", "7.16.1", "7.16.2", "7.17.0", "7.18.0", "7.18.1", "7.19.0", "7.20.0", "7.20.1", "7.20.2", "7.21.0"})
     {
         auto previousPackage = package;
         previousPackage["manifest.json"] = ReplayText(ReplayManifest(*map, true, true, version, true));

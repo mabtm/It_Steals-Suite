@@ -35,11 +35,11 @@ int main()
         "version=14\nappearance.menuFont=1e100\nappearance.hudFont=-1e100\nappearance.timerFont=nan\nappearance.color0.0=-9\nappearance.color0.1=88\nappearance.color0.2=1x\nappearance.hudFollowsTheme=8\n");
     assert(invalidTheme.appearance.menuFont == 9 && invalidTheme.appearance.hudFont == 0 &&
            invalidTheme.appearance.timerFont == 8 && invalidTheme.appearance.colors[0][0] == 0 &&
-           invalidTheme.appearance.colors[0][1] == 1 && invalidTheme.appearance.colors[0][2] == .20f &&
+           invalidTheme.appearance.colors[0][1] == 1 && invalidTheme.appearance.colors[0][2] == .18f &&
            invalidTheme.appearance.hudFollowsTheme);
     invalidTheme.appearance.colors[0][0] = NAN;
     invalidTheme.Validate();
-    assert(invalidTheme.appearance.colors[0][0] == .10f);
+    assert(invalidTheme.appearance.colors[0][0] == .12f);
     std::vector<uint32_t> uniform(384 * 157, 0x00804020);
     auto blurStarted = std::chrono::steady_clock::now();
     assert(BlurIntroPixels(uniform, 384, 157));
@@ -71,8 +71,32 @@ int main()
            std::abs(q.experience.volume - .37f) < 1e-6);
     auto migrated = TrainerPreferences::Decode(
         "version=12\nseed=983\nbackground0=.065\nbackground1=.075\nbackground2=.095\nheader0=.34\nheader1=.70\nheader2=.95\n");
-    assert(migrated.seed == 983 && migrated.background[0] == .048f && migrated.header[0] == .37f &&
+    assert(migrated.seed == 983 && migrated.background[0] == .055f && migrated.header[0] == .48f &&
            migrated.experience.sounds);
+    TrainerPreferences legacy;
+    const float old[4][4] = {{.048f, .063f, .074f, 1}, {.91f, .95f, .95f, 1},
+                             {.37f, .83f, .77f, 1}, {1, .69f, .38f, 1}};
+    float *oldPalette[] = {legacy.background, legacy.text, legacy.header, legacy.accent};
+    for (int c = 0; c < 4; ++c)
+        std::copy(old[c], old[c] + 4, oldPalette[c]);
+    legacy.appearance.colors[0] = {.10f, .18f, .20f};
+    legacy.appearance.colors[1] = {.37f, .83f, .77f};
+    legacy.appearance.colors[2] = {.20f, .29f, .32f};
+    auto encodedLegacy = legacy.Encode();
+    encodedLegacy.replace(0, encodedLegacy.find('\n'), "version=20");
+    auto elite = TrainerPreferences::Decode(encodedLegacy);
+    assert(elite.background[0] == .055f && elite.header[2] == 1.f &&
+           elite.appearance.colors[0] == TrainerPreferences{}.appearance.colors[0]);
+    legacy.text[0] = .87f;
+    encodedLegacy = legacy.Encode();
+    encodedLegacy.replace(0, encodedLegacy.find('\n'), "version=20");
+    auto customPalette = TrainerPreferences::Decode(encodedLegacy);
+    assert(customPalette.text[0] == .87f && customPalette.header[0] == .37f && customPalette.background[0] == .048f &&
+           customPalette.appearance.colors == legacy.appearance.colors);
+    legacy = TrainerPreferences{};
+    legacy.header[0] = .37f;
+    auto deliberate = TrainerPreferences::Decode(legacy.Encode());
+    assert(deliberate.header[0] == .37f); // A current-format choice is never migrated.
     auto custom = TrainerPreferences::Decode("version=12\nbackground0=.8\n");
     assert(custom.background[0] == .8f);
     auto bad = TrainerPreferences::Decode(
@@ -174,7 +198,7 @@ int main()
         assert(std::abs(mean) < 50);
     }
     Navigation nav;
-    assert(nav.Is(Page::Cheats) && !nav.Select(Page::Cheats, 1));
+    assert(nav.Is(Page::Speedrun) && !nav.Select(Page::Speedrun, 1));
     assert(nav.Select(Page::Replay, 2) && nav.changed == 2 && !nav.Select(Page::Count, 3));
     std::array<bool, PageCount> seen{};
     int groups = 0;

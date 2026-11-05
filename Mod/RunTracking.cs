@@ -7,6 +7,15 @@ public enum SeedKind : byte
     Set
 }
 
+// Explicit run selection, latched before the timer starts. SeedKind describes
+// RNG observations; older fixed-seed practice must never infer this category.
+public enum RunCategory : byte
+{
+    RandomSeed,
+    SetSeed,
+    Practice
+}
+
 [Flags]
 public enum RunAids : uint
 {
@@ -33,16 +42,18 @@ public sealed class SeedEvidence
     public int InitialRngSeed { get; private set; }
     public int Reseeds { get; private set; }
     public bool Coverage { get; private set; }
+    public bool RawSpawnSeed { get; private set; }
 
     public void Reset(bool coverage)
     {
         Coverage = coverage;
         Kind = SeedKind.Unknown;
         Known = false;
+        RawSpawnSeed = false;
         Seed = InitialRngSeed = Reseeds = 0;
     }
 
-    public void Observe(int original, int applied, bool forced, int baseSeed)
+    public void Observe(int original, int applied, bool forced, int baseSeed, bool rawSpawnSeed = false)
     {
         if (Reseeds < int.MaxValue)
             Reseeds++;
@@ -51,6 +62,7 @@ public sealed class SeedEvidence
             if (!Known)
                 InitialRngSeed = applied;
             Kind = SeedKind.Set;
+            RawSpawnSeed = rawSpawnSeed;
             Seed = baseSeed;
             Known = true;
         }
@@ -77,6 +89,9 @@ public sealed class RunRecord
     public double Seconds, PreviousBestSeconds;
     public float Progress;
     public SeedKind SeedType;
+    public RunCategory Category;
+    public int SelectedSeed;
+    public bool RawSpawnSeed;
     public bool SeedKnown, PersonalBest;
     public RunOutcome Outcome;
     public RunAids Aids, InitialAids;
@@ -129,9 +144,10 @@ public sealed class RunTracker
 
     public bool Begin(int scene, long utcTicks, RunAids aids, SeedEvidence seed,
                       RunEnvironment environment = null, bool exportReport = false,
-                      bool observedFromStart = true)
+                      bool observedFromStart = true, RunCategory category = RunCategory.RandomSeed,
+                      int selectedSeed = 0, bool rawSpawnSeed = false)
     {
-        if (Active != null || utcTicks <= 0 || utcTicks > DateTime.MaxValue.Ticks || scene < 0)
+        if (Active != null || utcTicks <= 0 || utcTicks > DateTime.MaxValue.Ticks || scene < 0 || (byte)category > 2)
             return false;
         if (store.Runs < int.MaxValue)
             store.Runs++;
@@ -141,11 +157,15 @@ public sealed class RunTracker
                                        Number = store.Runs,
                                        Aids = aids,
                                        InitialAids = aids,
+                                       Category = category == RunCategory.RandomSeed && (aids & RunAids.Practice) != 0
+                                                      ? RunCategory.Practice : category,
+                                       SelectedSeed = selectedSeed,
+                                       RawSpawnSeed = rawSpawnSeed,
                                        ObservedFromStart = observedFromStart,
                                        Environment = environment == null ? null : environment.Copy(),
                                        ExportReport = exportReport };
         lastFeatures = aids;
-        store.Modes.Begin(scene, (aids & (RunAids.Practice | RunAids.FixedSeed)) != 0);
+        store.Modes.BeginCategory(scene, StatisticsCategory(Active));
         Event("RunStart", aids.ToString());
         if (!observedFromStart)
             Warn(RunWarnings.StateUnavailable);
@@ -157,11 +177,31 @@ public sealed class RunTracker
         return true;
     }
 
+    public static int StatisticsCategory(RunRecord record)
+    {
+        if (record.Category == RunCategory.SetSeed)
+            return 3;
+        return (record.InitialAids & (RunAids.Practice | RunAids.FixedSeed)) != 0 ||
+                       record.Category == RunCategory.Practice ? 2 : 1;
+    }
+
+    public void ObserveSelection(RunCategory category, int selectedSeed, bool rawSpawnSeed)
+    {
+        if (Active != null && (Active.Category != category || Active.SelectedSeed != selectedSeed ||
+                               Active.RawSpawnSeed != rawSpawnSeed))
+            Warn(RunWarnings.SelectionChanged);
+    }
+
     public void ObserveSeed(SeedEvidence evidence)
     {
         if (Active == null || evidence == null)
             return;
         bool changed = false;
+        if (Active.Category == RunCategory.SetSeed &&
+            (!evidence.Coverage || evidence.Known &&
+             (evidence.Kind != SeedKind.Set || evidence.Seed != Active.SelectedSeed ||
+              evidence.RawSpawnSeed != Active.RawSpawnSeed)))
+            Warn(RunWarnings.SeedCoverageLost);
         if (Active.SeedType == SeedKind.Random && evidence.Kind == SeedKind.Unknown)
         {
             Active.SeedType = SeedKind.Unknown;
@@ -255,8 +295,7 @@ public sealed class RunTracker
         record.Outcome = outcome;
         bool quickReset = (outcome == RunOutcome.Reset || outcome == RunOutcome.Interrupted) &&
                           record.Seconds < 4 && record.Progress <= 0;
-        store.Modes.End(record.Scene, (record.InitialAids & (RunAids.Practice | RunAids.FixedSeed)) != 0,
-                        outcome, record.Seconds, quickReset);
+        store.Modes.EndCategory(record.Scene, StatisticsCategory(record), outcome, record.Seconds, quickReset);
         if (quickReset)
         {
             store.UncountAttempt(record.StartedUtc);
@@ -271,9 +310,9 @@ public sealed class RunTracker
                 SessionCompleted++;
             store.TotalFinishedTime += record.Seconds;
             // "Local PB" eligibility; external mods/memory/input are not verified.
-            record.PreviousBestSeconds = store.Best(record.Scene);
+            record.PreviousBestSeconds = store.Best(record.Scene, record.Category);
             if (RunValidity.Eligible(record))
-                record.PersonalBest = store.RecordBest(record.Scene, record.Seconds);
+                record.PersonalBest = store.RecordBest(record.Scene, record.Seconds, record.Category);
         }
         bool reset = !quickReset && (outcome == RunOutcome.Reset || outcome == RunOutcome.Death);
         if (reset)

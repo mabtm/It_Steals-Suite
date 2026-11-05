@@ -69,6 +69,34 @@ int main()
         audio.Shutdown();
         assert(fakePrepared == 0 && fakeHandles == 0 && fakeOpens == fakeCloses);
     }
+    {
+        InterfaceAudio audio;
+        int base = fakeWrites;
+        fakeHold = true;
+        audio.Policy(true, .16f);
+        Await([&] { return audio.Status() == 1; });
+        audio.Submit(suite_ui::Tone::Hover);
+        Await([&] { return fakeWrites == base + 1 && fakePrepared == 1; });
+        audio.Submit(suite_ui::Tone::Tab);
+        audio.Submit(suite_ui::Tone::Warning); // Replaces the queued decorative tab.
+        audio.Submit(suite_ui::Tone::Click); // Cannot displace the pending warning.
+        audio.Submit(suite_ui::Tone::Hover);
+        fakeHold = false;
+        FakeCompletePlayback();
+        Await([&] { return fakeWrites == base + 2 && fakePrepared == 0; });
+        {
+            std::lock_guard lock(fakeAudioGate);
+            assert(fakeLastSamples == suite_ui::ToneSamples(suite_ui::Tone::Warning, .16f));
+        }
+        audio.Submit(suite_ui::Tone::Warning);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        assert(fakeWrites == base + 2); // Restrained repeated warnings.
+        audio.Policy(true, 0); // Zero volume also releases the audio device.
+        Await([&] { return audio.Status() == 0 && fakeOpens == fakeCloses; });
+        audio.Submit(suite_ui::Tone::Confirm);
+        assert(fakeWrites == base + 2);
+        audio.Shutdown();
+    }
     fakeFailOpen = true;
     {
         InterfaceAudio audio;
@@ -96,5 +124,5 @@ int main()
     fakeFailPrepare = fakeFailWrite = false;
     assert(fakeOpens == fakeCloses);
     std::cout
-        << "Production audio worker: asynchronous original PCM, private sample gain, focus/run mute cancellation, bounded pending bursts, interrupted buffer lifetime, device/prepare/write failures, event-driven waits and idempotent shutdown: PASS\n";
+        << "Production audio worker: asynchronous original PCM, private sample gain, focus/run mute cancellation, bounded priority-aware bursts and warning cooldowns, zero-volume device release, interrupted buffer lifetime, device/prepare/write failures, event-driven waits and idempotent shutdown: PASS\n";
 }

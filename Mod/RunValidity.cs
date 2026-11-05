@@ -177,27 +177,46 @@ public static class RunValidity
         RunWarnings.ProcessStopped | RunWarnings.InvalidTiming | RunWarnings.ModeInterrupted |
         RunWarnings.ExternalTool | RunWarnings.IntegrityUnavailable | RunWarnings.TimeScaleChanged |
         RunWarnings.PlayerStateChanged | RunWarnings.GamePatchesChanged | RunWarnings.OverlayMissing |
-        RunWarnings.ForbiddenCommand;
+        RunWarnings.ForbiddenCommand | RunWarnings.SelectionChanged;
 
     public static bool Eligible(RunRecord record)
     {
         return record != null && record.ValidationChecked && record.ObservedFromStart && record.SeedKnown &&
-               record.SeedType == SeedKind.Random && record.Aids == RunAids.None &&
+               SeedMatchesCategory(record) && DisallowedAids(record) == RunAids.None &&
                (record.Warnings & ~RunWarnings.EventLogTruncated) == 0;
+    }
+
+    public static RunAids DisallowedAids(RunRecord record)
+    {
+        // Only the explicitly selected category permits deterministic RNG.
+        // No other aid is exempt, including Practice itself.
+        RunAids aids = record.Aids | record.InitialAids;
+        return record.Category == RunCategory.SetSeed ? aids & ~RunAids.FixedSeed : aids;
+    }
+
+    public static bool SeedMatchesCategory(RunRecord record)
+    {
+        return record.Category == RunCategory.RandomSeed
+                   ? record.SeedType == SeedKind.Random
+                   : record.Category == RunCategory.SetSeed && record.SeedType == SeedKind.Set &&
+                     record.Seed == record.SelectedSeed &&
+                     record.InitialAids == RunAids.FixedSeed &&
+                     (record.Aids & RunAids.FixedSeed) != 0;
     }
 
     public static string Reason(RunRecord record)
     {
         if (record == null)
             return "No observed run";
-        if (record.Aids != RunAids.None)
-            return "Trainer aids: " + record.Aids;
+        if (DisallowedAids(record) != RunAids.None)
+            return "Trainer aids: " + DisallowedAids(record);
         if ((record.Warnings & ~RunWarnings.EventLogTruncated) != 0)
             return (record.Warnings & ~RunWarnings.EventLogTruncated).ToString();
         if (!record.ObservedFromStart)
             return "Run start not observed";
-        if (!record.SeedKnown || record.SeedType != SeedKind.Random)
-            return "Random seed not verified";
+        if (!record.SeedKnown || !SeedMatchesCategory(record))
+            return record.Category == RunCategory.SetSeed ? "Selected Set-Seed recipe not verified from start"
+                                                         : "Random seed not verified";
         if (!record.ValidationChecked)
             return "Local validation not completed (pending or recorded by an older version)";
         return "Local checks passed; external memory changes are not fully detectable";

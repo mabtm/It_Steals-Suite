@@ -126,7 +126,7 @@ public static class PracticeMapArchive
             if (b.ReadUInt32() != 0x504D5349u)
                 throw new InvalidDataException("Unsupported recorded run format");
             int format = b.ReadInt32();
-            if (format < 7 || format > 14)
+            if (format < 7 || format > 15)
                 throw new InvalidDataException("Unsupported recorded run format");
             var d = new PracticeMapData {
                 Pid = b.ReadInt32(),         Scene = b.ReadInt32(),         Epoch = b.ReadInt32(),
@@ -220,11 +220,25 @@ public static class PracticeMapArchive
                 review.Aids = b.ReadUInt32();
                 review.Warnings = b.ReadUInt32();
                 review.ValidityReason = r.Text(1024);
+                if (format >= 15)
+                {
+                    review.Category = (RunCategory)b.ReadByte();
+                    review.SelectedSeed = b.ReadInt32();
+                    review.RunSeed = b.ReadInt32();
+                    review.RawSpawnSeed = r.Flag();
+                    review.InitialAids = b.ReadUInt32();
+                    if ((byte)review.Category > 2)
+                        throw new InvalidDataException("Invalid recorded run category");
+                }
+                else
+                    review.Category = (review.Aids & (uint)(RunAids.Practice | RunAids.FixedSeed)) != 0 ? RunCategory.Practice : RunCategory.RandomSeed;
                 if (review.SeedKind < 0 || review.SeedKind > 2 ||
                     review.Valid != RunValidity.Eligible(new RunRecord {
                         ValidationChecked = review.ValidationChecked,
                         ObservedFromStart = review.ObservedFromStart, SeedKnown = review.SeedKnown,
                         SeedType = (SeedKind)review.SeedKind, Aids = (RunAids)review.Aids,
+                        Category = review.Category, SelectedSeed = review.SelectedSeed, Seed = review.RunSeed,
+                        RawSpawnSeed = review.RawSpawnSeed, InitialAids = (RunAids)review.InitialAids,
                         Warnings = (RunWarnings)review.Warnings
                     }))
                     throw new InvalidDataException("Inconsistent recorded validation");

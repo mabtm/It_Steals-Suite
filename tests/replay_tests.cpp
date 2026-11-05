@@ -57,6 +57,54 @@ int main(int argc, char **argv)
     assert(!DecodeMap(EncodeFixture(wrongActor, 9), eventError));
     std::cout
         << "Replay v9: emitted flashlight/camera flashes without monsters; valid v8 compatibility, invalid actor rejection, and every aborted outcome takes precedence over VALID: PASS\n";
+    // v15 preserves the explicit category. SeedKind.Set in an old replay
+    // remains a practice aid, even with otherwise complete validation flags.
+    auto setMap = *wire;
+    auto setReview = std::make_shared<RunReview>(*wire->review);
+    setMap.review = setReview;
+    setReview->category = 1;
+    setReview->seedKind = 2;
+    setReview->aids = setReview->initialAids = 2;
+    setReview->selectedSeed = setReview->runSeed = 0;
+    assert(DecodeMap(EncodeFixture(setMap, 15), eventError));
+    auto setManifest = ReplayManifest(setMap, false, false, "7.22.0");
+    assert(setManifest.find("Elite-Suite 7.22.0") != std::string::npos &&
+           setManifest.find("\"speedrunCategory\": \"SET-SEED\"") != std::string::npos &&
+           setManifest.find("\"selectedSeed\": 0") != std::string::npos);
+    auto oldManifest = ReplayManifest(setMap, false, false, "7.21.0");
+    assert(oldManifest.find("PracticeSuite 7.21.0") != std::string::npos &&
+           oldManifest.find("speedrunCategory") == std::string::npos);
+    assert(!DecodeMap(EncodeFixture(setMap, 14), eventError));
+    setReview->valid = false;
+    auto legacySet = DecodeMap(EncodeFixture(setMap, 14), eventError);
+    assert(legacySet && legacySet->review->category == 2 && !legacySet->review->valid);
+    setReview->valid = true;
+    for (uint32_t aid : {1u, 4u, 8u, 16u, 32u, 64u, 128u, 256u, 512u, 0x80000000u})
+    {
+        setReview->aids = 2u | aid;
+        assert(!DecodeMap(EncodeFixture(setMap, 15), eventError));
+    }
+    setReview->aids = 2;
+    for (uint32_t warning : {1u, 2u, 4u, 8u, 16u, 32u, 128u, 256u, 512u, 1024u, 2048u, 4096u, 8192u, 16384u})
+    {
+        setReview->warnings = warning;
+        assert(!DecodeMap(EncodeFixture(setMap, 15), eventError));
+    }
+    setReview->warnings = 64; // A truncated optional event log is still permitted.
+    assert(DecodeMap(EncodeFixture(setMap, 15), eventError));
+    setReview->warnings = 0;
+    setReview->selectedSeed = 1;
+    assert(!DecodeMap(EncodeFixture(setMap, 15), eventError));
+    setReview->selectedSeed = 0;
+    setReview->rawSpawnSeed = true;
+    assert(DecodeMap(EncodeFixture(setMap, 15), eventError));
+    setReview->rawSpawnSeed = false;
+    setReview->initialAids = 0;
+    assert(!DecodeMap(EncodeFixture(setMap, 15), eventError));
+    setReview->initialAids = 2;
+    setReview->category = 3;
+    assert(!DecodeMap(EncodeFixture(setMap, 15), eventError));
+    std::cout << "Replay v15: explicit Set-Seed category, seed latch, all aids/warnings, both recipes and historical practice isolation: PASS\n";
     auto monsters = MonstersAt(*wire->review, .3, true);
     assert(monsters.size() == 1 && monsters[0].path && monsters[0].path->size() == 2);
     assert(monsters[0].pose.marker.x == 0); // Do not bridge a .5 s observation gap.

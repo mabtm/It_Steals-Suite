@@ -1,6 +1,6 @@
 <picture>
   <source media="(max-width: 720px)" srcset="assets/hero-mobile.svg">
-  <img src="assets/hero.svg" alt="It Steals PracticeSuite — Practice. Understand. Improve." width="100%">
+  <img src="assets/hero.svg" alt="Elite-Suite — Practice. Understand. Improve." width="100%">
 </picture>
 
 <p align="center">
@@ -15,6 +15,10 @@
 </p>
 
 <p align="center">
+  <a href="https://discord.gg/YySbYmGG2Y"><img src="assets/discord.svg" width="310" alt="Join the It-Steals Speedrunning Discord community"></a>
+</p>
+
+<p align="center">
   <a href="#install">Install</a> · <a href="#features">Features</a> · <a href="#downloads">Downloads</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="#about-the-project">About</a> · <a href="DEVELOPING.md">Development</a>
 </p>
 
@@ -25,14 +29,22 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.21.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.21.0)**
+**[v7.22.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
 
-- Fixed a bug caused by incomplete official MelonLoader installations blocking Suite Setup: missing files can now be repaired from the checksum-verified distribution while existing mods/settings remain intact. Modified or conflicting loaders are rejected before file changes, and interrupted repairs roll back.
-- Improved navigation preparation with on-demand physical detour searches that retain wall, floor and clearance validation. Timer captures distinguish the game's movable vault-door collider from the fixed bunker walls.
-- Fixed a bug caused by export cameras observing mixed game/export resolutions: world, arms and scene display now share the export-sized target before rendering, UI layout is refreshed, and temporal post-processing history is reset between export samples. Normal playback and game-owned textures are restored after capture.
+- Improved speedrun categories with explicit Set-Seed selection, separately stored personal bests, both deterministic seed recipes and latched start evidence. Other aids remain invalid; seed/category changes invalidate the attempt, and historical Practice runs retain their status.
+- Improved the Suite as Elite-Suite, with a new graphite and ice-blue interface, clearer workspace hierarchy, responsive navigation and explicit primary actions. Existing update files, settings, replays and installation identities remain compatible.
+- Fixed a bug caused by navigation refinement repeatedly repairing the same disconnected bunker component after the first checked connection. Timer preparation now reports its actual stages and reuses physically verified routes; fixed walls, floors and player clearance remain checked.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
+
+## Preview development
+
+This branch contains **Elite-Suite 7.22.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
+
+Set-Seed is a separate local speedrun category. Choose **Set-Seed** before starting; both the practice base-seed and captured spawn-seed recipes are supported. The selected seed and recipe are fixed for that attempt. All other trainer aids and normal integrity checks still apply. Random-Seed and Set-Seed personal bests remain separate; historical fixed-seed Practice runs keep their recorded status.
+
+The preview adds run-data format 9. Before upgrading older run data, it retains a permanent pre-v9 backup beside the stats file. Older stable builds cannot write format 9, so retain that backup when testing or rolling back.
 
 ## Install
 
