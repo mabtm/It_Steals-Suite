@@ -200,6 +200,70 @@ inline void OpenReplayLibrary()
     practice::g_replayArchive.Refresh();
 }
 
+inline void ReplayRows(const std::shared_ptr<const practice::ReplayArchiveState> &state,
+                       const std::vector<size_t> &shown, float height)
+{
+    using namespace suite_ui;
+    const float u = Unit(), rowHeight = 75 * u;
+    ImGui::BeginChild("Replay rows", {0, height});
+    ImGuiListClipper clipper;
+    clipper.Begin(int(shown.size()), rowHeight);
+    while (clipper.Step())
+        for (int visible = clipper.DisplayStart; visible < clipper.DisplayEnd; visible++)
+        {
+            size_t index = shown[visible];
+            const auto &row = state->runs[index];
+            auto &text = g_replayLibraryView.text[index];
+            if (text.date.empty()) text.date = practice::ReplayRecordedAt(row.id);
+            ImGui::PushID(text.id.c_str());
+            auto at = ImGui::GetCursorScreenPos();
+            float width = ImGui::GetContentRegionAvail().x;
+            const bool narrow = width < 540 * u;
+            ImGui::BeginDisabled(HasPendingRequest());
+            bool open = ImGui::InvisibleButton("Open replay", {std::max(30.f, width - 38 * u), rowHeight - 7 * u}, ImGuiButtonFlags_EnableNav);
+            auto id = ImGui::GetItemID();
+            float hover = Animate(id ^ 0x7632u, ImGui::IsItemHovered() || ImGui::IsItemFocused() ? 1.f : 0.f, true, .13f);
+            const bool selected = g_runReviewOpen && g_reviewTarget == row.id;
+            auto *draw = ImGui::GetWindowDrawList();
+            draw->AddRectFilled(at, {at.x + width, at.y + rowHeight - 7 * u},
+                ImGui::GetColorU32(Blend(background, heading, selected ? .15f : .025f + hover * .075f)), 4 * u);
+            if (hover > .01f || selected)
+                draw->AddRectFilled(at, {at.x + 2 * u, at.y + rowHeight - 7 * u}, ImGui::GetColorU32(Alpha(heading, selected ? 1 : hover)), u);
+            float timeWidth = narrow ? 106 * u : 145 * u, right = at.x + width - 50 * u;
+            DrawIcon(draw, row.protectedRecording ? Icon::Trophy : Icon::Replay,
+                     {at.x + 10 * u, at.y + 18 * u}, 24 * u,
+                     ImGui::GetColorU32(row.protectedRecording ? ImVec4(1, .79f, .41f, 1) : Alpha(heading, .6f + hover * .4f)));
+            ImVec4 titleClip(at.x + 44 * u, at.y, right - timeWidth - 12 * u, at.y + rowHeight - 7 * u);
+            TextAt(draw, {at.x + 44 * u, at.y + 9 * u}, row.name.c_str(), ink, 16 * u, titleClip);
+            int mode = MapLevelIndex(row.scene);
+            std::string detail = std::string(mode < 0 ? "Unknown" : kMapLevelNames[mode]) + " / " + practice::RecordedCategoryName(row.runCategory);
+            TextAt(draw, {at.x + 44 * u, at.y + 31 * u}, detail.c_str(), Muted(), 13 * u, titleClip);
+            std::string seed = "Seed " + std::to_string(row.runCategory == 1 ? row.selectedSeed : row.seed);
+            if (!narrow && !text.date.empty()) seed += "  /  " + text.date;
+            TextAt(draw, {at.x + 44 * u, at.y + 49 * u}, seed.c_str(), Muted(), 12 * u, titleClip);
+            auto time = FormatRunTime(row.seconds);
+            auto *face = g_timerFont ? g_timerFont : ImGui::GetFont();
+            float fontSize = narrow ? 18 * u : 23 * u;
+            float extent = face->CalcTextSizeA(fontSize, FLT_MAX, 0, time.c_str()).x;
+            fontSize *= std::min(1.f, timeWidth / std::max(1.f, extent));
+            extent = face->CalcTextSizeA(fontSize, FLT_MAX, 0, time.c_str()).x;
+            draw->AddText(face, fontSize, {right - extent, at.y + 11 * u}, ImGui::GetColorU32(ink), time.c_str());
+            auto status = practice::ReplayStatusName(row.outcome, row.valid);
+            TextAt(draw, {right - ImGui::CalcTextSize(status).x, at.y + 40 * u}, status,
+                   ReplayStatusColor(row.outcome, row.valid), ImGui::GetFontSize(), {right - timeWidth, at.y, right, at.y + rowHeight});
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                ImGui::SetTooltip("%s%s%s", row.reason.c_str(), row.notes.empty() ? "" : "\n", row.notes.c_str());
+            ImGui::EndDisabled();
+            if (open) { OpenSavedReplay(row); Request(Tone::Click); ImGui::CloseCurrentPopup(); }
+            ImGui::SetCursorScreenPos({at.x + width - 32 * u, at.y + 20 * u});
+            if (SmallButton(row.favorite ? "*" : "+")) practice::g_replayArchive.Favorite(row.id, !row.favorite);
+            Help(row.favorite ? "Remove from favorites" : "Add to favorites");
+            ImGui::SetCursorScreenPos({at.x, at.y + rowHeight});
+            ImGui::PopID();
+        }
+    ImGui::EndChild();
+}
+
 inline void ReplayList()
 {
     struct Remember { ~Remember() { RememberReplayFilters(); } } remember;
@@ -271,6 +335,17 @@ inline void ReplayList()
     }
     else
         drawFilters();
+    int &style = suite_ui::replayPreferences.libraryView;
+    if (suite_ui::Button(style == 0 ? "List *###ReplayListView" : "List###ReplayListView")) style = 0;
+    ImGui::SameLine();
+    if (suite_ui::Button(style == 1 ? "Table *###ReplayTableView" : "Table###ReplayTableView")) style = 1;
+    SameLineIfFits("Sort");
+    const char *sorts[] = {"Recorded", "Name", "Game mode", "Run time", "Seed", "Status", "Run category"};
+    int sort = int(filter.sort);
+    ImGui::SetNextItemWidth(std::min(170.f * g_dpiScale, ImGui::GetContentRegionAvail().x));
+    if (ImGui::Combo("##ReplaySort", &sort, sorts, 7)) filter.sort = practice::ReplaySort(sort);
+    SameLineIfFits("Ascending");
+    suite_ui::Checkbox("Ascending", &filter.ascending);
     auto state = practice::g_replayArchive.Get();
     if (!state->error.empty())
     {
@@ -294,7 +369,7 @@ inline void ReplayList()
     view.Update(state, filter);
     const auto &shown = view.shown;
     ImGui::TextDisabled("%zu / %zu recordings", shown.size(), state->runs.size());
-    Help("Click a column heading to sort; click it again to reverse the order.");
+    Help("Sort by date, time, mode or category. Switch to Table for detailed columns.");
     if (shown.empty())
     {
         suite_ui::EmptyState("Replay filtered", suite_ui::Icon::Replay, "No matching recordings",
@@ -302,6 +377,11 @@ inline void ReplayList()
         return;
     }
     float height = std::max(1.f, ImGui::GetContentRegionAvail().y - 4 * g_dpiScale);
+    if (style == 0)
+    {
+        ReplayRows(state, shown, height);
+        return;
+    }
     if (ImGui::BeginTable("Replay archive", 8,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX |
                               ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Sortable | ImGuiTableFlags_NoSavedSettings,

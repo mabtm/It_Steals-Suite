@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "run_split_reference_tests": ["RunSplitReference.cs"],
     "capture_profiler_tests": ["FrameCostMeter.cs", "CaptureProfiler.cs"],
     "replay_camera_sampling_tests": ["ReplaySceneData.cs", "ReplayCameraSampling.cs"],
     "restart_contract_tests": ["SharedMemoryProtocol.cs", "SharedLayout.cs"],

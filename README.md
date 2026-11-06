@@ -29,20 +29,24 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.23.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
+**[v7.24.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
 
-- Improved speedrun organization with a permanent attempt archive, sortable PBs, local Top 5, history and statistics across all eight modes. Random Seed and Set-Seed stay separate; exact seed/recipe and session/date filters do not change run setup. Earlier retained attempts, scalar PBs and lifetime counters remain intact, with missing historical evidence clearly labelled.
-- Fixed a bug caused by extra replay cameras holding transforms between samples while the view and flashlight interpolated. Arm-camera poses now follow the requested replay/export time, including backward seeks; new recordings preserve stationary endpoints before movement. Capture gaps remain discontinuous. The reported arm alignment still requires visual confirmation in the game.
-- Improved replay retention so valid PB/Top-5 candidates bypass ordinary duration/crystal thresholds, receive storage priority and keep a retention marker. Stable identities link archive rows to committed recordings; storage backpressure and unavailable replays remain visible.
+- Improved category visibility in the live speedrun HUD, recorded-run verification and clip information. Run setup now shows the best time for its draft mode/category, including separately stored, explicitly unranked Practice bests.
+- Improved Set-Seed timing with automatic crystal splits against the fastest matching completed recording, preferring valid PBs. Mode, selected seed, recipe, spawn position and crystal layout must match. Deltas follow the same crystal even when pickup order differs; no route or hidden-object hints are exposed.
+- Improved clip composition with default-on optional Set-Seed splits, independent position, scale and opacity, replay-time animations and a frozen export reference. Older clip projects retain their original layouts.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
 
 ## Preview development
 
-This branch contains **Elite-Suite 7.23.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
+This branch contains **Elite-Suite 7.24.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
 
 Set-Seed is a separate local speedrun category. Choose **Set-Seed** before starting; both the practice base-seed and captured spawn-seed recipes are supported. The selected seed and recipe are fixed for that attempt. All other trainer aids and normal integrity checks still apply. Random-Seed and Set-Seed personal bests remain separate; historical fixed-seed Practice runs keep their recorded status.
+
+The live HUD and final run check identify the recorded category. Set-Seed crystal splits use the fastest compatible completed recording (valid PB preferred), with exact mode, seed recipe, spawn and layout matching. Clip Studio enables splits by default when a reference exists; move and resize them under **Overlays**. Practice bests are stored separately and remain unranked.
+
+[Preview screenshots](assets/preview-7.24/README.md) show the actual native renderer with test data: [HUD and splits](assets/preview-7.24/01-speedrun-hud.png), [replay library](assets/preview-7.24/02-replay-library.png), [run setup](assets/preview-7.24/03-run-setup.png), [run check](assets/preview-7.24/04-run-check.png).
 
 The preview adds run-data format 9. Before upgrading older run data, it retains a permanent pre-v9 backup beside the stats file. Older stable builds cannot write format 9, so retain that backup when testing or rolling back.
 

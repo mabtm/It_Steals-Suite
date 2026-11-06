@@ -336,7 +336,7 @@ public sealed class ReplayNativeGraphics
                 s.sharedMesh = skin.sharedMesh;
                 s.localBounds = skin.localBounds;
                 s.quality = skin.quality;
-                s.updateWhenOffscreen = true;
+                ReplayRendererScope.ConfigureRecordedSkin(s);
                 var bones = skin.bones;
                 for (int i = 0; i < bones.Length; i++)
                     if (bones[i] != null && (bones[i] == proxy.Source || bones[i].IsChildOf(proxy.Source)))

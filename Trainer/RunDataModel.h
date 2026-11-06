@@ -103,6 +103,8 @@ struct Legacy
     bool available = false;
     int64_t since = 0;
     std::array<double, 16> pb{};
+    std::array<double, 8> practicePb{};
+    std::array<int64_t, 8> practiceDates{};
     std::array<int64_t, 16> dates{};
     std::array<Counters, 32> modes{};
 };
@@ -139,6 +141,19 @@ inline Legacy ParseLegacy(std::string_view bytes)
             if (c.attempts < 0 || c.finished < 0 || c.resets < 0 || c.deaths < 0 || c.finishSeconds < 0 ||
                 c.playSeconds < 0 || c.finished > c.attempts || c.resets > c.attempts || c.deaths > c.resets)
                 throw std::runtime_error("Inconsistent mode counter snapshot");
+        }
+        else if (key.starts_with("practicePb."))
+        {
+            int level = MapLevelIndex(Number<int>(key.substr(11)));
+            double time = Number<double>(value);
+            if (time < 0 || time > 315360000) throw std::runtime_error("Invalid Practice best");
+            if (level >= 0) result.practicePb[level] = time;
+        }
+        else if (key.starts_with("practicePbAt."))
+        {
+            int level = Number<int>(key.substr(13)); auto date = Number<int64_t>(value);
+            if (level < 0 || level >= 8 || date < 0 || date > MaxTicks) throw std::runtime_error("Invalid Practice best date");
+            result.practiceDates[level] = date;
         }
         else if (key.starts_with("pb.") || key.starts_with("setSeedPb."))
         {
@@ -234,7 +249,8 @@ inline View Build(std::shared_ptr<const Store> store, Query query, uint64_t requ
         else if (!r.quick && r.outcome == 2) t.resets++;
         else if (r.outcome == 3) { t.resets++; t.deaths++; }
         else if (r.outcome >= 4) t.interrupted++;
-        if ((query.display == Display::Bests || query.display == Display::TopFive) && !r.Ranked()) continue;
+        if (query.display == Display::TopFive && !r.Ranked() ||
+            query.display == Display::Bests && !r.Ranked() && !(r.category == 2 && r.outcome == 1 && r.seconds > 0)) continue;
         if (query.display != Display::Statistics) view.rows.push_back(r);
     }
     for (size_t i = 0; i < finishTimes.size(); i++)
@@ -255,19 +271,19 @@ inline View Build(std::shared_ptr<const Store> store, Query query, uint64_t requ
     if (query.display == Display::Bests || query.display == Display::TopFive)
     {
         std::vector<Record> selected;
-        std::array<int, 16> count{};
+        std::array<int, 24> count{};
         for (const auto &r : view.rows)
         {
-            int key = MapLevelIndex(r.scene) * 2 + r.category;
+            int key = MapLevelIndex(r.scene) * 3 + r.category;
             if (count[key]++ < (query.display == Display::Bests ? 1 : 5)) selected.push_back(r);
         }
         view.rows = std::move(selected);
         if (query.display == Display::Bests && !query.seedFilter && query.recipe < 0 && !query.from &&
             query.through == MaxTicks && !query.session && !query.pbOnly && !query.status)
             for (int level = 0; level < 8; level++)
-                for (int cat = 0; cat < 2; cat++)
+                for (int cat = 0; cat < 3; cat++)
                 {
-                    double time = view.source->legacy.pb[level * 2 + cat];
+                    double time = cat == 2 ? view.source->legacy.practicePb[level] : view.source->legacy.pb[level * 2 + cat];
                     if (time <= 0 || query.level >= 0 && query.level != level ||
                         query.category >= 0 && query.category != cat) continue;
                     auto it = std::find_if(view.rows.begin(), view.rows.end(), [&](const Record &r) {
@@ -276,7 +292,7 @@ inline View Build(std::shared_ptr<const Store> store, Query query, uint64_t requ
                     if (it != view.rows.end() && it->seconds <= time) continue;
                     Record old;
                     old.scene = kMapScenes[level]; old.category = cat; old.seconds = time; old.outcome = 1;
-                    old.started = view.source->legacy.dates[level * 2 + cat]; old.legacy = old.pb = true;
+                    old.started = cat == 2 ? view.source->legacy.practiceDates[level] : view.source->legacy.dates[level * 2 + cat]; old.legacy = true; old.pb = cat < 2;
                     if (it == view.rows.end()) view.rows.push_back(old); else *it = old;
                 }
     }

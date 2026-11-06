@@ -226,6 +226,7 @@ inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
     suite_replay::Bind(a->data);
     content = {};
     content.analysis = std::move(a);
+    practice::g_replayArchive.FindMatchingReference(content.analysis->data);
     content.motion = std::move(motion);
     content.markers = suite_replay::marks;
     content.input = suite_input::preferences;
@@ -269,7 +270,7 @@ inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
     SeedCamera();
     cameraEpoch++;
     selectedKey = -1;
-    selectedBlock = std::clamp(selectedBlock, 0, int(States));
+    selectedBlock = std::clamp(selectedBlock, 0, int(Splits));
     dragBlock = -1;
     status = "Preparing preview";
     previewRun = 0;
@@ -928,6 +929,15 @@ inline void OverlaysPanel(bool &changed)
     ImGui::SameLine();
     changed |= suite_ui::Checkbox("Seed", &options.seed);
     changed |= suite_ui::Checkbox("Replay annotations", &options.events);
+    if (content.analysis->data->review->category == 1)
+    {
+        changed |= suite_ui::Checkbox("Set-Seed splits", &options.splits);
+        if (content.splitReference)
+            ImGui::TextDisabled("Reference: %s / %s", content.splitReference->review->valid ? "matching PB" : "matching replay",
+                                FormatRunTime(content.splitReference->review->seconds).c_str());
+        else ImGui::TextDisabled(practice::g_replayArchive.ReferenceLoading(content.analysis->data->review->id)
+                                   ? "Finding a matching seed / spawn reference..." : "No matching seed / spawn recording available.");
+    }
     if (options.inputs)
     {
         changed |= suite_ui::Checkbox("Keyboard", &content.input.keyboard);
@@ -939,7 +949,7 @@ inline void OverlaysPanel(bool &changed)
     }
     ImGui::Separator();
     Field("Selected layer");
-    ImGui::Combo("##ClipBlock", &selectedBlock, BlockNames, BlockCount - 1);
+    ImGui::Combo("##ClipBlock", &selectedBlock, BlockNames, BlockCount);
     changed |= suite_ui::Checkbox("Arrange on preview", &editLayout);
     Help("Drag a layer to move it. Drag its lower-right corner to resize. "
          "Positions scale with the output resolution.");
@@ -954,7 +964,7 @@ inline void OverlaysPanel(bool &changed)
         content.layout = {};
         changed = true;
     }
-    if (selectedBlock != RunInfo && options.inputs)
+    if (selectedBlock > RunInfo && selectedBlock < Splits && options.inputs)
     {
         ImGui::Separator();
         ImGui::TextColored(g_headerCol, "INPUT APPEARANCE");
@@ -1302,6 +1312,17 @@ inline void Render()
     }
     content.font = suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont();
     content.palette = suite_input::Colors(1);
+    if (encoder.State() != 1 && !content.splitReference)
+    {
+        auto reference = practice::g_replayArchive.MatchingReference(content.analysis->data->review->id);
+        if (reference && practice::MatchingSplitLayout(*content.analysis->data, *reference))
+        {
+            content.splitReference = reference;
+            content.splits = std::make_shared<const std::vector<practice::PickupSplit>>(
+                practice::PickupSplits(*content.analysis->data, reference.get()));
+        }
+    }
+    content.splitMotion = suite_ui::preferences.motion;
     guideCache.Bind(content, revision);
     const auto &run = *content.analysis->data->review;
     bool busy = encoder.State() == 1 || awaitingFullRunCheck;
@@ -1493,6 +1514,8 @@ inline void Render()
     try
     {
         options.Validate(run.seconds);
+        if (options.splits && run.category == 1 && practice::g_replayArchive.ReferenceLoading(run.id))
+            throw std::runtime_error("Finding a matching split reference...");
         content.track.Validate(run.seconds);
         content.layout.Validate();
         if (options.scene3d && options.camera == 3 && content.track.keys.empty())

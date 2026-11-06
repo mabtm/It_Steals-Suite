@@ -2259,6 +2259,8 @@ void RunArchiveCases(const std::string &output)
     std::cout << "Native offline run archive: 24 page/viewport/DPI cases, 160 actual journal records, 16 PBs, 80 top-five entries, durable history, statistics and no game commands: PASS\n";
 }
 
+#include "split_ui_cases.inl"
+
 int main(int argc, char **argv)
 {
     std::cout.setf(std::ios::unitbuf);
@@ -3301,6 +3303,8 @@ int main(int argc, char **argv)
             }
         assert(orange && !green);
         auto *library = ImGui::FindWindowByName("Replay library QA");
+        suite_ui::replayPreferences.libraryView = 1;
+        libraryFrame(); libraryFrame();
         auto tableID = library->GetID("Replay archive");
         auto rowID = practice::g_replayArchive.Get()->runs[0].id;
         auto favoriteID = ImHashStr("+", 0, ImHashStr(std::to_string(rowID).c_str(), 0, tableID));
@@ -3577,6 +3581,7 @@ int main(int argc, char **argv)
         InspectorUICases(argv[1]);
         SeedRouteReliabilityUICases(argv[1]);
     }
+    SetSeedSplitUICases(argc > 1 ? argv[1] : "");
     RunStatisticsCases(argc > 1 ? argv[1] : "");
     RunArchiveCases(argc > 1 ? argv[1] : ".");
     if (argc > 1)

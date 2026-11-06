@@ -2,6 +2,15 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.24.0 Changelog
+
+- Improved category visibility in the live speedrun HUD, recorded-run verification and clip information. Run setup now shows the best time for its draft mode/category, including separately stored, explicitly unranked Practice bests.
+- Improved Set-Seed timing with automatic crystal splits against the fastest matching completed recording, preferring valid PBs. Mode, selected seed, recipe, spawn position and crystal layout must match. Deltas follow the same crystal even when pickup order differs; no route or hidden-object hints are exposed.
+- Improved clip composition with default-on optional Set-Seed splits, independent position, scale and opacity, replay-time animations and a frozen export reference. Older clip projects retain their original layouts.
+- Fixed a bug caused by skinned replay renderers reusing matrices and motion history across multiple export seeks inside one Unity frame. Recorded arm rigs now refresh skinning matrices per render and disable stale motion vectors. Visual confirmation of the reported arm flicker still requires an in-game export.
+- Improved the native replay library with compact animated recording rows, clearer category/time/status hierarchy, quick sorting and an optional detailed table. Existing filtering, favorites, metadata and recordings are preserved.
+- Improved preview isolation: this development update remains a GitHub pre-release and is excluded from stable automatic updates.
+
 ### v7.23.0 Changelog
 
 - Improved speedrun organization with a permanent attempt archive, sortable PBs, local Top 5, history and statistics across all eight modes. Random Seed and Set-Seed stay separate; exact seed/recipe and session/date filters do not change run setup. Earlier retained attempts, scalar PBs and lifetime counters remain intact, with missing historical evidence clearly labelled.

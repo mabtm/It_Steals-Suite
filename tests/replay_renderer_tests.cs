@@ -38,6 +38,8 @@ public sealed class CommandBuffer
     }
 }
 
+public enum MotionVectorGenerationMode { Camera, Object, ForceNoMotion }
+
 public enum ShadowCastingMode
 {
     Off,
@@ -240,6 +242,21 @@ public sealed class MaterialPropertyBlock
     }
 }
 
+public sealed class SkinnedMeshRenderer
+{
+    public bool updateWhenOffscreen, forceMatrixRecalculationPerRender, skinnedMotionVectors = true;
+    public MotionVectorGenerationMode motionVectorGenerationMode;
+    public float Pose;
+    private float cached;
+    private int lastFrame = -1;
+    public float RenderPose(int frame)
+    {
+        if (frame != lastFrame || forceMatrixRecalculationPerRender) cached = Pose;
+        lastFrame = frame;
+        return cached;
+    }
+}
+
 public sealed class Renderer
 {
     private Material[] materials;
@@ -323,6 +340,17 @@ public static class ReplayRendererTests
 
     public static int Main()
     {
+        var recordedSkin = new SkinnedMeshRenderer();
+        recordedSkin.Pose = 1;
+        Check(recordedSkin.RenderPose(20) == 1, "initial arm pose");
+        ReplayRendererScope.ConfigureRecordedSkin(recordedSkin);
+        foreach (float pose in new[] { 4f, 1f, 4.5f, 1f, 2f, 1f })
+        {
+            recordedSkin.Pose = pose;
+            Check(recordedSkin.RenderPose(20) == pose, "seek / export / restore recomputes skin in one Unity frame");
+        }
+        Check(!recordedSkin.skinnedMotionVectors && recordedSkin.motionVectorGenerationMode == MotionVectorGenerationMode.ForceNoMotion,
+              "manual replay seeks do not use temporal motion from another timestamp");
         var world = new RenderTexture { width = 640, height = 360, Value = 77 };
         var output = new RenderTexture();
         var radar = new RenderTexture { width = 256, height = 256 };

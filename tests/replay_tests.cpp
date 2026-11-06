@@ -131,6 +131,47 @@ int main(int argc, char **argv)
         << "Cross-language v8: validation, Outside, monster paths/events, timestamps, checksum and conservative legacy validity: PASS\n";
     auto root = std::filesystem::path(argv[2]);
     std::filesystem::remove_all(root);
+    {
+        auto folder = root / "split-source";
+        std::filesystem::create_directories(folder);
+        auto target = std::make_shared<MapData>(*wire);
+        auto targetReview = std::make_shared<RunReview>(*wire->review);
+        targetReview->id = 9000; targetReview->category = 1; targetReview->outcome = 1;
+        targetReview->seedKind = 2; targetReview->selectedSeed = targetReview->runSeed = 42;
+        targetReview->aids = targetReview->initialAids = 2;
+        targetReview->valid = targetReview->validationChecked = true;
+        targetReview->seconds = 15;
+        target->review = targetReview;
+        auto save = [&](int64_t id, double seconds, bool valid, bool wrongSpawn) {
+            auto item = *target;
+            auto review = std::make_shared<RunReview>(*targetReview);
+            review->id = id; review->seconds = seconds; review->valid = review->validationChecked = valid;
+            item.review = review;
+            if (wrongSpawn) item.spawns[item.spawn].x += 10;
+            auto bytes = EncodeFixture(item, 15);
+            std::string error;
+            if (!DecodeMap(bytes, error)) throw std::runtime_error("Split fixture: " + error);
+            std::ofstream out(folder / ("run-" + std::to_string(id) + ".isrun"), std::ios::binary);
+            out.write(reinterpret_cast<const char *>(bytes.data()), std::streamsize(bytes.size()));
+        };
+        save(9000,15,true,false); // self must never become its own reference
+        save(6000,30,true,false);
+        save(6001,25,true,false);
+        save(6002,20,false,false); // faster unverified replay loses to valid PB
+        save(6003,16,true,true); // same seed, different spawn cannot match
+        ReplayArchive archive;
+        archive.SetDirectory(root / "split-saved"); archive.SetSourceDirectory(folder);
+        Await([&] { return archive.Get()->runs.size() == 5; });
+        archive.FindMatchingReference(target);
+        Await([&] { return !archive.ReferenceLoading(9000); });
+        assert(archive.MatchingReference(9000) && archive.MatchingReference(9000)->review->id == 6001);
+        assert(!archive.Loaded() && !archive.Reference()); // active replay/manual reference unchanged
+        target->spawn = -1;
+        archive.FindMatchingReference(target);
+        Await([&] { return !archive.ReferenceLoading(9000); });
+        assert(!archive.MatchingReference(9000));
+        std::cout << "Automatic Set-Seed reference: actual bounded archive decode, exact spawn/layout, PB priority, self-exclusion and no playback mutation: PASS\n";
+    }
     auto source = root / "game";
     auto library = root / "saved";
     std::filesystem::create_directories(source);

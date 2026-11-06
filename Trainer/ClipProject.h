@@ -49,7 +49,7 @@ inline std::string EncodeProject(const Project &p)
     layout.Validate();
     std::ostringstream s;
     s.imbue(std::locale::classic());
-    s << std::setprecision(17) << "ISCLIP 7\n"
+    s << std::setprecision(17) << "ISCLIP 8\n"
       << p.run << ' ' << p.duration << ' ' << std::quoted(p.gameHash) << ' ' << std::quoted(p.name) << '\n';
     s << o.a << ' ' << o.b << ' ' << o.rate << ' ' << o.width << ' ' << o.height << ' ' << o.fps << ' '
       << o.format << ' ' << o.camera << '\n';
@@ -60,6 +60,7 @@ inline std::string EncodeProject(const Project &p)
     }
     s << '\n' << int(o.speedKeys) << ' ' << o.quality << ' ' << o.preset << ' ' << o.maxFileBytes << '\n';
     s << int(o.audio) << ' ' << o.audioVolume << '\n';
+    s << int(o.splits) << '\n';
     for (auto b : layout.blocks)
         s << b.x << ' ' << b.y << ' ' << b.width << ' ' << b.opacity << '\n';
     std::ostringstream input;
@@ -102,7 +103,7 @@ inline Project DecodeProject(const std::string &bytes, int64_t expectedRun, doub
     std::string magic;
     int version = 0;
     s >> magic >> version;
-    if (magic != "ISCLIP" || version < 1 || version > 7)
+    if (magic != "ISCLIP" || version < 1 || version > 8)
         throw std::runtime_error("Unsupported clip project version");
     Project p;
     s >> p.run >> p.duration >> std::quoted(p.gameHash) >> std::quoted(p.name);
@@ -152,8 +153,15 @@ inline Project DecodeProject(const std::string &bytes, int64_t expectedRun, doub
             throw std::runtime_error("Invalid audio setting");
         o.audio = audio == 1;
     }
-    for (auto &b : p.content.layout.blocks)
+    if (version >= 8)
     {
+        int splits = -1; s >> splits;
+        if (splits < 0 || splits > 1) throw std::runtime_error("Invalid split setting");
+        o.splits = splits == 1;
+    }
+    for (int i = 0; i < (version >= 8 ? BlockCount : 6); i++)
+    {
+        auto &b = p.content.layout.blocks[i];
         s >> b.x >> b.y >> b.width >> b.opacity;
     }
     p.content.layout.Validate();
@@ -251,7 +259,7 @@ inline void StoreProject(const std::filesystem::path &path, const Project &proje
         std::string magic;
         int version = 0;
         header >> magic >> version;
-        if (magic != "ISCLIP" || version < 1 || version > 7)
+        if (magic != "ISCLIP" || version < 1 || version > 8)
             throw std::runtime_error("Project from another version was preserved");
         DecodeProject(previous, project.run, project.duration, project.gameHash);
     }
@@ -306,6 +314,9 @@ inline void ApplyProject(const Project &p, Options &o, Content &c, bool profile 
     auto analysis = c.analysis;
     auto motion = c.motion;
     auto markers = c.markers;
+    auto reference = c.splitReference;
+    auto splits = c.splits;
+    bool splitMotion = c.splitMotion;
     auto font = c.font;
     auto palette = c.palette;
     double a = o.a, b = o.b;
@@ -320,6 +331,9 @@ inline void ApplyProject(const Project &p, Options &o, Content &c, bool profile 
     c.analysis = analysis;
     c.motion = motion;
     c.markers = markers;
+    c.splitReference = reference;
+    c.splits = splits;
+    c.splitMotion = splitMotion;
     c.font = font;
     c.palette = palette;
     if (profile)

@@ -40,6 +40,23 @@ inline void SyncSetupSelection()
     observedSelection = current;
 }
 
+inline int SetupCategory() { return setupPractice ? 2 : setupFixed ? 1 : 0; }
+inline const char *SetupBestCategory() { return setupPractice ? "Practice" : setupFixed ? "Set-Seed" : "Random Seed"; }
+inline double SetupBest(int mode)
+{
+    const auto &data = dashboard.snapshot;
+    double value = data.allModePersonalBest[std::clamp(mode, 0, 7) * 3 + SetupCategory()];
+    // Old cached/offline snapshots only know their explicitly identified clean category.
+    if (value <= 0 && SetupCategory() == data.statsCategory)
+        value = data.modePersonalBest[std::clamp(mode, 0, 7)];
+    return value;
+}
+inline std::string SetupBestLabel(int mode)
+{
+    double value = SetupBest(mode);
+    return value > 0 ? FormatRunTime(value) : "--:--.---";
+}
+
 inline bool CanStart()
 {
     const bool setSeed = setupFixed && !setupPractice;
@@ -84,11 +101,16 @@ inline void Card(int index, float width)
     if (selected > .01f)
         draw->AddRectFilled(a, {a.x + 3 * u, a.y + height},
                             ImGui::GetColorU32(Alpha(heading, selected)), u);
+    const auto bestText = SetupBest(index) > 0 ? SetupBestLabel(index) : std::string();
+    float bestWidth = bestText.empty() ? 0 : ImGui::CalcTextSize(bestText.c_str()).x + 18 * u;
     float textWidth = ImGui::CalcTextSize(kMapLevelNames[index]).x;
-    float font = ImGui::GetFontSize() * std::min(1.f, std::max(1.f, width - 24 * u) /
+    float font = ImGui::GetFontSize() * std::min(1.f, std::max(1.f, width - 24 * u - bestWidth) /
                                                         std::max(1.f, textWidth));
     TextAt(draw, {a.x + 12 * u, a.y + (height - font) * .5f}, kMapLevelNames[index], ink, font,
-           {a.x + 10 * u, a.y, a.x + width - 8 * u, a.y + height});
+           {a.x + 10 * u, a.y, a.x + width - 8 * u - bestWidth, a.y + height});
+    if (!bestText.empty())
+        TextAt(draw, {a.x + width - bestWidth, a.y + (height - ImGui::GetFontSize()) * .5f}, bestText.c_str(),
+               Muted(), ImGui::GetFontSize(), {a.x, a.y, a.x + width - 8 * u, a.y + height});
     if (ImGui::IsItemFocused())
         draw->AddRect(a, {a.x + width, a.y + height}, ImGui::GetColorU32(heading), 3 * u);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
@@ -119,10 +141,10 @@ inline void Details()
                                            ? (dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed")
                                            : viewFilter == 2 ? "Practice" : "Overview");
     ImGui::Separator();
-    ImGui::Text("%s PB  %s", dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed",
-                 pbLabels[dashboard.selected].c_str());
-    if (mode.pb > 0)
-        ImGui::TextDisabled("PB date: %s", mode.pbDate.c_str());
+    ImGui::Text("%s %s  %s", SetupBestCategory(), setupPractice ? "best (unranked)" : "PB",
+                 SetupBestLabel(dashboard.selected).c_str());
+    const auto bestDate = dashboard.snapshot.allModePbUtc[dashboard.selected * 3 + SetupCategory()];
+    if (bestDate > 0) ImGui::TextDisabled("Best date: %s", Date(bestDate).c_str());
     if (ImGui::BeginTable("Mode totals", 2, ImGuiTableFlags_SizingStretchSame))
     {
         auto row = [&](const char *label, const std::string &text) {
@@ -354,13 +376,8 @@ inline void RenderCompact()
         ImGui::SetTooltip("Overview includes normal play, Practice, and the displayed clean category. Random Seed and Set-Seed records are tracked separately.");
     RefreshDashboard();
     const auto &mode = dashboard.modes[std::clamp(dashboard.selected, 0, kMapLevelCount - 1)];
-    if (dashboard.snapshot.statsCategory == 1)
-        ImGui::TextWrapped("Set-Seed PB: %s / %s attempts / %s finishes",
-                           pbLabels[dashboard.selected].c_str(),
-                           mode.attempts.c_str(), mode.finished.c_str());
-    else
-        ImGui::TextWrapped("Random Seed PB: %s / %s attempts / %s finishes",
-                           pbLabels[dashboard.selected].c_str(), mode.attempts.c_str(), mode.finished.c_str());
+    ImGui::TextWrapped("%s %s: %s", SetupBestCategory(), setupPractice ? "best (unranked)" : "PB",
+                        SetupBestLabel(dashboard.selected).c_str());
     Settings();
     Details();
     ImGui::EndChild();
@@ -420,7 +437,7 @@ inline void SectionHeading(const char *label)
 inline void SelectionOverview()
 {
     const auto &mode = dashboard.modes[dashboard.selected];
-    const char *cleanCategory = dashboard.snapshot.statsCategory == 1 ? "Set-Seed" : "Random Seed";
+    const char *cleanCategory = SetupBestCategory();
     int latest = -1;
     for (int i = 0; i < dashboard.snapshot.historyCount; i++)
         if (ReadHistory(dashboard.snapshot, i).scene == kMapScenes[dashboard.selected])
@@ -431,7 +448,7 @@ inline void SelectionOverview()
     if (ImGui::BeginTable("Selected mode times", 2, ImGuiTableFlags_SizingStretchSame))
     {
         ImGui::TableNextColumn();
-        ImGui::TextDisabled("%s PERSONAL BEST", cleanCategory);
+        ImGui::TextDisabled(setupPractice ? "%s BEST / UNRANKED" : "%s PERSONAL BEST", cleanCategory);
         const auto drawValue = [&](const std::string &text, bool available) {
             float u = suite_ui::Unit();
             auto at = ImGui::GetCursorScreenPos();
@@ -447,7 +464,7 @@ inline void SelectionOverview()
                 ImGui::GetColorU32(available ? g_textCol : suite_ui::Muted()), text.c_str(), nullptr, 0, &clip);
             ImGui::Dummy({width, 36 * u});
         };
-        drawValue(pbLabels[dashboard.selected], mode.pb > 0);
+        drawValue(SetupBestLabel(dashboard.selected), SetupBest(dashboard.selected) > 0);
         ImGui::TableNextColumn();
         if (latest >= 0)
         {

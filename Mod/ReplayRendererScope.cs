@@ -52,6 +52,16 @@ public sealed class ReplayMaterialLibrary
 // renderer owns a sub-range of a shared combined mesh, not that whole mesh.
 public static class ReplayRendererScope
 {
+    public static void ConfigureRecordedSkin(SkinnedMeshRenderer skin)
+    {
+        // Manual export evaluates and restores multiple absolute poses in one
+        // Unity frame. Frame-cached bone matrices / previous-pose vectors are
+        // stale in that sequence, even though the transforms are up to date.
+        skin.updateWhenOffscreen = true;
+        skin.forceMatrixRecalculationPerRender = true;
+        skin.skinnedMotionVectors = false;
+        skin.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
+    }
     public static void Apply(ReplayRestoreScope restore, Renderer renderer, Material[] materials)
     {
         var original = renderer.sharedMaterials;

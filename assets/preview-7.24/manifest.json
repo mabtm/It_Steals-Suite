@@ -1,0 +1,11 @@
+{
+  "version": "7.24.0 Preview",
+  "testData": true,
+  "renderer": "production ImGui",
+  "images": {
+    "01-speedrun-hud.png": "b9ae255c33f8a88154f4a93f14efdfd97e4f852f72ec2d11a2411511b4eed13b",
+    "02-replay-library.png": "e592e69f2acbd980547d1cf4f23f7f54dd2b26b4d8190c786564643338d2b19d",
+    "03-run-setup.png": "cc606f1af0ef94745290a75140b96a16ae27999faf46722e76a7408cbbb3fa22",
+    "04-run-check.png": "6eb4cc231a0d114261e784a136f6dc897ff24dde1625f798a27c6aae5597225d"
+  }
+}

@@ -3,6 +3,7 @@
 #include "InputUI.h"
 #include "PracticeMapWorker.h"
 #include "RoutePlayback.h"
+#include "SplitDisplay.h"
 
 namespace suite_clip
 {
@@ -16,6 +17,9 @@ struct Content
     suite_input::Palette palette;
     ImFont *font = nullptr;
     Layout layout;
+    std::shared_ptr<const practice::MapData> splitReference;
+    std::shared_ptr<const std::vector<practice::PickupSplit>> splits;
+    bool splitMotion = true;
     CameraTrack track;
     Orbit orbit;
     CameraPose freePose;
@@ -118,6 +122,9 @@ inline Content CompositionSnapshot(const Content &c)
     snapshot.palette = c.palette;
     snapshot.font = c.font;
     snapshot.layout = c.layout;
+    snapshot.splitReference = c.splitReference;
+    snapshot.splits = c.splits;
+    snapshot.splitMotion = c.splitMotion;
     return snapshot;
 }
 
@@ -129,7 +136,7 @@ struct Bounds
 inline Bounds OverlayBounds(int block, const Options &o, const Content &c)
 {
     auto p = c.layout.blocks[block];
-    auto nominal = block == RunInfo ? ImVec2(1280, 74) : suite_input::ModuleSize(block - 1, c.input);
+    auto nominal = block == RunInfo ? ImVec2(1280, 74) : block == Splits ? ImVec2(320, 145) : suite_input::ModuleSize(block - 1, c.input);
     float w = std::min(float(o.width) * p.width * (block == Mouse ? c.input.mouseScale : 1), float(o.width)),
           h = w * nominal.y / nominal.x;
     if (h > o.height)
@@ -142,7 +149,9 @@ inline Bounds OverlayBounds(int block, const Options &o, const Content &c)
 
 inline bool BlockEnabled(int block, const Options &o, const Content &c)
 {
-    return block == RunInfo ? !o.transparent : o.inputs && suite_input::ModuleVisible(block - 1, c.input);
+    return block == RunInfo ? !o.transparent : block == Splits ?
+        o.splits && c.splits && c.splitReference && !c.splits->empty() :
+        o.inputs && suite_input::ModuleVisible(block - 1, c.input);
 }
 
 // Defined beside the live run-result renderer, after the application UI.
@@ -288,7 +297,7 @@ inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Conten
                                                : IM_COL32(255, 98, 103, 255);
         int mode = MapLevelIndex(map.scene);
         label(20, 12, 20, accent, "REPLAY  /  " + std::string(mode >= 0 ? kMapLevelNames[mode] : "Unknown"));
-        label(20, 43, 15, content.palette.muted, std::string("Elite-Suite ") + suite_brand::Version);
+        label(20, 43, 15, content.palette.muted, std::string("CATEGORY / ") + (run.category == 1 ? "Set-Seed" : run.category == 2 ? "Practice" : "Random Seed") + "  /  Elite-Suite " + suite_brand::Version);
         label(1070, 14, 22, color, status);
         if (options.time)
             label(480, 12, 28, ink, FormatRunTime(seconds));
@@ -321,6 +330,13 @@ inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Conten
             label(700, 12, 24, ink, value);
         }
     }
+    if (BlockEnabled(Splits, options, content))
+    {
+        auto bounds = OverlayBounds(Splits, options, content);
+        suite_splits::Draw(draw, font, {bounds.x, bounds.y}, bounds.w, bounds.h, *content.splits, seconds,
+                          content.splitReference->review->validationChecked && content.splitReference->review->valid,
+                          content.splitMotion, content.layout.blocks[Splits].opacity);
+    }
     if (options.inputs)
     {
         auto f = content.motion ? suite_input::ReplayFrame(*content.motion, seconds) : std::nullopt;
@@ -329,7 +345,7 @@ inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Conten
         suite_input::Glow glow = content.motion && content.input.animations
                                      ? suite_input::ReplayGlow(*content.motion, seconds)
                                      : suite_input::Glow{};
-        for (int block = Keyboard; block < BlockCount; block++)
+        for (int block = Keyboard; block < Splits; block++)
             if (BlockEnabled(block, options, content))
             {
                 auto r = OverlayBounds(block, options, content);

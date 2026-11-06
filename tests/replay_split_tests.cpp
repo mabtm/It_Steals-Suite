@@ -4,7 +4,7 @@
 int main()
 {
     using namespace practice;
-    MapData a; a.scene = 3; a.seed = 42; a.hash = "layout"; a.selected = {0, 1, 2};
+    MapData a; a.scene = 3; a.seed = 42; a.hash = "layout"; a.selected = {0, 1, 2}; a.spawn = 0; a.spawns = {{0,0,0}};
     a.points = {{0,0,0}, {1,0,0}, {2,0,0}};
     auto r = std::make_shared<RunReview>(); r->category = 1; r->selectedSeed = 42;
     r->collected = {0,1,2}; r->pickupSeconds = {2,5,9}; a.review = r;
@@ -13,7 +13,8 @@ int main()
     auto splits = PickupSplits(a, &b);
     assert(splits.size() == 3 && splits[0].delta == -1 && splits[1].delta == 1 && splits[2].segment == 4);
     ref->collected = {0,2,1}; splits = PickupSplits(a, &b);
-    assert(splits[0].comparable && !splits[1].comparable && !splits[2].comparable);
+    assert(splits[0].comparable && splits[1].comparable && splits[2].comparable);
+    assert(splits[1].delta == -5 && splits[2].delta == 5);
     ref->rawSpawnSeed = true; assert(!MatchingSplitLayout(a,b));
     ref->rawSpawnSeed = false; ref->category = 0; assert(!MatchingSplitLayout(a,b));
     ref->category = 1; b.seed++; assert(!MatchingSplitLayout(a,b));

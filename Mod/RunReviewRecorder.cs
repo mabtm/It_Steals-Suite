@@ -173,6 +173,7 @@ public static class RunReviewRecorder
 
     public static void Restore(string directory)
     {
+        RunSplitArchive.DirectoryPath = Path.Combine(directory, "RunReviews");
         new Thread(() =>
                    {
                        try
@@ -229,7 +230,9 @@ public static class RunReviewRecorder
         if (active == null || record == null)
             return;
         startedFrame = Time.frameCount;
-        active.Review = new RunReviewData { Id = record.Id };
+        RunSplitArchive.Begin(record.Id);
+        active.Review = new RunReviewData { Id = record.Id, Category = record.Category,
+            SelectedSeed = record.SelectedSeed, RawSpawnSeed = record.RawSpawnSeed };
         ReplayCapture.Begin(active.Review, player);
         ReplayInputCapture.Begin(active, player, record);
         Observe(player, 0);
@@ -250,6 +253,17 @@ public static class RunReviewRecorder
                 active = capture;
                 active.Review = review;
                 geometryReady = active.Indices.Length > 0 && active.AgentHeight > 0;
+                if (geometryReady && active.Review.Category == RunCategory.SetSeed)
+                {
+                    var candidates = new List<RunSplitReference>();
+                    foreach (var previous in recent)
+                        if (previous.Review.Outcome == (int)RunOutcome.Completed)
+                        {
+                            var item = RunSplitReference.Capture(previous);
+                            if (item != null) candidates.Add(item);
+                        }
+                    RunSplitArchive.Find(RunSplitReference.Capture(active), candidates.ToArray());
+                }
             }
         }
         var body = PlayerContext.Body(player);
@@ -382,6 +396,33 @@ public static class RunReviewRecorder
             if (item.Review.Id == id)
                 return item;
         return null;
+    }
+
+    public static void WriteSplits(SnapshotBuffer data, long expectedRun)
+    {
+        var map = active != null && active.Review.Id == expectedRun ? active : Find(expectedRun);
+        if (map == null || map.Review.Category != RunCategory.SetSeed) return;
+        data.Write(SharedLayout.SplitRunId, expectedRun);
+        var review = map.Review;
+        int count = Math.Min(64, Math.Min(review.Collected.Count, review.PickupSeconds.Count));
+        data.Write(SharedLayout.SplitPickupCount, count);
+        for (int i = 0; i < count; i++)
+        {
+            data.Write(SharedLayout.SplitPickupIds + i * 4, review.Collected[i]);
+            data.Write(SharedLayout.SplitPickupSeconds + i * 8, review.PickupSeconds[i]);
+        }
+        var reference = RunSplitArchive.Reference(expectedRun);
+        data.Write(SharedLayout.SplitReferenceState, (byte)RunSplitArchive.State(expectedRun));
+        if (reference == null) return;
+        data.Write(SharedLayout.SplitReferenceId, reference.Id);
+        data.Write(SharedLayout.SplitReferenceValid, reference.Valid);
+        count = Math.Min(64, Math.Min(reference.Collected.Length, reference.PickupSeconds.Length));
+        data.Write(SharedLayout.SplitReferenceCount, count);
+        for (int i = 0; i < count; i++)
+        {
+            data.Write(SharedLayout.SplitReferenceIds + i * 4, reference.Collected[i]);
+            data.Write(SharedLayout.SplitReferenceSeconds + i * 8, reference.PickupSeconds[i]);
+        }
     }
 
     public static void WriteStatus(SnapshotBuffer data, long expectedRun = 0, int expectedScene = -1)

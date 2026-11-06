@@ -27,6 +27,7 @@ public sealed class ModeStatistics
     public readonly ModeTotals[] Rows = new ModeTotals[32];
     public readonly long[] BestUtc = new long[8];
     public readonly long[] SetSeedBestUtc = new long[8];
+    public readonly long[] PracticeBestUtc = new long[8];
     public long SinceUtc = DateTime.UtcNow.Ticks;
     public int Revision;
     private double previousAt = double.NaN;
@@ -141,6 +142,9 @@ public sealed class ModeStatistics
         for (int i = 0; i < BestUtc.Length; i++)
             if (BestUtc[i] > 0)
                 text.Append("pbAt.").Append(i).Append('=').Append(BestUtc[i]).Append('\n');
+        for (int i = 0; i < PracticeBestUtc.Length; i++)
+            if (PracticeBestUtc[i] > 0)
+                text.Append("practicePbAt.").Append(i).Append('=').Append(PracticeBestUtc[i]).Append('\n');
         for (int i = 0; i < SetSeedBestUtc.Length; i++)
             if (SetSeedBestUtc[i] > 0)
                 text.Append("setSeedPbAt.").Append(i).Append('=').Append(SetSeedBestUtc[i]).Append('\n');
@@ -157,6 +161,14 @@ public sealed class ModeStatistics
             return true;
         }
         int index;
+        if (key.StartsWith("practicePbAt.", StringComparison.Ordinal))
+        {
+            if (!int.TryParse(key.Substring(13), out index) || index < 0 || index >= PracticeBestUtc.Length ||
+                !long.TryParse(value, out ticks) || ticks < 0 || ticks > DateTime.MaxValue.Ticks)
+                throw new IOException("Invalid Practice best date.");
+            PracticeBestUtc[index] = ticks;
+            return true;
+        }
         if (key.StartsWith("setSeedPbAt.", StringComparison.Ordinal))
         {
             if (!int.TryParse(key.Substring(12), out index) || index < 0 || index >= SetSeedBestUtc.Length ||

@@ -19,6 +19,7 @@ public sealed class RunStore : IDisposable
     public volatile string LedgerWarning;
     private readonly Dictionary<int, double> best = new Dictionary<int, double>();
     private readonly Dictionary<int, double> setSeedBest = new Dictionary<int, double>();
+    private readonly Dictionary<int, double> practiceBest = new Dictionary<int, double>();
     private readonly SortedDictionary<int, int[]> days = new SortedDictionary<int, int[]>();
     public readonly List<RunRecord> History = new List<RunRecord>();
     public RunRecord Active;
@@ -130,10 +131,10 @@ public sealed class RunStore : IDisposable
 
     public double Best(int scene, RunCategory category = RunCategory.RandomSeed)
     {
-        if ((byte)category > 1)
+        if ((byte)category > 2)
             return 0;
         double value;
-        return (category == RunCategory.SetSeed ? setSeedBest : best).TryGetValue(scene, out value) ? value : 0;
+        return (category == RunCategory.Practice ? practiceBest : category == RunCategory.SetSeed ? setSeedBest : best).TryGetValue(scene, out value) ? value : 0;
     }
 
     public long NextId(long utcTicks)
@@ -149,15 +150,15 @@ public sealed class RunStore : IDisposable
 
     public bool RecordBest(int scene, double time, RunCategory category = RunCategory.RandomSeed)
     {
-        if (!ValidTime(time) || (byte)category > 1)
+        if (!ValidTime(time) || (byte)category > 2)
             return false;
         double old = Best(scene, category);
         if (old > 0 && time >= old)
             return false;
-        (category == RunCategory.SetSeed ? setSeedBest : best)[scene] = time;
+        (category == RunCategory.Practice ? practiceBest : category == RunCategory.SetSeed ? setSeedBest : best)[scene] = time;
         int mode = Array.IndexOf(ModeStatistics.Scenes, scene);
         if (mode >= 0)
-            (category == RunCategory.SetSeed ? Modes.SetSeedBestUtc : Modes.BestUtc)[mode] = DateTime.UtcNow.Ticks;
+            (category == RunCategory.Practice ? Modes.PracticeBestUtc : category == RunCategory.SetSeed ? Modes.SetSeedBestUtc : Modes.BestUtc)[mode] = DateTime.UtcNow.Ticks;
         Modes.Revision++;
         return true;
     }
@@ -174,6 +175,15 @@ public sealed class RunStore : IDisposable
             if (old.Id == record.Id && old.Number == record.Number)
                 return;
         lastRunId = Math.Max(lastRunId, record.Id);
+        // Practice has a separate unranked best; migrate retained historical
+        // finishes without turning assisted runs into clean speedrun PBs.
+        if (record.Category == RunCategory.Practice && record.Outcome == RunOutcome.Completed && ValidTime(record.Seconds) &&
+            (Best(record.Scene, record.Category) <= 0 || record.Seconds < Best(record.Scene, record.Category)))
+        {
+            practiceBest[record.Scene] = record.Seconds;
+            int mode = Array.IndexOf(ModeStatistics.Scenes, record.Scene);
+            if (mode >= 0) Modes.PracticeBestUtc[mode] = record.EndedUtc;
+        }
         var copy = record.Copy();
         copy.Events.Clear();
         History.Add(copy);
@@ -444,6 +454,8 @@ public sealed class RunStore : IDisposable
         lastRunId = 0;
         best.Clear();
         setSeedBest.Clear();
+        practiceBest.Clear();
+        Array.Clear(Modes.PracticeBestUtc, 0, Modes.PracticeBestUtc.Length);
         days.Clear();
         History.Clear();
     }
@@ -570,6 +582,9 @@ public sealed class RunStore : IDisposable
                     TotalResetTime = time;
                 else if (key == "furthest")
                     FurthestProgress = (float)Math.Min(1, time);
+                else if (key.StartsWith("practicePb.", StringComparison.Ordinal) &&
+                         int.TryParse(key.Substring(11), out number) && ValidTime(time))
+                    practiceBest[number] = time;
                 else if (key.StartsWith("setSeedPb.", StringComparison.Ordinal) &&
                          int.TryParse(key.Substring(10), out number) && ValidTime(time))
                     setSeedBest[number] = time;
@@ -637,6 +652,10 @@ public sealed class RunStore : IDisposable
         keys.Sort();
         foreach (int key in keys)
             text.Append("setSeedPb.").Append(key).Append('=').Append(setSeedBest[key].ToString("R", culture)).Append('\n');
+        keys = new List<int>(practiceBest.Keys);
+        keys.Sort();
+        foreach (int key in keys)
+            text.Append("practicePb.").Append(key).Append('=').Append(practiceBest[key].ToString("R", culture)).Append('\n');
         foreach (var day in days)
             text.Append("day.")
                 .Append(day.Key)

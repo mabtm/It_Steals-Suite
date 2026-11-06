@@ -315,6 +315,8 @@ public sealed class RunTracker
             record.PreviousBestSeconds = store.Best(record.Scene, record.Category);
             if (RunValidity.Eligible(record))
                 record.PersonalBest = store.RecordBest(record.Scene, record.Seconds, record.Category);
+            else if (record.Category == RunCategory.Practice)
+                store.RecordBest(record.Scene, record.Seconds, record.Category);
         }
         bool reset = !quickReset && (outcome == RunOutcome.Reset || outcome == RunOutcome.Death);
         if (reset)

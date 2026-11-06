@@ -167,7 +167,7 @@ inline void Records(const View &view)
         if (r.seedKnown) { ImGui::Text("%d%s", r.category == 1 ? r.selectedSeed : r.seed, r.raw ? " / spawn" : ""); }
         else ImGui::TextDisabled("Unknown");
         ImGui::TableNextColumn();
-        const char *outcome = !r.id ? "Legacy PB" : r.quick ? "Quick reset" : r.outcome == 1 ? (r.eligible ? "Valid finish" : "Unranked finish") :
+        const char *outcome = !r.id ? (r.category == 2 ? "Practice best" : "Legacy PB") : r.quick ? "Quick reset" : r.outcome == 1 ? (r.eligible ? "Valid finish" : "Unranked finish") :
             r.outcome == 2 ? "Reset" : r.outcome == 3 ? "Death" : r.outcome == 4 ? "Interrupted" : "Stopped";
         ImGui::TextUnformatted(outcome);
         ImGui::TableNextColumn();
@@ -185,7 +185,7 @@ inline void Records(const View &view)
         }
         else
         {
-            ImGui::TextDisabled("%s", !r.id ? "Legacy PB" : "Unavailable");
+            ImGui::TextDisabled("%s", !r.id ? (r.category == 2 ? "Practice best" : "Legacy PB") : "Unavailable");
             Help(!r.id ? "This older PB has no retained run identity or seed evidence. Its original time and date are preserved." :
                 "No committed replay for this run is present in the current archive. It may be saving, outside the retention rule, or unavailable after a storage error.");
         }

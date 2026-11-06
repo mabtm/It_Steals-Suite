@@ -1,5 +1,6 @@
 #pragma once
 #include "PracticeMapData.h"
+#include "ReplaySplitModel.h"
 #include "ReplayPackage.h"
 #include "ReplayAudioIO.h"
 #include "ReplayHealth.h"
@@ -126,6 +127,7 @@ class ReplayArchive
         ChangeSource,
         LoadRecording,
         LoadReference,
+        MatchReference,
         SaveRecording,
         ExportPackage,
         LoadMotion,
@@ -164,6 +166,8 @@ class ReplayArchive
     std::shared_ptr<const ReplayArchiveState> state = std::make_shared<ReplayArchiveState>();
     std::shared_ptr<const MapData> loaded;
     std::shared_ptr<const MapData> splitReference;
+    struct MatchedReference { int64_t target = 0; std::shared_ptr<const MapData> data; bool pending = false; };
+    std::shared_ptr<const MatchedReference> matchedReference = std::make_shared<MatchedReference>();
     std::shared_ptr<const ReplayMotion> motion;
     std::shared_ptr<const ReplayRevalidation> revalidation;
     std::atomic<uint64_t> nextRevalidation{0};
@@ -1172,6 +1176,38 @@ class ReplayArchive
         case JobKind::LoadRecording:
             LoadRecording(job);
             break;
+        case JobKind::MatchReference:
+        {
+            auto answer = std::make_shared<MatchedReference>();
+            answer->target = job.data->review->id;
+            auto snapshot = Get();
+            std::vector<const ReplayInfo *> candidates;
+            for (const auto &row : snapshot->runs)
+                if (row.id != answer->target && row.outcome == 1 && row.runCategory == 1 &&
+                    row.scene == job.data->scene && row.seed == job.data->seed &&
+                    row.selectedSeed == job.data->review->selectedSeed && row.rawSeed == job.data->review->rawSpawnSeed)
+                    candidates.push_back(&row);
+            std::sort(candidates.begin(), candidates.end(), [](auto a, auto b) {
+                if (a->valid != b->valid) return a->valid;
+                return a->seconds != b->seconds ? a->seconds < b->seconds : a->id < b->id;
+            });
+            for (const auto *row : candidates)
+            {
+                try
+                {
+                    std::string error;
+                    auto data = DecodeMap(Read(row->file, MapCapacity - 64), error);
+                    if (data && data->review && data->review->id == row->id &&
+                        data->review->outcome == 1 && MatchingSplitLayout(*job.data, *data))
+                    { answer->data = std::move(data); break; }
+                }
+                catch (const std::exception &) { /* Next intact compatible recording. */ }
+            }
+            auto wanted = std::atomic_load(&matchedReference);
+            if (wanted->target == answer->target)
+                std::atomic_store(&matchedReference, std::shared_ptr<const MatchedReference>(answer));
+            break;
+        }
         case JobKind::LoadReference:
         {
             if (!job.id) { std::atomic_store(&splitReference, std::shared_ptr<const MapData>{}); break; }
@@ -1316,6 +1352,24 @@ class ReplayArchive
     void Load(int64_t id)
     {
         Queue({.kind = JobKind::LoadRecording, .id = id});
+    }
+    void FindMatchingReference(std::shared_ptr<const MapData> data)
+    {
+        if (!data || !data->review || data->review->category != 1) return;
+        auto answer = std::make_shared<MatchedReference>();
+        answer->target = data->review->id; answer->pending = true;
+        std::atomic_store(&matchedReference, std::shared_ptr<const MatchedReference>(answer));
+        Queue({.kind = JobKind::MatchReference, .data = std::move(data)});
+    }
+    bool ReferenceLoading(int64_t target) const
+    {
+        auto answer = std::atomic_load(&matchedReference);
+        return answer->target == target && answer->pending;
+    }
+    std::shared_ptr<const MapData> MatchingReference(int64_t target) const
+    {
+        auto answer = std::atomic_load(&matchedReference);
+        return answer->target == target ? answer->data : nullptr;
     }
     void SetReference(int64_t id) { Queue({.kind = JobKind::LoadReference, .id = id}); }
     std::shared_ptr<const MapData> Reference() const { return std::atomic_load(&splitReference); }

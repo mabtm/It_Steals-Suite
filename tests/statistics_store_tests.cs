@@ -42,6 +42,11 @@ public static class StatisticsStoreTests
             set = tracker.Last.Copy();
             Check(set.PersonalBest && store.Best(7, RunCategory.SetSeed) == 10 && store.Best(7) == 0,
                   "Set-Seed PB never enters Random Seed PBs");
+            tracker.Begin(7, now++, RunAids.Practice, seed, category: RunCategory.Practice);
+            tracker.End(RunOutcome.Completed, now++, 6, 1);
+            Check(!tracker.Last.PersonalBest && !RunValidity.Eligible(tracker.Last) &&
+                      store.Best(7, RunCategory.Practice) == 6 && store.Best(7, RunCategory.SetSeed) == 10,
+                  "Practice best stays unranked and cannot overwrite clean categories");
             var random = new SeedEvidence();
             random.Reset(true);
             random.Observe(123, 123, false, 0);
@@ -172,7 +177,7 @@ public static class StatisticsStoreTests
         }
         using (var store = new RunStore(folder))
         {
-            Check(store.Best(7) == 20 && store.Best(7, RunCategory.SetSeed) == 10 &&
+            Check(store.Best(7) == 20 && store.Best(7, RunCategory.SetSeed) == 10 && store.Best(7, RunCategory.Practice) == 6 &&
                       store.History[0].Category == RunCategory.SetSeed &&
                       store.History[0].SelectedSeed == 0 && RunValidity.Eligible(store.History[0]),
                   "category, selected seed and separate PBs survive persistence");

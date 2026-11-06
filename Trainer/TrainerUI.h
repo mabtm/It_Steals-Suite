@@ -206,6 +206,8 @@ inline void RenderHudSettings()
         {
             RenderHudPreview(g_speedrunLayout, true);
             RenderOverlaySettings(g_speedrunLayout, true);
+            suite_ui::Checkbox("Set-Seed crystal splits", &suite_ui::replayPreferences.liveSplits);
+            Help("Compares each collected crystal with your fastest completed recording on the same seed, spawn and layout. A valid PB is preferred. Green is ahead; red is behind. The split panel moves with the speedrun HUD.");
             suite_ui::EndTabItem();
         }
         ImGui::EndTabBar();

@@ -7,6 +7,7 @@ inline HudRegion g_validityBadgeBounds{};
 #include "SuiteAppearance.h"
 #include "HudEditorModel.h"
 #include "RunExperienceModel.h"
+#include "SplitDisplay.h"
 #include <cstdio>
 #include <ctime>
 
@@ -268,7 +269,8 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
     auto wanted = [&](OverlayField f) {
         return layout.enabled && layout.visible[int(f)] && HudFieldAllowed(f, !compact, clean);
     };
-    label(speedrun ? (d.practiceModeActive ? "PRACTICE" : d.runCategory == 1 ? "SET-SEED" : "RANDOM SEED") : "PRACTICE HUD", accent);
+    if (speedrun) label("RUN CATEGORY", muted);
+    label(speedrun ? (d.runCategory == 2 ? "PRACTICE" : d.runCategory == 1 ? "SET-SEED" : "RANDOM SEED") : "PRACTICE HUD", accent);
     if (speedrun)
     {
         const auto allowed = d.runCategory == 1 ? 2u : 0u;
@@ -327,6 +329,21 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
             draw->AddRectFilled(p, {p.x + w * std::clamp(d.runProgress, 0.f, 1.f), p.y + 4 * u},
                                 ImGui::GetColorU32(accent), 2 * u);
             ImGui::Dummy({w, 5 * u});
+        }
+    }
+    if (speedrun && d.runCategory == 1 && d.splitReferenceId > 0 && d.splitRunId == d.reviewRunId &&
+        (d.timerState == 1 || d.timerState == 2) && suite_ui::replayPreferences.liveSplits)
+    {
+        auto at = ImGui::GetCursorScreenPos();
+        float space = viewport.y - 24 * preview - (at.y - start.y) - 72 * u;
+        float splitWidth = std::min(ImGui::GetContentRegionAvail().x, 360 * u);
+        float splitHeight = std::min(145 * splitWidth / 320.f, space);
+        if (splitHeight >= 62 * splitWidth / 320.f)
+        {
+            suite_splits::Draw(ImGui::GetWindowDrawList(), ImGui::GetFont(), at, splitWidth, splitHeight,
+                suite_splits::Live(d), d.currentRunTimeSeconds, d.splitReferenceValid != 0,
+                suite_ui::preferences.motion);
+            ImGui::Dummy({splitWidth, splitHeight});
         }
     }
     const bool shortView = viewport.y < 480 * u;

@@ -284,7 +284,9 @@ inline void RenderRunExperience(suite_run::Presentation &p, double now, bool exp
             int level = MapLevelIndex(d.reviewScene);
             if (level < 0)
                 level = MapLevelIndex(d.currentSceneIndex);
-            ImGui::TextColored(muted, "%s", level >= 0 ? kMapLevelNames[level] : "Recorded run");
+            ImGui::TextColored(suite_ui::HudAccent(), "CATEGORY: %s / %s",
+                                d.runCategory == 1 ? "SET-SEED" : d.runCategory == 2 ? "PRACTICE" : "RANDOM SEED",
+                                level >= 0 ? kMapLevelNames[level] : "Recorded run");
             if (content > 460 * u)
                 suite_ui::Logo(draw, {hero.x + content - 83 * u, hero.y + 3 * u}, 76 * u,
                                done ? 1 : .2f + .8f * p.scan.Fraction(motion), .65f);

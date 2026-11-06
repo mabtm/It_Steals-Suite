@@ -17,6 +17,15 @@ std::string LegacyProjectBytes(const suite_clip::Project &p, int version)
     body.replace(flagsStart, flagsEnd - flagsStart, flags);
     auto exportStart = body.find('\n', flagsStart) + 1;
     auto audioStart = body.find('\n', exportStart) + 1;
+    if (version < 8)
+    {
+        auto splitStart = body.find('\n', audioStart) + 1;
+        auto layoutStart = body.find('\n', splitStart) + 1;
+        auto extra = layoutStart;
+        for (int i = 0; i < 6; i++) extra = body.find('\n', extra) + 1;
+        body.erase(extra, body.find('\n', extra) - extra + 1);
+        body.erase(splitStart, body.find('\n', splitStart) - splitStart + 1);
+    }
     if (version < 7)
         body.erase(audioStart, body.find('\n', audioStart) - audioStart + 1);
     if (version < 6)
@@ -204,8 +213,8 @@ void Workshop751Cases(const std::string &output)
     auto migrated = DecodeProject(old, 751, 12, map->hash);
     assert(migrated.content.input.states && migrated.content.input.events &&
            migrated.content.track.keys.size() == 3);
-    assert(EncodeProject(migrated).rfind("ISCLIP 7", 0) == 0);
-    for (int version : {2, 3})
+    assert(EncodeProject(migrated).rfind("ISCLIP 8", 0) == 0);
+    for (int version : {2, 3, 7})
     {
         auto previous = DecodeProject(LegacyProjectBytes(project, version), 751, 12, map->hash);
         assert(previous.content.track.keys.size() == 3 && !previous.content.track.keys[0].speedOverride &&

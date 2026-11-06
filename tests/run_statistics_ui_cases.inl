@@ -38,6 +38,21 @@ void RunStatisticsCases(const std::string &output)
             data.modePlaySeconds[i] = 2230 + mode * 543 + kind * 110;
         }
     }
+    // Draft PB selection is independent of the applied/active category.
+    for (int mode = 0; mode < 8; mode++)
+        for (int category = 0; category < 3; category++)
+        {
+            data.allModePersonalBest[mode * 3 + category] = 30 + mode + category * 10;
+            data.allModePbUtc[mode * 3 + category] = data.modeStatsSinceUtc;
+        }
+    run_stats::dashboard.snapshot = data;
+    for (int mode = 0; mode < 8; mode++)
+        for (int category = 0; category < 3; category++)
+        {
+            run_stats::setupPractice = category == 2; run_stats::setupFixed = category == 1;
+            assert(run_stats::SetupBest(mode) == data.allModePersonalBest[mode * 3 + category]);
+            assert(g_commands.speedrunLoadLevelCmd == savedCommands.speedrunLoadLevelCmd);
+        }
     g_pShared = &data;
     g_compactMode = g_runReviewOpen = g_selectRunReview = false;
     g_allOverlayEnabled = g_overlayVisible = true;

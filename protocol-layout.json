@@ -1,8 +1,8 @@
 {
-  "version": 30,
+  "version": 31,
   "mappingSize": 32768,
   "payloadOffset": 256,
-  "payloadSize": 17860,
+  "payloadSize": 19806,
   "fields": [
     {
       "name": "playerX",
@@ -1491,6 +1491,78 @@
       "offset": 17796,
       "type": "long long",
       "count": 8
+    },
+    {
+      "name": "allModePersonalBest",
+      "type": "double",
+      "count": 24,
+      "offset": 17860
+    },
+    {
+      "name": "allModePbUtc",
+      "type": "long long",
+      "count": 24,
+      "offset": 18052
+    },
+    {
+      "name": "splitRunId",
+      "type": "long long",
+      "count": 1,
+      "offset": 18244
+    },
+    {
+      "name": "splitReferenceId",
+      "type": "long long",
+      "count": 1,
+      "offset": 18252
+    },
+    {
+      "name": "splitReferenceValid",
+      "type": "byte",
+      "count": 1,
+      "offset": 18260
+    },
+    {
+      "name": "splitReferenceState",
+      "type": "byte",
+      "count": 1,
+      "offset": 18261
+    },
+    {
+      "name": "splitPickupCount",
+      "type": "int",
+      "count": 1,
+      "offset": 18262
+    },
+    {
+      "name": "splitPickupIds",
+      "type": "int",
+      "count": 64,
+      "offset": 18266
+    },
+    {
+      "name": "splitPickupSeconds",
+      "type": "double",
+      "count": 64,
+      "offset": 18522
+    },
+    {
+      "name": "splitReferenceCount",
+      "type": "int",
+      "count": 1,
+      "offset": 19034
+    },
+    {
+      "name": "splitReferenceIds",
+      "type": "int",
+      "count": 64,
+      "offset": 19038
+    },
+    {
+      "name": "splitReferenceSeconds",
+      "type": "double",
+      "count": 64,
+      "offset": 19294
     }
   ],
   "commandSize": 192

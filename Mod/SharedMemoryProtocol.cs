@@ -222,10 +222,10 @@ public sealed class SnapshotBuffer
 
 public sealed class SharedMemoryProtocol : IDisposable
 {
-    public const string MapName = "ItStealsSharedMem.v30";
-    public const string MutexName = "ItStealsSharedMem.v30.Lock";
+    public const string MapName = "ItStealsSharedMem.v31";
+    public const string MutexName = "ItStealsSharedMem.v31.Lock";
     public const int Capacity = 32768, PayloadOffset = 256, PayloadSize = SharedLayout.Size;
-    public const uint Magic = 0x53535449, Version = 30;
+    public const uint Magic = 0x53535449, Version = 31;
     private MemoryMappedFile map;
     private MemoryMappedViewAccessor view;
     private Mutex gate;

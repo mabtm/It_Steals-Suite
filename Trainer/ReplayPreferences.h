@@ -9,7 +9,8 @@ struct ReplayPreferences
     int mode = 0, crystals = 3;
     float seconds = 10;
     int libraryLevel = -1, libraryCategory = -1, libraryStatus = 0, librarySort = 0;
-    bool libraryAscending = false, libraryFavorites = false;
+    bool libraryAscending = false, libraryFavorites = false, liveSplits = true;
+    int libraryView = 0;
 
     void Validate()
     {
@@ -20,12 +21,14 @@ struct ReplayPreferences
         libraryCategory = std::clamp(libraryCategory, -1, 2);
         libraryStatus = std::clamp(libraryStatus, 0, 4);
         librarySort = std::clamp(librarySort, 0, 6);
+        libraryView = std::clamp(libraryView, 0, 1);
     }
 
     void Encode(std::ostream &out) const
     {
         out << "replay.mode=" << mode << "\nreplay.seconds=" << seconds << "\nreplay.crystals=" << crystals
             << '\n';
+        out << "replay.liveSplits=" << int(liveSplits) << "\nreplay.libraryView=" << libraryView << '\n';
         out << "replay.libraryLevel=" << libraryLevel << "\nreplay.libraryCategory=" << libraryCategory
             << "\nreplay.libraryStatus=" << libraryStatus << "\nreplay.librarySort=" << librarySort
             << "\nreplay.libraryAscending=" << int(libraryAscending) << "\nreplay.libraryFavorites=" << int(libraryFavorites) << '\n';
@@ -41,6 +44,8 @@ struct ReplayPreferences
             crystals = int(std::clamp(v, 1., 1000.));
         else if (key == "seconds")
             seconds = float(std::clamp(v, 0., 600.));
+        else if (key == "liveSplits" && (v == 0 || v == 1)) liveSplits = v == 1;
+        else if (key == "libraryView") libraryView = int(std::clamp(v, 0., 1.));
         else if (key == "libraryLevel") libraryLevel = int(std::clamp(v, -1., 7.));
         else if (key == "libraryCategory") libraryCategory = int(std::clamp(v, -1., 2.));
         else if (key == "libraryStatus") libraryStatus = int(std::clamp(v, 0., 4.));

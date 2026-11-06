@@ -5,9 +5,9 @@
 #include <cmath>
 #include <cstring>
 using byte = std::uint8_t;
-inline constexpr char kMapName[] = "ItStealsSharedMem.v30";
-inline constexpr char kMutexName[] = "ItStealsSharedMem.v30.Lock";
-inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 30;
+inline constexpr char kMapName[] = "ItStealsSharedMem.v31";
+inline constexpr char kMutexName[] = "ItStealsSharedMem.v31.Lock";
+inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 31;
 inline constexpr size_t kMappingSize = 32768, kCommandOffset = 64, kPayloadOffset = 256;
 inline constexpr uint32_t kTelemetryConfigured = 0x80000000u, kTelemetryMap = 1, kTelemetryPath = 2, kTelemetryDetails = 4, kTelemetryLive = 8;
 inline constexpr uint32_t kTelemetryWalls=16,kTelemetryCrystals=32,kTelemetryMonster=64,kTelemetryPlanner=128,kTelemetryGeometry=256,kTelemetryInputs=1024,kTelemetryInspector=2048;
@@ -266,6 +266,18 @@ struct GameData {
     double modePlaySeconds[24];
     double modePersonalBest[8];
     long long modePbUtc[8];
+    double allModePersonalBest[24];
+    long long allModePbUtc[24];
+    long long splitRunId;
+    long long splitReferenceId;
+    byte splitReferenceValid;
+    byte splitReferenceState;
+    int splitPickupCount;
+    int splitPickupIds[64];
+    double splitPickupSeconds[64];
+    int splitReferenceCount;
+    int splitReferenceIds[64];
+    double splitReferenceSeconds[64];
 };
 struct TrainerCommands {
     uint32_t serial = 0, heartbeat = 0;
@@ -297,7 +309,7 @@ struct SharedHeader {
     byte reserved[20];
 };
 #pragma pack(pop)
-static_assert(sizeof(GameData) == 17860);
+static_assert(sizeof(GameData) == 19806);
 static_assert(sizeof(TrainerCommands) == 192);
 static_assert(sizeof(SharedHeader) == 64);
 static_assert(offsetof(SharedHeader, commandAck) == 40);
@@ -566,6 +578,18 @@ static_assert(offsetof(GameData, modeFinishSeconds) == 17348);
 static_assert(offsetof(GameData, modePlaySeconds) == 17540);
 static_assert(offsetof(GameData, modePersonalBest) == 17732);
 static_assert(offsetof(GameData, modePbUtc) == 17796);
+static_assert(offsetof(GameData, allModePersonalBest) == 17860);
+static_assert(offsetof(GameData, allModePbUtc) == 18052);
+static_assert(offsetof(GameData, splitRunId) == 18244);
+static_assert(offsetof(GameData, splitReferenceId) == 18252);
+static_assert(offsetof(GameData, splitReferenceValid) == 18260);
+static_assert(offsetof(GameData, splitReferenceState) == 18261);
+static_assert(offsetof(GameData, splitPickupCount) == 18262);
+static_assert(offsetof(GameData, splitPickupIds) == 18266);
+static_assert(offsetof(GameData, splitPickupSeconds) == 18522);
+static_assert(offsetof(GameData, splitReferenceCount) == 19034);
+static_assert(offsetof(GameData, splitReferenceIds) == 19038);
+static_assert(offsetof(GameData, splitReferenceSeconds) == 19294);
 
 inline bool ValidCoordinate(float value) {
     return std::isfinite(value) && std::fabs(value) <= 1000000.0f;

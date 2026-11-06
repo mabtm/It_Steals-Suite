@@ -467,7 +467,16 @@ public sealed class SpeedrunManager
             data.Write(SharedLayout.ModePersonalBest + i * 8, store.Best(LevelIndices[i], statsCategory));
             data.Write(SharedLayout.ModePbUtc + i * 8, (statsCategory == RunCategory.SetSeed ? store.Modes.SetSeedBestUtc : store.Modes.BestUtc)[i]);
         }
+        for (int mode = 0; mode < LevelIndices.Length; mode++)
+            for (int category = 0; category < 3; category++)
+            {
+                int row = mode * 3 + category;
+                data.Write(SharedLayout.AllModePersonalBest + row * 8, store.Best(LevelIndices[mode], (RunCategory)category));
+                data.Write(SharedLayout.AllModePbUtc + row * 8,
+                    (category == 2 ? store.Modes.PracticeBestUtc : category == 1 ? store.Modes.SetSeedBestUtc : store.Modes.BestUtc)[mode]);
+            }
         RunRecord record = timerState == 0 ? tracker.Active : Record;
+        RunReviewRecorder.WriteSplits(data, record == null ? 0 : record.Id);
         if (record != null && record.Environment != null && record.Environment.GameHash == "UNKNOWN" &&
             build != null && build.Supported)
             record.Environment.GameHash = build.Hash;

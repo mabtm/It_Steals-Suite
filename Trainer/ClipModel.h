@@ -23,7 +23,7 @@ struct Options
     bool fullKeyboard = false, hideCeiling = false, fadeWalls = false;
     int camera = 0;
     bool transparent = false, simplified = false, fullbright = false;
-    bool speedKeys = true, audio = false, verification = false;
+    bool speedKeys = true, audio = false, verification = false, splits = true;
     float audioVolume = 1;
 
     bool AudioEnabled() const
@@ -119,11 +119,12 @@ enum Block : int
     Controller,
     States,
     Events,
+    Splits,
     BlockCount
 };
 
 inline constexpr const char *BlockNames[] = {"Run information", "Keyboard",        "Mouse",
-                                             "Controller",      "Player activity", "Legacy events"};
+                                             "Controller",      "Player activity", "Legacy events", "Set-Seed splits"};
 
 struct Placement
 {
@@ -137,7 +138,8 @@ struct Layout
                                               {.615f, .77f, .105f, 1},
                                               {.025f, .73f, .19f, 1},
                                               {.755f, .77f, .23f, 1},
-                                              {.79f, .77f, .19f, 1}}};
+                                              {.79f, .77f, .19f, 1},
+                                              {.015f, .16f, .25f, 1}}};
 
     void Validate()
     {
