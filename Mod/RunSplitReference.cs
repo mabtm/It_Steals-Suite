@@ -9,6 +9,8 @@ using UnityEngine;
 public sealed class RunSplitReference
 {
     public long Id, TargetId;
+    internal string LayoutIdentity;
+    internal int ObservedBookGeneration;
     public int Scene, Seed, Spawn, Keep, SelectedSeed, PointCount, Outcome;
     public bool RawSeed, Valid;
     public string Hash;
@@ -91,11 +93,13 @@ public static class RunSplitArchive
     private static readonly object gate = new object();
     private static readonly AutoResetEvent wake = new AutoResetEvent(false);
     private static readonly ManualResetEvent idle = new ManualResetEvent(true);
+    private static readonly byte[] checksumBuffer = new byte[64 * 1024];
     private static readonly Dictionary<string, Cached> cache = new Dictionary<string, Cached>(StringComparer.OrdinalIgnoreCase);
     private static Request pending;
     private static readonly Queue<RunSplitReference> ended = new Queue<RunSplitReference>();
     private static RunSegmentBook book;
     private static string bookDirectory;
+    private static int bookGeneration;
     private static RunSplitHistory history;
     public static volatile string Error;
     private static void EnsureWorker()
@@ -108,10 +112,24 @@ public static class RunSplitArchive
     {
         if (book != null && directory == bookDirectory) return;
         if (book != null) book.Save();
-        bookDirectory = directory;
+        bookDirectory = directory; bookGeneration++;
         book = new RunSegmentBook(string.IsNullOrEmpty(directory) ? null :
             Path.Combine(Path.GetDirectoryName(directory), "set-seed-sectors-v1.bin"));
         Error = book.Error;
+    }
+    private static void ObserveOnce(RunSplitReference item)
+    {
+        if (item == null || item.ObservedBookGeneration == bookGeneration) return;
+        book.Observe(item); item.ObservedBookGeneration = bookGeneration;
+    }
+    public static void WarmUp(string directory)
+    {
+        lock (gate)
+        {
+            if (pending != null || Interlocked.Read(ref targetId) != 0) return;
+            pending = new Request { Directory = directory, Recent = new RunSplitReference[0] };
+            idle.Reset(); EnsureWorker(); wake.Set();
+        }
     }
     public static RunSplitHistory History(long run)
     {
@@ -184,13 +202,14 @@ public static class RunSplitArchive
             try
             {
                 EnsureBook(request == null ? DirectoryPath : request.Directory);
-                foreach (var run in completed) book.Observe(run);
+                foreach (var run in completed) ObserveOnce(run);
                 if (request == null) { book.Save(); Error = book.Error; continue; }
+                bool warming = request.Target == null;
                 RunSplitReference best = null;
                 bool failed = false;
                 Action<RunSplitReference> consider = item => {
-                    if (item == null || item.Id == request.Target.Id) return;
-                    book.Observe(item);
+                    ObserveOnce(item);
+                    if (item == null || warming || item.Id == request.Target.Id) return;
                     if (request.Target.Matches(item) && item.Follows(request.Target.Collected) && RunSplitReference.Better(item, best)) best = item;
                 };
                 foreach (var item in request.Recent) consider(item);
@@ -199,9 +218,11 @@ public static class RunSplitArchive
                     if (!string.IsNullOrEmpty(request.Directory) && Directory.Exists(request.Directory))
                     {
                         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        bool scannedAll = true;
                         foreach (string path in Directory.GetFiles(request.Directory, "run-*.isrun"))
                         {
-                            if (request.Target.Id != Interlocked.Read(ref targetId)) break;
+                            if (warming ? Volatile.Read(ref pending) != null || Interlocked.Read(ref targetId) != 0 : request.Target.Id != Interlocked.Read(ref targetId))
+                            { scannedAll = false; break; }
                             seen.Add(path);
                             try
                             {
@@ -210,23 +231,25 @@ public static class RunSplitArchive
                                 if (!cache.TryGetValue(path, out entry) || entry.Size != info.Length || entry.Modified != info.LastWriteTimeUtc.Ticks)
                                 {
                                     entry = new Cached { Size = info.Length, Modified = info.LastWriteTimeUtc.Ticks };
+                                    cache[path] = entry; // Cache failed signatures too; modified files retry next scan.
                                     if (info.Length <= PracticeMapChannel.Capacity - 64)
                                     {
-                                        var map = PracticeMapArchive.Decode(File.ReadAllBytes(path));
-                                        if (map.Review != null) entry.Item = RunSplitReference.Capture(map);
+                                        entry.Item = RunSplitFile.Read(path,checksumBuffer);
                                     }
-                                    cache[path] = entry;
                                 }
                                 consider(entry.Item);
                             }
-                            catch (IOException) { /* A recording can still be committing. Try again next run. */ }
+                            catch (InvalidDataException) { /* An unchanged invalid file is not reparsed every reset. */ }
+                            catch (IOException) { cache.Remove(path); /* Sharing/commit failures retry next run. */ }
                             catch (Exception) { /* Corrupt recordings cannot be a reference. */ }
                         }
-                        foreach (var path in new List<string>(cache.Keys)) if (!seen.Contains(path)) cache.Remove(path);
+                        if (scannedAll)
+                            foreach (var path in new List<string>(cache.Keys)) if (!seen.Contains(path)) cache.Remove(path);
                     }
                 }
                 catch (Exception) { failed = true; }
                 book.Save(); Error = book.Error;
+                if (warming) continue;
                 var profile = book.Snapshot(request.Target);
                 var summary = new RunSplitHistory { TargetId = request.Target.Id, Profile = profile, Ready = book.Error == null };
                 if (best != null && best.Collected.Length == best.Selected.Length)
@@ -246,7 +269,7 @@ public static class RunSplitArchive
             catch (Exception e)
             {
                 Error = "Split history unavailable: " + e.Message;
-                if (request != null && request.Target.Id == Interlocked.Read(ref targetId))
+                if (request != null && request.Target != null && request.Target.Id == Interlocked.Read(ref targetId))
                     Volatile.Write(ref state, 3);
             }
             finally

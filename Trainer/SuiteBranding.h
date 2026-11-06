@@ -5,7 +5,7 @@
 #define SUITE_MOD_VERSION "7.25.0"
 #define SUITE_AUTHOR "mab"
 #define SUITE_PRODUCT_NAME "Elite-Suite"
-#define SUITE_PREVIEW 1
+#define SUITE_PREVIEW 0
 #if SUITE_PREVIEW
 #define SUITE_DISPLAY_VERSION SUITE_VERSION " Preview"
 #else

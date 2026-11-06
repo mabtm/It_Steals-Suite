@@ -174,6 +174,7 @@ public static class RunReviewRecorder
     public static void Restore(string directory)
     {
         RunSplitArchive.DirectoryPath = Path.Combine(directory, "RunReviews");
+        RunSplitArchive.WarmUp(RunSplitArchive.DirectoryPath);
         new Thread(() =>
                    {
                        try

@@ -29,18 +29,18 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.25.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
+**[v7.25.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.25.0)**
 
-- Improved live Set-Seed splits with an independently positioned panel, defaulting to the bottom center. Choose timer HUD, independent panel or both; drag, resize, undo and save the panel in the on-screen editor. Position, text size, colors, animation, display duration, opacity and optional pace displays persist independently of timer metrics. The default is the latest crystal delta as text on a fully transparent background; a compact panel remains optional, also showing only the latest pickup.
-- Improved sector timing with separate sector and total deltas, neutral equal times and gold indicators for new observed sector bests. Sector comparisons require the same pickup prefix; same-crystal total deltas remain available when pickup order changes.
-- Improved Set-Seed pace with a checkpoint-based finish forecast that updates at crystals and increases when the current sector runs late. A changed route suspends the forecast; completed runs show their observed finish time. Forecasts are estimates, not guaranteed finish times.
+- Improved Elite-Suite's stable speedrun workflow with the native Run workspace, separate Random Seed / Set-Seed categories, sortable personal bests and replays, local Top 5 and permanent per-mode/category history and statistics. Categories are visible in setup, the live HUD and run verification. Public stable updates require no GitHub account or token.
+- Improved live Set-Seed splits with independently positioned, customizable text, defaulting to the latest crystal delta on a fully transparent background at the bottom center. Choose timer HUD, independent display or both; drag, resize, undo and save placement in the on-screen editor. Colors, size, animation, duration and opacity are adjustable; an optional compact panel also shows only the latest pickup.
+- Improved Clip Studio splits with the same transparent delta font, colors and animations as live play. New clips inherit the live style and position; Overlays provides a direct reference chooser and optional appearance controls. Only the current crystal is shown; reverse seeking and export use absolute replay time. Projects retain their appearance and older versions remain readable.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
 
-## Preview development
+## Speedrun workflow
 
-This branch contains **Elite-Suite 7.25.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
+**Elite-Suite 7.25.0 is the stable release.** Use the download buttons above or **Updates → Check**. Public downloads require no account or token; future preview builds remain excluded from stable update checks.
 
 Set-Seed is a separate local speedrun category. Choose **Set-Seed** before starting; both the practice base-seed and captured spawn-seed recipes are supported. The selected seed and recipe are fixed for that attempt. All other trainer aids and normal integrity checks still apply. Random-Seed and Set-Seed personal bests remain separate; historical fixed-seed Practice runs keep their recorded status.
 
@@ -54,11 +54,11 @@ The live HUD and final run check identify the recorded category. Set-Seed crysta
 
 [Preview screenshots](assets/preview-7.24/README.md) show the actual native renderer with test data: [HUD and splits](assets/preview-7.24/01-speedrun-hud.png), [replay library](assets/preview-7.24/02-replay-library.png), [run setup](assets/preview-7.24/03-run-setup.png), [run check](assets/preview-7.24/04-run-check.png).
 
-The preview adds run-data format 9. Before upgrading older run data, it retains a permanent pre-v9 backup beside the stats file. Older stable builds cannot write format 9, so retain that backup when testing or rolling back.
+This release uses run-data format 9. Before upgrading older run data, it retains a permanent pre-v9 backup beside the stats file. Older stable builds cannot write format 9, so retain that backup when rolling back to an older build.
 
 **Runs > PBs / Top 5 / History / Statistics** reads the permanent archive, also while the game is disconnected. Filters do not alter run setup. Use **Filters** for an exact seed, seed recipe, session or date range; click column headings to sort. All eight modes keep separate Random Seed and Set-Seed rankings. Practice remains unranked. Earlier retained attempts and scalar PBs are preserved; missing older run history cannot be reconstructed.
 
-In a replay, expand **Splits / reference**, choose **Use this run as reference**, then open another recording. Matching layouts and pickup order show signed split deltas. Replay labels are editable; the recorded run category is fixed. Valid PB/Top-5 candidates bypass ordinary recording thresholds and receive save priority; storage warnings and missing replay links remain explicit.
+In the current replay or **Clip Studio → Overlays**, choose **Split reference** directly: use the automatic matching PB or search compatible completed recordings. Playback stays open. Matching seed/recipe, spawn and layout produce same-crystal deltas; sector comparisons also require the same pickup prefix. Clip splits inherit the live transparent text style and position; **Split appearance** customizes the clip independently. Replay labels are editable; the recorded run category is fixed. Valid PB/Top-5 candidates bypass ordinary recording thresholds and receive save priority; storage warnings and missing replay links remain explicit.
 
 ## Install
 

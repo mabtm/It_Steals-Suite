@@ -49,7 +49,7 @@ inline std::string EncodeProject(const Project &p)
     layout.Validate();
     std::ostringstream s;
     s.imbue(std::locale::classic());
-    s << std::setprecision(17) << "ISCLIP 8\n"
+    s << std::setprecision(17) << "ISCLIP 9\n"
       << p.run << ' ' << p.duration << ' ' << std::quoted(p.gameHash) << ' ' << std::quoted(p.name) << '\n';
     s << o.a << ' ' << o.b << ' ' << o.rate << ' ' << o.width << ' ' << o.height << ' ' << o.fps << ' '
       << o.format << ' ' << o.camera << '\n';
@@ -61,6 +61,9 @@ inline std::string EncodeProject(const Project &p)
     s << '\n' << int(o.speedKeys) << ' ' << o.quality << ' ' << o.preset << ' ' << o.maxFileBytes << '\n';
     s << int(o.audio) << ' ' << o.audioVolume << '\n';
     s << int(o.splits) << '\n';
+    std::ostringstream split;
+    p.content.splitPresentation.Encode(split);
+    s << std::quoted(split.str()) << '\n';
     for (auto b : layout.blocks)
         s << b.x << ' ' << b.y << ' ' << b.width << ' ' << b.opacity << '\n';
     std::ostringstream input;
@@ -103,7 +106,7 @@ inline Project DecodeProject(const std::string &bytes, int64_t expectedRun, doub
     std::string magic;
     int version = 0;
     s >> magic >> version;
-    if (magic != "ISCLIP" || version < 1 || version > 8)
+    if (magic != "ISCLIP" || version < 1 || version > 9)
         throw std::runtime_error("Unsupported clip project version");
     Project p;
     s >> p.run >> p.duration >> std::quoted(p.gameHash) >> std::quoted(p.name);
@@ -159,6 +162,23 @@ inline Project DecodeProject(const std::string &bytes, int64_t expectedRun, doub
         if (splits < 0 || splits > 1) throw std::runtime_error("Invalid split setting");
         o.splits = splits == 1;
     }
+    if (version >= 9)
+    {
+        std::string style; s >> std::quoted(style);
+        if (style.size() > 16384) throw std::runtime_error("Invalid split appearance");
+        std::istringstream lines(style); std::string line;
+        while (std::getline(lines,line))
+        {
+            auto equal = line.find('=');
+            if (equal == std::string::npos || !line.starts_with("replay.")) throw std::runtime_error("Invalid split appearance key");
+            double value = 0;
+            std::istringstream number(line.substr(equal + 1)); number.imbue(std::locale::classic());
+            if (!(number >> value) || !(number >> std::ws).eof() || !std::isfinite(value)) throw std::runtime_error("Invalid split appearance value");
+            p.content.splitPresentation.Decode(line.substr(7,equal-7),value);
+        }
+        p.content.splitPresentation.Validate();
+    }
+    else p.content.splitPresentation.splitStyle = 1; // Existing projects retain their panel appearance.
     for (int i = 0; i < (version >= 8 ? BlockCount : 6); i++)
     {
         auto &b = p.content.layout.blocks[i];
@@ -259,7 +279,7 @@ inline void StoreProject(const std::filesystem::path &path, const Project &proje
         std::string magic;
         int version = 0;
         header >> magic >> version;
-        if (magic != "ISCLIP" || version < 1 || version > 8)
+        if (magic != "ISCLIP" || version < 1 || version > 9)
             throw std::runtime_error("Project from another version was preserved");
         DecodeProject(previous, project.run, project.duration, project.gameHash);
     }
@@ -318,6 +338,7 @@ inline void ApplyProject(const Project &p, Options &o, Content &c, bool profile 
     auto splits = c.splits;
     bool splitMotion = c.splitMotion;
     auto font = c.font;
+    auto splitFont = c.splitFont;
     auto palette = c.palette;
     double a = o.a, b = o.b;
     bool scene = o.scene3d;
@@ -335,6 +356,7 @@ inline void ApplyProject(const Project &p, Options &o, Content &c, bool profile 
     c.splits = splits;
     c.splitMotion = splitMotion;
     c.font = font;
+    c.splitFont = splitFont;
     c.palette = palette;
     if (profile)
     {

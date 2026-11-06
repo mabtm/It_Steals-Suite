@@ -3,7 +3,7 @@
 #include "InputUI.h"
 #include "PracticeMapWorker.h"
 #include "RoutePlayback.h"
-#include "SplitDisplay.h"
+#include "SplitDeltaUI.h"
 
 namespace suite_clip
 {
@@ -20,6 +20,8 @@ struct Content
     std::shared_ptr<const practice::MapData> splitReference;
     std::shared_ptr<const std::vector<practice::PickupSplit>> splits;
     bool splitMotion = true;
+    ReplayPreferences splitPresentation;
+    ImFont *splitFont = nullptr;
     CameraTrack track;
     Orbit orbit;
     CameraPose freePose;
@@ -125,6 +127,8 @@ inline Content CompositionSnapshot(const Content &c)
     snapshot.splitReference = c.splitReference;
     snapshot.splits = c.splits;
     snapshot.splitMotion = c.splitMotion;
+    snapshot.splitPresentation = c.splitPresentation;
+    snapshot.splitFont = c.splitFont;
     return snapshot;
 }
 
@@ -136,7 +140,7 @@ struct Bounds
 inline Bounds OverlayBounds(int block, const Options &o, const Content &c)
 {
     auto p = c.layout.blocks[block];
-    auto nominal = block == RunInfo ? ImVec2(1280, 74) : block == Splits ? ImVec2(320, 145) : suite_input::ModuleSize(block - 1, c.input);
+    auto nominal = block == RunInfo ? ImVec2(1280, 74) : block == Splits ? (c.splitPresentation.splitStyle == 0 ? ImVec2(480,c.splitPresentation.splitTextSize*1.35f+10) : ImVec2(320,68)) : suite_input::ModuleSize(block - 1, c.input);
     float w = std::min(float(o.width) * p.width * (block == Mouse ? c.input.mouseScale : 1), float(o.width)),
           h = w * nominal.y / nominal.x;
     if (h > o.height)
@@ -333,9 +337,20 @@ inline void Compose(ImDrawList *draw, const Options &sourceOptions, const Conten
     if (BlockEnabled(Splits, options, content))
     {
         auto bounds = OverlayBounds(Splits, options, content);
-        suite_splits::Draw(draw, font, {bounds.x, bounds.y}, bounds.w, bounds.h, *content.splits, seconds,
-                          content.splitReference->review->validationChecked && content.splitReference->review->valid,
-                          content.splitMotion, content.layout.blocks[Splits].opacity);
+        auto end = std::upper_bound(content.splits->begin(),content.splits->end(),seconds,
+            [](double time,const auto &row) { return time < row.at; });
+        if (end != content.splits->begin())
+        {
+            auto style = content.splitPresentation;
+            style.splitPace = style.splitTheory = false;
+            style.splitOpacity *= content.layout.blocks[Splits].opacity;
+            if (style.splitStyle == 0)
+                suite_splits::DrawDeltaGlyphs(draw,content.splitFont ? content.splitFont : font,
+                    {bounds.x,bounds.y,bounds.w,bounds.h},*std::prev(end),style,content.splitMotion,seconds-std::prev(end)->at);
+            else suite_splits::Draw(draw,font,{bounds.x,bounds.y},bounds.w,bounds.h,*content.splits,seconds,
+                    content.splitReference->review->validationChecked && content.splitReference->review->valid,
+                    content.splitMotion,content.layout.blocks[Splits].opacity,true);
+        }
     }
     if (options.inputs)
     {

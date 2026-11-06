@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "ReplayArchive.h"
 #include "RoutePlayback.h"
 #include "seed_map_fixture.h"
@@ -168,11 +171,26 @@ int main(int argc, char **argv)
         Await([&] { return !archive.ReferenceLoading(9000); });
         assert(archive.MatchingReference(9000) && archive.MatchingReference(9000)->review->id == 6001);
         assert(!archive.Loaded() && !archive.Reference()); // active replay/manual reference unchanged
+        archive.SetReference(6000,target);
+        Await([&] { return !archive.ManualReferenceLoading(); });
+        assert(archive.ResolvedReference(*target) && archive.ResolvedReference(*target)->review->id==6000);
+        assert(!archive.Loaded()); // changing references does not open/close or seek the active replay
+        archive.SetReference(6003,target);
+        Await([&] { return !archive.ManualReferenceLoading(); });
+        assert(!archive.ResolvedReference(*target) && !archive.ReferenceError().empty());
+        archive.SetReference(6004,target);
+        Await([&] { return !archive.ManualReferenceLoading(); });
+        assert(!archive.Reference() && !archive.ReferenceError().empty());
+        archive.SetReference(6000,target);archive.SetReference(6001,target);archive.SetReference(0);
+        Await([&] { return !archive.ManualReferenceLoading(); });
+        assert(archive.WantedReference()==0 && !archive.Reference() && archive.ResolvedReference(*target)->review->id==6001);
+        auto tolerated=*target;tolerated.spawns[tolerated.spawn].x+=.0001f;
+        assert(MatchingSplitLayout(*target,tolerated) && SplitLayoutKey(*target)==SplitLayoutKey(tolerated));
         target->spawn = -1;
         archive.FindMatchingReference(target);
         Await([&] { return !archive.ReferenceLoading(9000); });
         assert(!archive.MatchingReference(9000));
-        std::cout << "Automatic Set-Seed reference: actual bounded archive decode, exact spawn/layout, PB priority, self-exclusion and no playback mutation: PASS\n";
+        std::cout << "Automatic Set-Seed reference: actual bounded archive decode, exact spawn/layout, PB priority, self-exclusion, direct reference overrides, load failure/clear and no playback mutation: PASS\n";
     }
     auto source = root / "game";
     auto library = root / "saved";

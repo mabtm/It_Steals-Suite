@@ -81,6 +81,51 @@ void IndependentSplitPanelCases(const std::string &output)
         auto *one=font->FindGlyph('1');
         assert(one && glyphs[4].uv.x==one->U0 && glyphs[4].uv.y==one->V0);
         assert(draw(3.1).empty());
+        // The actual clip composition emits exactly the live delta vertices,
+        // with absolute source time for reverse seeks and no panel primitives.
+        suite_clip::Content clip;
+        auto map=std::make_shared<practice::MapData>(SeedFixture());
+        auto review=std::make_shared<practice::RunReview>();review->id=725;review->seconds=50;review->category=1;
+        map->review=review;
+        auto analysis=std::make_shared<practice::MapAnalysis>();analysis->data=map;
+        clip.analysis=analysis;clip.splitReference=map;clip.font=clip.splitFont=font;
+        clip.splits=std::make_shared<const std::vector<practice::PickupSplit>>(suite_splits::Live(data));
+        clip.splitPresentation=prefs;clip.splitMotion=false;
+        clip.layout.blocks[suite_clip::Splits]={100.f/1280,100.f/720,480.f/1280,1};
+        suite_clip::Options settings;settings.width=1280;settings.height=720;settings.transparent=true;settings.inputs=false;
+        auto compose=[&](double at) {
+            ImDrawList list(ImGui::GetDrawListSharedData());list._ResetForNewFrame();
+            list.PushTextureID(io.Fonts->TexID);list.PushClipRect({0,0},{1280,720});
+            suite_clip::Compose(&list,settings,clip,at);
+            return std::vector<ImDrawVert>(list.VtxBuffer.begin(),list.VtxBuffer.end());
+        };
+        auto latest=clip.splits->back().at;auto exported=compose(latest+.4);
+        assert(exported.size()==glyphs.size() && std::memcmp(exported.data(),glyphs.data(),glyphs.size()*sizeof(ImDrawVert))==0);
+        assert(compose(0).empty() && compose(latest+3.1).empty());
+        compose(latest-1);auto repeated=compose(latest+.4);
+        assert(repeated.size()==exported.size() && std::memcmp(repeated.data(),exported.data(),exported.size()*sizeof(ImDrawVert))==0);
+        auto frozen=suite_clip::CompositionSnapshot(clip);clip.splitPresentation.splitTextSize=90;
+        assert(frozen.splitPresentation.splitTextSize==52);
+        // A warmed live text frame performs no heap allocations. This is an
+        // allocation contract, not a hardware-dependent FPS/time threshold.
+        struct Allocations
+        {
+            ImGuiMemAllocFunc alloc;ImGuiMemFreeFunc free;void *user;size_t count=0;
+            static void *Allocate(size_t n,void *p){auto &a=*static_cast<Allocations *>(p);a.count++;return a.alloc(n,a.user);}
+            static void Release(void *p,void *context){auto &a=*static_cast<Allocations *>(context);a.free(p,a.user);}
+        } meter{};
+        ImGui::GetAllocatorFunctions(&meter.alloc,&meter.free,&meter.user);
+        ImDrawList steady(ImGui::GetDrawListSharedData());
+        auto drawSteady=[&] {
+            steady._ResetForNewFrame();steady.PushTextureID(io.Fonts->TexID);steady.PushClipRect({0,0},{1280,720});
+            suite_splits::DrawDeltaText(&steady,font,{100,100,480,90},data,prefs,false,.4);
+        };
+        drawSteady();drawSteady();
+        ImGui::SetAllocatorFunctions(Allocations::Allocate,Allocations::Release,&meter);
+        for(int frame=0;frame<10000;frame++)drawSteady();
+        ImGui::SetAllocatorFunctions(meter.alloc,meter.free,meter.user);
+        assert(meter.count==0);
+        std::cout<<"Shared live/clip transparent latest delta: identical vertices, reverse seek, fade, frozen appearance and zero heap allocations in 10000 warmed live frames: PASS\n";
         prefs.splitDuration=0;assert(draw(99).size()==24);
         prefs.splitMetric=1;assert(std::abs(*suite_splits::Delta(suite_splits::Live(data).back(),prefs)+1.2)<1e-6);
         prefs.splitMetric=2;assert(std::abs(*suite_splits::Delta(suite_splits::Live(data).back(),prefs)+.2)<1e-6);

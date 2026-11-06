@@ -15,6 +15,25 @@ inline bool MatchingSplitLayout(const MapData &a, const MapData &b)
         if (Distance(a.points[id], b.points[id]) > .001f) return false;
     return true;
 }
+// Index key is only a fast UI filter. Loading a choice still validates the
+// complete recorded layout before any comparison is allowed.
+inline uint64_t SplitLayoutKey(const MapData &map)
+{
+    if (!map.review || map.spawn < 0 || map.spawn >= int(map.spawns.size())) return 0;
+    uint64_t hash = 14695981039346656037ull;
+    auto bytes = [&](const void *data,size_t count) { auto p=static_cast<const uint8_t *>(data);for(size_t i=0;i<count;i++){hash^=p[i];hash*=1099511628211ull;} };
+    auto value = [&](auto v) { bytes(&v,sizeof(v)); };
+    value(map.scene);value(map.seed);value(map.spawn);value(map.keep);value(map.points.size());
+    value(map.review->category);if(map.review->category==1)value(map.review->selectedSeed);value(map.review->rawSpawnSeed);
+    bytes(map.hash.data(),map.hash.size());
+    // Positions are checked with a tolerance by MatchingSplitLayout, not hashed.
+    for(int id:map.selected)
+    {
+        if(id<0 || id>=int(map.points.size())) return 0;
+        value(id);
+    }
+    return hash;
+}
 struct PickupSplit
 {
     int crystal = 0;

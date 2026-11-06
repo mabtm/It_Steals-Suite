@@ -10,6 +10,7 @@
 #include "ClipUI.h"
 #include "RunExperienceModel.h"
 #include "ReplaySplitModel.h"
+#include "ReplayReferenceUI.h"
 inline bool g_reviewFromArchive = false;
 inline int64_t g_reviewLoadedId = 0;
 inline practice::ReplayLibraryView g_replayLibraryView;
@@ -440,6 +441,13 @@ inline void ReplayList()
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndDisabled();
+                if (ImGui::BeginPopupContextItem("Replay actions"))
+                {
+                    ImGui::BeginDisabled(!row.hasSplits);
+                    if (ImGui::MenuItem("Use as split reference")) practice::g_replayArchive.SetReference(row.id);
+                    ImGui::EndDisabled();
+                    ImGui::EndPopup();
+                }
                 Help((std::string(OutcomeLabel(byte(row.outcome))) +
                       (row.saved ? " | saved replay" : " | recent recording") +
                       (row.protectedRecording ? " | protected PB / Top 5 recording" : "") +
@@ -541,24 +549,18 @@ inline void ReplayEditor(std::shared_ptr<const practice::MapData> data)
     }
 }
 
-inline void ReplaySplits(const practice::MapData &data, bool retained)
+inline void ReplaySplits(std::shared_ptr<const practice::MapData> source, bool)
 {
-    if (!suite_ui::CollapsingHeader("Splits / reference")) return;
-    auto reference = practice::g_replayArchive.Reference();
-    ImGui::BeginDisabled(!retained);
-    if (suite_ui::SmallButton("Use this run as reference")) practice::g_replayArchive.SetReference(data.review->id);
-    ImGui::EndDisabled();
-    Help("Open another recording to compare its pickup and segment times. Only matching mode, category, seed recipe, layout and pickup order produce split deltas.");
-    if (reference)
-    {
-        SameLineIfFits("Clear");
-        if (suite_ui::SmallButton("Clear")) practice::g_replayArchive.SetReference(0);
-        ImGui::TextDisabled("Reference: %s / %s", FormatRunTime(reference->review->seconds).c_str(), practice::ReplayRecordedAt(reference->review->id).c_str());
-        if (!practice::MatchingSplitLayout(data, *reference)) ImGui::TextWrapped("Different category or layout; split comparison unavailable.");
-        else if (data.review->outcome == 1 && reference->review->outcome == 1)
-            ImGui::Text("Finish delta: %+.3f s", data.review->seconds - reference->review->seconds);
-    }
-    auto splits = practice::PickupSplits(data, reference.get());
+    const auto &data=*source;
+    suite_splits::ReferencePicker(source,"Replay reference");
+    if (!suite_ui::CollapsingHeader("Crystal split details")) return;
+    auto reference=practice::g_replayArchive.ResolvedReference(data);
+    if(reference && data.review->outcome==1 && reference->review->outcome==1)
+        ImGui::Text("Finish delta: %+.3f s",data.review->seconds-reference->review->seconds);
+    static std::shared_ptr<const practice::MapData> cachedSource,cachedReference;
+    static std::vector<practice::PickupSplit> splits;
+    if(cachedSource!=source || cachedReference!=reference)
+    {cachedSource=source;cachedReference=reference;splits=practice::PickupSplits(data,reference.get());}
     if (splits.empty()) { ImGui::TextDisabled("No observed crystal pickups in this recording."); return; }
     if (ImGui::BeginTable("Pickup splits", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchSame))
     {
@@ -775,7 +777,7 @@ inline void RenderRunReview()
         ImGui::PopFont();
     ImGui::Text("Seed  %d", d.seed);
     Help("Captured layout seed.");
-    ReplaySplits(d, retained);
+    ReplaySplits(result->data, retained);
     RecordingCpu(review.id);
     ImGui::TextDisabled("%s / %zu of %zu crystals", OutcomeLabel(byte(review.outcome)),
                         review.collected.size(), d.selected.size());

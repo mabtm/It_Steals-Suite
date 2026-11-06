@@ -3,6 +3,7 @@
 #include "ClipGuides.h"
 #include "ClipProject.h"
 #include "ExportProfiles.h"
+#include "ReplayReferenceUI.h"
 
 namespace suite_clip
 {
@@ -217,6 +218,36 @@ inline void PauseViewer()
     }
 }
 
+inline void UseLiveSplitAppearance(bool position)
+{
+    content.splitPresentation=suite_ui::replayPreferences;
+    content.splitPresentation.splitPace=content.splitPresentation.splitTheory=false;
+    // Historical sector bests are not embedded in old replay recordings.
+    if(content.splitPresentation.splitMetric==2)content.splitPresentation.splitMetric=1;
+    content.splitFont=g_timerFont ? g_timerFont : ImGui::GetFont();
+    if(position)
+    {
+        const auto &p=content.splitPresentation;auto view=ImGui::GetIO().DisplaySize;
+        float margin=12, width=std::min(p.splitWidth*p.splitScale*g_dpiScale,std::max(24.f,view.x-2*margin));
+        float height=width/480*((p.splitStyle==0?p.splitTextSize*1.35f:80.f)+10.f);
+        auto &layer=content.layout.blocks[Splits];
+        layer.width=std::clamp(width/std::max(1.f,view.x),.04f,1.f);
+        layer.x=(margin+std::max(0.f,view.x-width-2*margin)*p.splitX)/std::max(1.f,view.x);
+        layer.y=(margin+std::max(0.f,view.y-height-2*margin)*p.splitY)/std::max(1.f,view.y);
+        layer.opacity=1;
+        content.layout.Validate();
+    }
+}
+inline void RefreshSplitReference()
+{
+    auto reference=practice::g_replayArchive.ResolvedReference(*content.analysis->data);
+    if(reference==content.splitReference)return;
+    content.splitReference=std::move(reference);
+    content.splits=content.splitReference ? std::make_shared<const std::vector<practice::PickupSplit>>(
+        practice::PickupSplits(*content.analysis->data,content.splitReference.get())) : nullptr;
+    Changed();
+}
+
 inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
                  std::shared_ptr<const practice::ReplayMotion> motion)
 {
@@ -226,7 +257,9 @@ inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
     suite_replay::Bind(a->data);
     content = {};
     content.analysis = std::move(a);
-    practice::g_replayArchive.FindMatchingReference(content.analysis->data);
+    practice::g_replayArchive.EnsureReference(content.analysis->data);
+    UseLiveSplitAppearance(true);
+    RefreshSplitReference();
     content.motion = std::move(motion);
     content.markers = suite_replay::marks;
     content.input = suite_input::preferences;
@@ -932,11 +965,36 @@ inline void OverlaysPanel(bool &changed)
     if (content.analysis->data->review->category == 1)
     {
         changed |= suite_ui::Checkbox("Set-Seed splits", &options.splits);
-        if (content.splitReference)
-            ImGui::TextDisabled("Reference: %s / %s", content.splitReference->review->valid ? "matching PB" : "matching replay",
-                                FormatRunTime(content.splitReference->review->seconds).c_str());
-        else ImGui::TextDisabled(practice::g_replayArchive.ReferenceLoading(content.analysis->data->review->id)
-                                   ? "Finding a matching seed / spawn reference..." : "No matching seed / spawn recording available.");
+        if (suite_splits::ReferencePicker(content.analysis->data,"Clip reference"))
+        {RefreshSplitReference();changed=true;}
+        if (options.splits && suite_ui::CollapsingHeader("Split appearance"))
+        {
+            auto &p=content.splitPresentation;
+            const char *styles[]={"Delta text / transparent","Compact panel"};
+            ImGui::SetNextItemWidth(-1);changed |= ImGui::Combo("##ClipSplitStyle",&p.splitStyle,styles,2);
+            ImGui::TextDisabled("Latest crystal only");
+            if(p.splitStyle==0)
+            {
+                const char *metrics[]={"Crystal delta vs reference","Sector delta vs reference"};
+                ImGui::SetNextItemWidth(-1);changed |= ImGui::Combo("##ClipSplitMetric",&p.splitMetric,metrics,2);
+                changed |= ImGui::SliderFloat("Delta text size",&p.splitTextSize,24,96,"%.0f");
+                const char *animations[]={"None","Fade","Soft pop","Slide"};
+                ImGui::SetNextItemWidth(-1);changed |= ImGui::Combo("##ClipSplitAnimation",&p.splitAnimation,animations,4);
+                bool keep=p.splitDuration==0;
+                if(suite_ui::Checkbox("Keep until next crystal",&keep)){p.splitDuration=keep?0:3;changed=true;}
+                if(!keep)changed |= ImGui::SliderFloat("Show seconds",&p.splitDuration,.5f,10,"%.1f");
+                changed |= ImGui::SliderFloat("Text opacity",&p.splitOpacity,.1f,1,"%.2f");
+                if(suite_ui::CollapsingHeader("Delta colors"))
+                {
+                    changed |= ImGui::ColorEdit4("Ahead",p.splitAhead.data(),ImGuiColorEditFlags_NoInputs);
+                    changed |= ImGui::ColorEdit4("Behind",p.splitBehind.data(),ImGuiColorEditFlags_NoInputs);
+                    changed |= ImGui::ColorEdit4("Equal",p.splitEqual.data(),ImGuiColorEditFlags_NoInputs);
+                }
+            }
+            if(suite_ui::Button("Copy live split style and position")){UseLiveSplitAppearance(true);changed=true;}
+            Help("Transparent text uses the same font, colors and animation as live splits. Only the latest crystal is shown. Drag the Set-Seed splits layer to position it. Historical best sectors are not part of older recordings; those use sector delta vs reference.");
+            p.Validate();
+        }
     }
     if (options.inputs)
     {
@@ -1312,16 +1370,8 @@ inline void Render()
     }
     content.font = suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont();
     content.palette = suite_input::Colors(1);
-    if (encoder.State() != 1 && !content.splitReference)
-    {
-        auto reference = practice::g_replayArchive.MatchingReference(content.analysis->data->review->id);
-        if (reference && practice::MatchingSplitLayout(*content.analysis->data, *reference))
-        {
-            content.splitReference = reference;
-            content.splits = std::make_shared<const std::vector<practice::PickupSplit>>(
-                practice::PickupSplits(*content.analysis->data, reference.get()));
-        }
-    }
+    content.splitFont = g_timerFont ? g_timerFont : ImGui::GetFont();
+    if (encoder.State() != 1) RefreshSplitReference();
     content.splitMotion = suite_ui::preferences.motion;
     guideCache.Bind(content, revision);
     const auto &run = *content.analysis->data->review;
@@ -1514,8 +1564,14 @@ inline void Render()
     try
     {
         options.Validate(run.seconds);
-        if (options.splits && run.category == 1 && practice::g_replayArchive.ReferenceLoading(run.id))
-            throw std::runtime_error("Finding a matching split reference...");
+        if (options.splits && run.category == 1)
+        {
+            auto &archive=practice::g_replayArchive;
+            if(archive.WantedReference() ? archive.ManualReferenceLoading() : archive.ReferenceLoading(run.id))
+                throw std::runtime_error("Loading split reference...");
+            if(archive.WantedReference() && !content.splitReference)
+                throw std::runtime_error("Choose a compatible split reference or select Automatic");
+        }
         content.track.Validate(run.seconds);
         content.layout.Validate();
         if (options.scene3d && options.camera == 3 && content.track.keys.empty())

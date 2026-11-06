@@ -53,8 +53,9 @@ struct ReplayInfo
 {
     int64_t id = 0;
     int scene = 0, seed = 0, outcome = 0, runCategory = -1, selectedSeed = 0;
+    uint64_t splitLayout = 0;
     double seconds = 0;
-    bool valid = false, saved = false, favorite = false, rawSeed = false, protectedRecording = false;
+    bool valid = false, saved = false, favorite = false, rawSeed = false, protectedRecording = false, hasSplits = false;
     std::string name, category, notes, reason;
     std::array<CaptureCost, 7> captureCpu{};
     bool hasCaptureCpu = false;
@@ -166,7 +167,11 @@ class ReplayArchive
     std::shared_ptr<const ReplayArchiveState> state = std::make_shared<ReplayArchiveState>();
     std::shared_ptr<const MapData> loaded;
     std::shared_ptr<const MapData> splitReference;
-    struct MatchedReference { int64_t target = 0; std::shared_ptr<const MapData> data; bool pending = false; };
+    std::atomic<int64_t> wantedReference{0};
+    std::atomic<bool> referenceBusy{false};
+    std::shared_ptr<const std::string> referenceError = std::make_shared<const std::string>();
+    struct MatchedReference { uint64_t request = 0; int64_t target = 0; std::shared_ptr<const MapData> data; bool pending = false; };
+    std::atomic<uint64_t> referenceRequest{0};
     std::shared_ptr<const MatchedReference> matchedReference = std::make_shared<MatchedReference>();
     std::shared_ptr<const ReplayMotion> motion;
     std::shared_ptr<const ReplayRevalidation> revalidation;
@@ -374,6 +379,8 @@ class ReplayArchive
                     info.id = r.id;
                     info.scene = data->scene;
                     info.seed = data->seed;
+                    info.splitLayout = SplitLayoutKey(*data);
+                    info.hasSplits = !r.collected.empty() && r.collected.size() == r.pickupSeconds.size();
                     info.runCategory = r.category;
                     info.selectedSeed = r.selectedSeed;
                     info.rawSeed = r.rawSpawnSeed;
@@ -1179,7 +1186,7 @@ class ReplayArchive
         case JobKind::MatchReference:
         {
             auto answer = std::make_shared<MatchedReference>();
-            answer->target = job.data->review->id;
+            answer->target = job.data->review->id; answer->request = job.request;
             auto snapshot = Get();
             std::vector<const ReplayInfo *> candidates;
             for (const auto &row : snapshot->runs)
@@ -1206,20 +1213,26 @@ class ReplayArchive
                 catch (const std::exception &) { /* Next intact compatible recording. */ }
             }
             auto wanted = std::atomic_load(&matchedReference);
-            if (wanted->target == answer->target)
+            if (wanted->target == answer->target && wanted->request == answer->request)
                 std::atomic_store(&matchedReference, std::shared_ptr<const MatchedReference>(answer));
             break;
         }
         case JobKind::LoadReference:
         {
-            if (!job.id) { std::atomic_store(&splitReference, std::shared_ptr<const MapData>{}); break; }
+            if (wantedReference.load() != job.id) break;
+            if (!job.id) { std::atomic_store(&splitReference, std::shared_ptr<const MapData>{}); referenceBusy=false; break; }
             auto snapshot = Get(); auto row = snapshot->byId.find(job.id);
             if (row == snapshot->byId.end()) throw std::runtime_error("Split reference recording is unavailable");
             std::string error;
             auto data = DecodeMap(Read(snapshot->runs[row->second].file, MapCapacity - 64), error);
             if (!data || !data->review || data->review->id != job.id)
                 throw std::runtime_error("Split reference could not be read: " + error);
-            std::atomic_store(&splitReference, data);
+            if (data->review->collected.empty() || data->review->collected.size()!=data->review->pickupSeconds.size())
+                throw std::runtime_error("This recording has no usable crystal split timings");
+            if (job.data && (job.data->review->id == job.id || !MatchingSplitLayout(*job.data,*data)))
+                throw std::runtime_error("The selected reference has a different seed, spawn or recorded layout");
+            if (wantedReference.load() == job.id)
+            { std::atomic_store(&splitReference,data); referenceBusy=false; }
             break;
         }
         case JobKind::SaveRecording:
@@ -1285,7 +1298,15 @@ class ReplayArchive
             }
             catch (const std::exception &e)
             {
-                if (job.kind == JobKind::LoadAnnotations || job.kind == JobKind::SaveAnnotations)
+                if (job.kind == JobKind::LoadReference)
+                {
+                    if (wantedReference.load() == job.id)
+                    {
+                        std::atomic_store(&referenceError,std::make_shared<const std::string>(e.what()));
+                        std::atomic_store(&splitReference,std::shared_ptr<const MapData>{});referenceBusy=false;
+                    }
+                }
+                else if (job.kind == JobKind::LoadAnnotations || job.kind == JobKind::SaveAnnotations)
                     annotationError = e.what();
                 else if (job.kind == JobKind::LoadMotion)
                     motionError = e.what();
@@ -1359,9 +1380,9 @@ class ReplayArchive
     {
         if (!data || !data->review || data->review->category != 1) return;
         auto answer = std::make_shared<MatchedReference>();
-        answer->target = data->review->id; answer->pending = true;
+        answer->target = data->review->id; answer->pending = true;answer->request=++referenceRequest;
         std::atomic_store(&matchedReference, std::shared_ptr<const MatchedReference>(answer));
-        Queue({.kind = JobKind::MatchReference, .data = std::move(data)});
+        Queue({.kind = JobKind::MatchReference, .request = answer->request, .data = std::move(data)});
     }
     bool ReferenceLoading(int64_t target) const
     {
@@ -1373,7 +1394,28 @@ class ReplayArchive
         auto answer = std::atomic_load(&matchedReference);
         return answer->target == target ? answer->data : nullptr;
     }
-    void SetReference(int64_t id) { Queue({.kind = JobKind::LoadReference, .id = id}); }
+    void SetReference(int64_t id,std::shared_ptr<const MapData> target = {})
+    {
+        wantedReference=id;referenceBusy=true;
+        std::atomic_store(&referenceError,std::make_shared<const std::string>());
+        std::atomic_store(&splitReference,std::shared_ptr<const MapData>{});
+        Queue({.kind=JobKind::LoadReference,.id=id,.data=std::move(target)});
+    }
+    int64_t WantedReference() const { return wantedReference.load(); }
+    bool ManualReferenceLoading() const { return referenceBusy.load(); }
+    std::string ReferenceError() const { return *std::atomic_load(&referenceError); }
+    bool HasReferenceTarget(int64_t id) const { return std::atomic_load(&matchedReference)->target == id; }
+    void EnsureReference(std::shared_ptr<const MapData> target)
+    {
+        if(target && target->review && !HasReferenceTarget(target->review->id))FindMatchingReference(std::move(target));
+    }
+    std::shared_ptr<const MapData> ResolvedReference(const MapData &target) const
+    {
+        if(!target.review) return {};
+        auto manual=Reference();int64_t selected=wantedReference.load();
+        auto result=selected ? (manual && manual->review->id==selected ? manual : nullptr) : MatchingReference(target.review->id);
+        return result && result->review->id!=target.review->id && MatchingSplitLayout(target,*result) ? result : nullptr;
+    }
     std::shared_ptr<const MapData> Reference() const { return std::atomic_load(&splitReference); }
 
     void RecordVerification(const GameData &data, uint32_t session)

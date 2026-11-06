@@ -80,6 +80,7 @@ public sealed class RunSegmentBook
     }
     public static string LayoutKey(RunSplitReference item)
     {
+        if (item.LayoutIdentity != null) return item.LayoutIdentity;
         using (var stream = new MemoryStream())
         using (var w = new BinaryWriter(stream, Encoding.UTF8))
         {
@@ -96,7 +97,7 @@ public sealed class RunSegmentBook
                 w.Write(item.Positions[i].z == 0 ? 0 : item.Positions[i].z);
             }
             using (var hash = SHA256.Create())
-                return BitConverter.ToString(hash.ComputeHash(stream.ToArray())).Replace("-", "").ToLowerInvariant();
+                return item.LayoutIdentity = BitConverter.ToString(hash.ComputeHash(stream.ToArray())).Replace("-", "").ToLowerInvariant();
         }
     }
     public Profile Snapshot(RunSplitReference target)

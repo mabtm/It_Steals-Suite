@@ -17,6 +17,14 @@ std::string LegacyProjectBytes(const suite_clip::Project &p, int version)
     body.replace(flagsStart, flagsEnd - flagsStart, flags);
     auto exportStart = body.find('\n', flagsStart) + 1;
     auto audioStart = body.find('\n', exportStart) + 1;
+    if (version < 9)
+    {
+        auto splitStart = body.find('\n',audioStart) + 1;
+        auto appearance = body.find('\n',splitStart) + 1;
+        std::istringstream encoded(body.substr(appearance));std::string style;encoded >> std::quoted(style);
+        auto end=appearance+size_t(encoded.tellg());
+        body.erase(appearance,body.find('\n',end)-appearance+1);
+    }
     if (version < 8)
     {
         auto splitStart = body.find('\n', audioStart) + 1;
@@ -208,15 +216,24 @@ void Workshop751Cases(const std::string &output)
     project.content = content;
     project.content.input.states = false;
     project.content.input.events = true;
+    project.content.splitPresentation.splitTextSize=67;
+    project.content.splitPresentation.splitDuration=4.5f;
+    project.content.splitPresentation.splitAnimation=3;
+    project.content.splitPresentation.splitAhead={.2f,.8f,.3f,.75f};
     auto bytes = EncodeProject(project);
+    auto appearance=DecodeProject(bytes,751,12,map->hash);
+    assert(appearance.content.splitPresentation.splitStyle==0 && appearance.content.splitPresentation.splitTextSize==67 &&
+        appearance.content.splitPresentation.splitDuration==4.5f && appearance.content.splitPresentation.splitAnimation==3 &&
+        appearance.content.splitPresentation.splitAhead==project.content.splitPresentation.splitAhead);
     auto old = LegacyProjectBytes(project, 1);
     auto migrated = DecodeProject(old, 751, 12, map->hash);
     assert(migrated.content.input.states && migrated.content.input.events &&
            migrated.content.track.keys.size() == 3);
-    assert(EncodeProject(migrated).rfind("ISCLIP 8", 0) == 0);
-    for (int version : {2, 3, 7})
+    assert(EncodeProject(migrated).rfind("ISCLIP 9", 0) == 0);
+    for (int version : {2, 3, 7, 8})
     {
         auto previous = DecodeProject(LegacyProjectBytes(project, version), 751, 12, map->hash);
+        assert(previous.content.splitPresentation.splitStyle==1);
         assert(previous.content.track.keys.size() == 3 && !previous.content.track.keys[0].speedOverride &&
                !previous.options.simplified);
     }

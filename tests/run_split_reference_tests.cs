@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.IO;
 using System.Security.Cryptography;
+using System.Diagnostics;
 namespace UnityEngine
 {
     public struct Vector3
@@ -111,7 +112,75 @@ public static class RunSplitReferenceTests
         }
         finally { RunSplitArchive.Flush(); Directory.Delete(folder,true); RunSplitArchive.DirectoryPath=null; }
     }
-    public static int Main()
+    private static ulong WireChecksum(byte[] bytes,int n)
+    {
+        ulong hash=14695981039346656037UL;
+        unchecked { for(int i=0;i<n;i++){hash^=bytes[i];hash*=1099511628211UL;} }
+        return hash;
+    }
+    private static void SplitFileCases(string fixture)
+    {
+        var buffer=new byte[65536];
+        var summary=RunSplitFile.Read(fixture,buffer);
+        Check(summary!=null && summary.Id==6001 && summary.Valid && summary.Seconds==25 && summary.Collected.Length>0,
+              "streaming reader agrees with native validated v15 golden recording");
+        byte[] original=File.ReadAllBytes(fixture);int vertexOffset;
+        using(var input=new BinaryReader(new MemoryStream(original)))
+        {
+            input.BaseStream.Position=80;
+            for(int i=0;i<2;i++){int n=input.ReadInt32();input.BaseStream.Position+=n;}
+            for(int i=0;i<4;i++){int n=input.ReadInt32();input.BaseStream.Position+=n*(i<2?12:4);}
+            vertexOffset=(int)input.BaseStream.Position;
+        }
+        int count=BitConverter.ToInt32(original,vertexOffset),extra=(30000-count)*12;
+        var large=new byte[original.Length+extra];
+        Array.Copy(original,large,vertexOffset);Array.Copy(BitConverter.GetBytes(30000),0,large,vertexOffset,4);
+        Array.Copy(original,vertexOffset+4,large,vertexOffset+4,count*12);
+        Array.Copy(original,vertexOffset+4+count*12,large,vertexOffset+4+30000*12,original.Length-(vertexOffset+4+count*12));
+        Array.Copy(BitConverter.GetBytes(WireChecksum(large,large.Length-8)),0,large,large.Length-8,8);
+        string path=Path.Combine(Path.GetTempPath(),"elite-split-file-"+Guid.NewGuid().ToString("N")+".isrun");
+        try
+        {
+            File.WriteAllBytes(path,large);
+            var expanded=RunSplitFile.Read(path,buffer);
+            Check(summary.Matches(expanded) && expanded.Id==summary.Id,"unused large geometry does not change split identity");
+            for(int i=0;i<3;i++)RunSplitFile.Read(path,buffer);
+            long start=GC.GetAllocatedBytesForCurrentThread();var watch=Stopwatch.StartNew();
+            for(int i=0;i<40;i++)RunSplitFile.Read(path,buffer);
+            watch.Stop();long allocated=GC.GetAllocatedBytesForCurrentThread()-start;
+            Check(allocated/40<65536,"archive scan allocation bounded independently of floor/trace size");
+            Console.WriteLine("Streaming split scan: "+large.Length+" byte replay, "+(allocated/40)+" bytes allocated/read, "+
+                (watch.Elapsed.TotalMilliseconds/40).ToString("F3",System.Globalization.CultureInfo.InvariantCulture)+" ms/read; old byte-array read alone allocates >= file size");
+            large[large.Length-9]^=1;File.WriteAllBytes(path,large);
+            bool rejected=false;try{RunSplitFile.Read(path,buffer);}catch(InvalidDataException){rejected=true;}
+            Check(rejected,"full-payload checksum still validates skipped recording channels");
+        }
+        finally{File.Delete(path);}
+    }
+    private static void WarmArchiveCases(string fixture)
+    {
+        string root=Path.Combine(Path.GetTempPath(),"elite-split-warm-"+Guid.NewGuid().ToString("N"));
+        string folder=Path.Combine(root,"RunReviews");Directory.CreateDirectory(folder);
+        try
+        {
+            File.Copy(fixture,Path.Combine(folder,"run-6001.isrun"));
+            RunSplitArchive.DirectoryPath=folder;RunSplitArchive.WarmUp(folder);
+            Await(()=>File.Exists(Path.Combine(root,"set-seed-sectors-v1.bin")));
+            var target=RunSplitFile.Read(fixture,new byte[65536]);
+            int first=target.Collected[0];double firstAt=target.PickupSeconds[0];
+            target.Seconds=0;target.Outcome=0;target.Collected=new int[0];target.PickupSeconds=new double[0];
+            for(int i=0;i<12;i++)
+            {
+                target.Id=6501+i;RunSplitArchive.Begin(target.Id);RunSplitArchive.Find(target,new RunSplitReference[0]);
+                Await(()=>RunSplitArchive.State(target.Id)!=1);
+                Check(RunSplitArchive.Reference(target.Id)!=null && RunSplitArchive.Reference(target.Id).Id==6001,"warmed archive reference survives rapid restarts");
+                Check(RunSplitArchive.History(target.Id).Profile.Best(new[] {first},1)==firstAt,"warm backfill preserves sector history");
+            }
+            Console.WriteLine("Background warm-up: actual v15 archive backfill, cached matching reference and sector history across 12 restarts: PASS");
+        }
+        finally{RunSplitArchive.Flush();RunSplitArchive.DirectoryPath=null;Directory.Delete(root,true);}
+    }
+    public static int Main(string[] args)
     {
         var target=Item(100,0,false); var pb=Item(80,20,true); var replay=Item(90,10,false);
         Check(target.Matches(pb),"identical layout matches");
@@ -144,6 +213,7 @@ public static class RunSplitReferenceTests
         Await(()=>RunSplitArchive.State(200)!=1);
         Check(RunSplitArchive.Reference(200).Id==201,"same-run route request selects a compatible baseline without another seed");
         SectorBookCases();
+        if(args.Length>0){SplitFileCases(args[0]);WarmArchiveCases(args[0]);}
         Console.WriteLine("Set-Seed reference: exact mode/seed/recipe/spawn/layout, valid PB priority, immutable snapshots and restart cancellation: PASS");
         return 0;
     }

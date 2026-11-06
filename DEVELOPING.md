@@ -55,7 +55,19 @@ Game, Unity, MelonLoader, and Harmony assemblies are local build inputs. Keep th
 
 ## Check a change
 
-### Elite-Suite preview: 7.23.0
+### Stable speedrun release: 7.25.0
+
+Stable publication requires `SUITE_PREVIEW 0` on `main`; development branches still publish only pre-releases. The workflow builds and tests Windows packages before publishing the complete `v7.25.0` asset set and marking it latest. Installed previews can adopt the stable build with the same numeric version.
+
+`Mod/RunSplitFile.cs` reads only bounded v15 Set-Seed metadata and verifies the entire payload checksum with a reused 64 KiB buffer. It seeks past geometry, navigation, traces and monster tracks instead of creating those managed objects during a split scan. The independent full archive decoder still handles playback and export. Background startup warm-up yields to runs; file signatures and immutable layout identities are cached. An unchanged recording is observed once per sector-book generation, while transient file-sharing failures retry. No run-start, pickup or rendering path performs archive IO.
+
+`SplitDeltaUI.h` is the shared live/clip text renderer. It emits glyphs only, draws the latest pickup and uses an explicit animation age; Clip Studio derives that age from source time for deterministic seeking and export. Clip project 9 stores the appearance; versions 1–8 remain readable and retain their panel appearance. Composition snapshots freeze the reference, split rows, font and appearance for exports. Old recordings do not embed historical sector bests, so a copied best-sector metric uses the recorded reference-sector delta in clips.
+
+`ReplayReferenceUI.h` caches matching archive row labels and search indices. Selection queues a bounded load on the archive worker without opening or seeking the active recording; full layout validation remains authoritative. Manual loading/errors are separate from automatic PB lookup, stale auto requests are generation-checked, and choosing Automatic clears a manual override. Reference rows require observed pickup timing; export waits for a pending selection.
+
+The native golden fixture is decoded independently by the full native reader and lightweight managed reader. A synthetic 360866-byte recording with 30000 floor vertices allocates about 2.6 KiB per split read, compared with at least the entire file size for the previous byte-array read alone. This measures allocation, not game FPS. UI tests compare exact live/clip glyph vertices, reverse seeks, fade boundaries and frozen style; 10000 warmed live text frames perform zero ImGui heap allocations. Tests also exercise startup backfill, repeated resets, direct reference changes and incompatible/unavailable choices. The reported arm export correction was confirmed by the user in game and its Unity render path is unchanged in this release.
+
+### Previous preview development: 7.22–7.24
 
 The development branch publishes tags of the form `v7.23.0-preview.RUN_NUMBER`, with GitHub's prerelease flag and latest=false. `SUITE_PREVIEW` also forces preview publication if this source is built from another ref. Stable update metadata rejects both prerelease rows and non-stable tag syntax. Promotion to a stable release is a separate change; an installed preview may accept the same numeric version once it is actually stable. File names, registry identities, IPC names, installation discovery, replay paths and credential bindings retain their existing identities.
 
