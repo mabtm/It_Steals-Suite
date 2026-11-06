@@ -1,5 +1,7 @@
 #pragma once
 #include "PracticeMapData.h"
+#include <optional>
+#include <span>
 namespace practice
 {
 inline bool MatchingSplitLayout(const MapData &a, const MapData &b)
@@ -17,7 +19,8 @@ struct PickupSplit
 {
     int crystal = 0;
     double at = 0, segment = 0, reference = 0, delta = 0;
-    bool comparable = false;
+    double referenceSegment = 0, sectorDelta = 0, bestSegment = -1;
+    bool comparable = false, sectorComparable = false, gold = false;
 };
 inline std::vector<PickupSplit> PickupSplits(const MapData &data, const MapData *reference)
 {
@@ -25,6 +28,7 @@ inline std::vector<PickupSplit> PickupSplits(const MapData &data, const MapData 
     if (!data.review) return result;
     const auto &r = *data.review;
     const bool matching = reference && MatchingSplitLayout(data, *reference);
+    bool prefix = matching;
     for (size_t i = 0; i < r.collected.size() && i < r.pickupSeconds.size(); i++)
     {
         PickupSplit split;
@@ -45,8 +49,43 @@ inline std::vector<PickupSplit> PickupSplits(const MapData &data, const MapData 
                 }
             }
         }
+        prefix = prefix && i < reference->review->collected.size() && i < reference->review->pickupSeconds.size() &&
+                 split.crystal == reference->review->collected[i];
+        if (prefix)
+        {
+            split.sectorComparable = true;
+            split.referenceSegment = reference->review->pickupSeconds[i] - (i ? reference->review->pickupSeconds[i - 1] : 0);
+            split.sectorDelta = split.segment - split.referenceSegment;
+        }
         result.push_back(split);
     }
     return result;
 }
+// A forecast uses observed checkpoint timing, never distance or a machine-
+// dependent rate. Overdue sectors raise the estimate before the next pickup.
+inline std::optional<double> ProjectedFinish(const std::vector<PickupSplit> &splits,
+    std::span<const int> order, std::span<const double> times, double finish, double now, bool completed = false)
+{
+    if (order.empty() || order.size() != times.size() || !std::isfinite(now) || now < 0 ||
+        !std::isfinite(finish) || finish <= 0) return {};
+    double previous = 0;
+    for (double time : times)
+    {
+        if (!std::isfinite(time) || time < previous || time > finish) return {};
+        previous = time;
+    }
+    size_t count = 0;
+    double actual = 0;
+    for (const auto &split : splits)
+    {
+        if (split.at > now) break;
+        if (!std::isfinite(split.at) || split.at < actual || count >= order.size() || split.crystal != order[count]) return {};
+        actual = split.at; count++;
+    }
+    if (completed) return count == order.size() ? std::optional<double>(now) : std::nullopt;
+    double reference = count ? times[count - 1] : 0;
+    double next = count < times.size() ? times[count] : finish;
+    return std::max(finish + actual - reference, now + finish - next);
+}
+
 }

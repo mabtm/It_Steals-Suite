@@ -513,9 +513,9 @@ void AppearanceCases(const std::string &output)
                     Dump(output + "/appearance-page-" + std::to_string(page) + ".draw");
                 if (page == 1)
                 {
-                    auto *profiles = findTabs("Compact HUD", 3);
-                    assert(profiles && profiles->Tabs.Size == 3);
-                    profiles->NextSelectedTabId = profiles->Tabs[2].ID;
+                    auto *profiles = findTabs("Compact HUD", 4);
+                    assert(profiles && profiles->Tabs.Size == 4);
+                    profiles->NextSelectedTabId = profiles->Tabs[3].ID;
                     for (int frame = 0; frame < 14; frame++)
                         Frame();
                     if (!output.empty() && size.x == 1000 && dpi == 1)
@@ -3582,6 +3582,7 @@ int main(int argc, char **argv)
         SeedRouteReliabilityUICases(argv[1]);
     }
     SetSeedSplitUICases(argc > 1 ? argv[1] : "");
+    IndependentSplitPanelCases(argc > 1 ? argv[1] : "");
     RunStatisticsCases(argc > 1 ? argv[1] : "");
     RunArchiveCases(argc > 1 ? argv[1] : ".");
     if (argc > 1)

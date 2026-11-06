@@ -1,6 +1,7 @@
 #pragma once
 #include "HudEditorModel.h"
 #include "InputUI.h"
+#include "SplitPanel.h"
 #include <optional>
 
 namespace suite_hud
@@ -10,6 +11,7 @@ struct Snapshot
     OverlayLayout compact{false}, speedrun{true};
     suite_input::Preferences input;
     AppearancePreferences appearance;
+    ReplayPreferences replay;
 
     std::string Key() const
     {
@@ -18,6 +20,7 @@ struct Snapshot
         speedrun.Encode(s, "s.");
         input.Encode(s);
         appearance.Encode(s);
+        replay.Encode(s);
         return s.str();
     }
 };
@@ -40,6 +43,7 @@ inline void Open()
     draft.speedrun = g_speedrunLayout;
     draft.input = suite_input::preferences;
     draft.appearance = suite_ui::appearance;
+    draft.replay = suite_ui::replayPreferences;
     stable = draft;
     undo.clear();
     pending.reset();
@@ -59,6 +63,7 @@ inline void Close(bool save)
         g_speedrunLayout = draft.speedrun;
         suite_input::preferences = draft.input;
         suite_ui::appearance = draft.appearance;
+        suite_ui::replayPreferences = draft.replay;
         suite_ui::fontsDirty = true;
         SavePreferencesNow();
     }
@@ -161,11 +166,13 @@ inline void Render()
     suite_input::Draw(foreground, {r.x, r.y}, {r.x + r.w, r.y + r.h}, &f, draft.input, {}, 0,
                       suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont(),
                       suite_input::Colors(draft.input.opacity));
+    auto splitDemo = suite_splits::PreviewData(data);
+    suite_splits::RenderPanel(splitDemo, draft.replay, 0, true);
     auto mouse = ImGui::GetIO().MousePos;
     bool inside = mouse.x >= lo.x && mouse.y >= lo.y && mouse.x <= hi.x && mouse.y <= hi.y;
     if (ImGui::IsMouseClicked(0) && inside)
     {
-        for (int i = 2; i >= 0; i--)
+        for (int i = 3; i >= 0; i--)
             if (bounds[i].Contains(mouse.x, mouse.y))
             {
                 selected = drag = i;
@@ -173,7 +180,8 @@ inline void Render()
                 dragStart = mouse;
                 resizing = mouse.x > original.x + original.w - 18 * unit &&
                            mouse.y > original.y + original.h - 18 * unit;
-                originalScale = i == 2   ? draft.input.scale
+                originalScale = i == 3   ? draft.replay.splitScale
+                                : i == 2   ? draft.input.scale
                                 : i == 0 ? draft.compact.scale
                                          : draft.speedrun.scale;
                 break;
@@ -186,7 +194,9 @@ inline void Render()
         {
             float factor = std::max((original.w + dx) / std::max(1.f, original.w),
                                     (original.h + dy) / std::max(1.f, original.h));
-            if (drag == 2)
+            if (drag == 3)
+                draft.replay.splitScale = std::clamp(originalScale * factor, .6f, 1.8f);
+            else if (drag == 2)
                 draft.input.scale = std::clamp(originalScale * factor, .5f, 2.5f);
             else
                 (drag == 0 ? draft.compact : draft.speedrun).scale =
@@ -201,7 +211,12 @@ inline void Render()
                               9 * unit);
             float x = Fraction(moved.x, canvas.w, moved.w, 12 * fit),
                   y = Fraction(moved.y, canvas.h, moved.h, 12 * fit);
-            if (drag == 2)
+            if (drag == 3)
+            {
+                draft.replay.splitX = x; draft.replay.splitY = y;
+                if (draft.replay.splitPlacement == 0) draft.replay.splitPlacement = 1;
+            }
+            else if (drag == 2)
             {
                 draft.input.x = x;
                 draft.input.y = y;
@@ -217,7 +232,7 @@ inline void Render()
     }
     if (ImGui::IsMouseReleased(0))
         drag = -1;
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 4; i++)
     {
         const auto &b = bounds[i];
         auto color = i == selected ? IM_COL32(98, 232, 205, 255) : IM_COL32(120, 150, 160, 150);
@@ -233,12 +248,15 @@ inline void Render()
     canvas.active = false;
     ImGui::SetNextWindowPos({display.x - sidebar - 8 * unit, top}, ImGuiCond_Always);
     ImGui::SetNextWindowSize({sidebar, display.y - top - 12 * unit}, ImGuiCond_Always);
-    ImGui::Begin("HUD properties", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
-    const char *names[] = {"Compact HUD", "Speedrun HUD", "Input HUD"};
+    ImGui::Begin("HUD properties", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings);
+    const char *names[] = {"Compact HUD", "Speedrun HUD", "Input HUD", "Set-Seed splits"};
     ImGui::SetNextItemWidth(-1);
-    ImGui::Combo("##Selected HUD", &selected, names, 3);
+    ImGui::Combo("##Selected HUD", &selected, names, 4);
     ImGui::TextWrapped("Drag a panel. Drag its corner to resize. Alt temporarily disables snapping.");
-    if (selected == 2)
+    if (selected == 3)
+        suite_splits::Settings(draft.replay);
+    else if (selected == 2)
         suite_input::Settings(draft.input);
     else
         RenderOverlaySettings(selected == 0 ? draft.compact : draft.speedrun, selected == 1, true);
@@ -253,8 +271,10 @@ inline void Render()
             draft.compact = OverlayLayout(false);
         else if (selected == 1)
             draft.speedrun = OverlayLayout(true);
-        else
+        else if (selected == 2)
             draft.input = suite_input::Preferences();
+        else
+            suite_splits::ResetPresentation(draft.replay);
     }
     ImGui::TextWrapped("Preview uses current values. Input keys are demo data.");
     ImGui::End();
@@ -263,6 +283,7 @@ inline void Render()
     draft.compact.Validate();
     draft.speedrun.Validate();
     draft.input.Validate();
+    draft.replay.Validate();
     draft.appearance.Validate();
     if (draft.Key() != stable.Key() && !pending)
         pending = stable;

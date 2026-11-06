@@ -332,7 +332,7 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
         }
     }
     if (speedrun && d.runCategory == 1 && d.splitReferenceId > 0 && d.splitRunId == d.reviewRunId &&
-        (d.timerState == 1 || d.timerState == 2) && suite_ui::replayPreferences.liveSplits)
+        (d.timerState == 1 || d.timerState == 2) && suite_ui::replayPreferences.liveSplits && suite_ui::replayPreferences.splitPlacement != 1)
     {
         auto at = ImGui::GetCursorScreenPos();
         float space = viewport.y - 24 * preview - (at.y - start.y) - 72 * u;

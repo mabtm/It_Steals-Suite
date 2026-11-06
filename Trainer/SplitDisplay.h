@@ -12,14 +12,18 @@ inline const std::vector<practice::PickupSplit> &Live(const GameData &data)
     {
         int64_t run = 0, reference = 0;
         int count = -1, referenceCount = -1, pid = 0;
+        bool history = false, eligible = false;
         std::vector<practice::PickupSplit> rows;
     };
     static Cache cache;
     int count = std::clamp(data.splitPickupCount, 0, 64), referenceCount = std::clamp(data.splitReferenceCount, 0, 64);
     if (cache.run == data.splitRunId && cache.reference == data.splitReferenceId && cache.count == count &&
-        cache.referenceCount == referenceCount && cache.pid == data.pid) return cache.rows;
+        cache.referenceCount == referenceCount && cache.pid == data.pid &&
+        cache.history == bool(data.splitHistoryReady) && cache.eligible == (data.runValidity == 1)) return cache.rows;
     cache.run = data.splitRunId; cache.reference = data.splitReferenceId; cache.count = count;
-    cache.referenceCount = referenceCount; cache.pid = data.pid; cache.rows.clear();
+    cache.referenceCount = referenceCount; cache.pid = data.pid; cache.history = data.splitHistoryReady != 0;
+    cache.eligible = data.runValidity == 1; cache.rows.clear();
+    bool prefix = data.splitReferenceId > 0;
     for (int i = 0; i < count; i++)
     {
         practice::PickupSplit row;
@@ -31,9 +35,54 @@ inline const std::vector<practice::PickupSplit> &Live(const GameData &data)
             {
                 row.comparable = true; row.reference = data.splitReferenceSeconds[j]; row.delta = row.at - row.reference; break;
             }
+        prefix = prefix && i < referenceCount && data.splitReferenceIds[i] == row.crystal;
+        if (prefix)
+        {
+            row.sectorComparable = true;
+            row.referenceSegment = data.splitReferenceSeconds[i] - (i ? data.splitReferenceSeconds[i - 1] : 0);
+            row.sectorDelta = row.segment - row.referenceSegment;
+        }
+        if (cache.history)
+        {
+            double best = data.splitSectorBest[i];
+            if (std::isfinite(best) && best >= 0) row.bestSegment = best;
+            row.gold = cache.eligible && row.segment >= 0 && (row.bestSegment < 0 || row.segment < row.bestSegment - .0005);
+        }
         cache.rows.push_back(row);
     }
     return cache.rows;
+}
+
+inline bool Completed(const GameData &data) { return data.timerState == 2 && data.runOutcome == 1; }
+inline std::optional<double> Pace(const GameData &data, const std::vector<practice::PickupSplit> &rows, double now)
+{
+    if (Completed(data)) return std::isfinite(now) && now >= 0 ? std::optional<double>(now) : std::nullopt;
+    int count = std::clamp(data.splitReferenceCount, 0, 64);
+    if (!data.splitReferenceComplete || data.splitReferenceId <= 0) return {};
+    return practice::ProjectedFinish(rows, std::span<const int>(data.splitReferenceIds, size_t(count)),
+        std::span<const double>(data.splitReferenceSeconds, size_t(count)), data.splitReferenceFinish, now);
+}
+inline std::optional<double> Theoretical(const GameData &data, const std::vector<practice::PickupSplit> &rows)
+{
+    bool known = data.splitHistoryReady && std::isfinite(data.splitTheoreticalBest) && data.splitTheoreticalBest >= 0;
+    bool eligible = data.runValidity == 1;
+    if (data.splitHistoryReady && eligible && Completed(data) && !rows.empty() && int(rows.size()) == data.splitExpectedPickups)
+    {
+        double total = 0;
+        for (const auto &row : rows) total += row.bestSegment >= 0 ? std::min(row.segment, row.bestSegment) : row.segment;
+        double exit = std::max(0., data.currentRunTimeSeconds - rows.back().at);
+        total += data.splitHistoryReady && data.splitBestExit >= 0 ? std::min(exit, data.splitBestExit) : exit;
+        return std::isfinite(total) && total >= 0 ? std::optional<double>(total) : std::nullopt;
+    }
+    if (!known) return {};
+    double total = data.splitTheoreticalBest;
+    int count = std::clamp(data.splitReferenceCount, 0, 64);
+    for (size_t i = 0; i < rows.size(); i++)
+    {
+        if (i >= size_t(count) || rows[i].crystal != data.splitReferenceIds[i]) return {};
+        if (eligible && rows[i].bestSegment >= 0) total += std::min(0., rows[i].segment - rows[i].bestSegment);
+    }
+    return std::isfinite(total) && total >= 0 ? std::optional<double>(total) : std::nullopt;
 }
 
 // Uses replay time, never wall-clock animation state: seeks, slow motion and

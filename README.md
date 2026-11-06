@@ -29,22 +29,28 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.24.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
+**[v7.25.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
 
-- Improved category visibility in the live speedrun HUD, recorded-run verification and clip information. Run setup now shows the best time for its draft mode/category, including separately stored, explicitly unranked Practice bests.
-- Improved Set-Seed timing with automatic crystal splits against the fastest matching completed recording, preferring valid PBs. Mode, selected seed, recipe, spawn position and crystal layout must match. Deltas follow the same crystal even when pickup order differs; no route or hidden-object hints are exposed.
-- Improved clip composition with default-on optional Set-Seed splits, independent position, scale and opacity, replay-time animations and a frozen export reference. Older clip projects retain their original layouts.
+- Improved live Set-Seed splits with an independently positioned panel, defaulting to the bottom center. Choose timer HUD, independent panel or both; drag, resize, undo and save the panel in the on-screen editor. Position, opacity, visible rows and pace displays persist independently of timer metrics.
+- Improved sector timing with separate sector and total deltas, neutral equal times and gold indicators for new observed sector bests. Sector comparisons require the same pickup prefix; same-crystal total deltas remain available when pickup order changes.
+- Improved Set-Seed pace with a checkpoint-based finish forecast that updates at crystals and increases when the current sector runs late. A changed route suspends the forecast; completed runs show their observed finish time. Forecasts are estimates, not guaranteed finish times.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
 
 ## Preview development
 
-This branch contains **Elite-Suite 7.24.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
+This branch contains **Elite-Suite 7.25.0 Preview**. Preview downloads are published as GitHub pre-releases for manual testing. The normal update checker and the download buttons above stay on the stable channel; **7.21.0 remains stable**. Preview packages are clearly labelled and do not become the latest stable release.
 
 Set-Seed is a separate local speedrun category. Choose **Set-Seed** before starting; both the practice base-seed and captured spawn-seed recipes are supported. The selected seed and recipe are fixed for that attempt. All other trainer aids and normal integrity checks still apply. Random-Seed and Set-Seed personal bests remain separate; historical fixed-seed Practice runs keep their recorded status.
 
 The live HUD and final run check identify the recorded category. Set-Seed crystal splits use the fastest compatible completed recording (valid PB preferred), with exact mode, seed recipe, spawn and layout matching. Clip Studio enables splits by default when a reference exists; move and resize them under **Overlays**. Practice bests are stored separately and remain unranked.
+
+**Independent live splits:** open **Settings > HUD > Splits / pace**, select **Independent panel** (default) or **Both**, and use **Place split panel on screen** to drag it anywhere. The default is bottom center. Sector +/- and total +/- are separate; a gold marker indicates an observed sector best. Undo, Cancel and Apply keep editor changes separate until saved.
+
+**Pace and theoretical best:** pace uses the compatible recorded route and updates at pickups and overdue sectors. A changed pickup order searches for a compatible recorded route; until then the forecast stays unavailable. Theoretical best sums sector durations, including the final sector. In-progress improvements are provisional; only eligible Set-Seed attempts are persisted. Short resets and deaths contribute even when replay retention discards their video data. Previously retained valid replays are backfilled; unrecorded old resets cannot be reconstructed. Sector history lives in `set-seed-sectors-v1.bin` beside the game-mod statistics, separately from replay files and resettable aggregate counters.
+
+[7.25 live-split previews](assets/preview-7.25/README.md): [independent panel](assets/preview-7.25/01-independent-splits.png), [on-screen editor](assets/preview-7.25/02-split-editor.png), [settings](assets/preview-7.25/03-split-settings.png). These are captures of the production renderer with test data.
 
 [Preview screenshots](assets/preview-7.24/README.md) show the actual native renderer with test data: [HUD and splits](assets/preview-7.24/01-speedrun-hud.png), [replay library](assets/preview-7.24/02-replay-library.png), [run setup](assets/preview-7.24/03-run-setup.png), [run check](assets/preview-7.24/04-run-check.png).
 

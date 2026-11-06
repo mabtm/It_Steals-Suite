@@ -9,7 +9,7 @@ using UnityEngine;
 public sealed class RunSplitReference
 {
     public long Id, TargetId;
-    public int Scene, Seed, Spawn, Keep, SelectedSeed, PointCount;
+    public int Scene, Seed, Spawn, Keep, SelectedSeed, PointCount, Outcome;
     public bool RawSeed, Valid;
     public string Hash;
     public double Seconds;
@@ -35,7 +35,7 @@ public sealed class RunSplitReference
             SelectedSeed = r.SelectedSeed, RawSeed = r.RawSpawnSeed, Hash = map.Hash,
             PointCount = map.Points.Length, Selected = (int[])map.Selected.Clone(), Positions = positions,
             Collected = r.Collected.ToArray(), PickupSeconds = r.PickupSeconds.ToArray(),
-            Seconds = r.Seconds, Valid = r.ValidationChecked && r.Valid };
+            Seconds = r.Seconds, Outcome = r.Outcome, Valid = r.ValidationChecked && r.Valid };
     }
 
     public bool Matches(RunSplitReference other)
@@ -49,14 +49,29 @@ public sealed class RunSplitReference
         return true;
     }
 
+    public bool Follows(int[] prefix)
+    {
+        if (prefix.Length > Collected.Length) return false;
+        for (int i = 0; i < prefix.Length; i++) if (prefix[i] != Collected[i]) return false;
+        return true;
+    }
+
     public static bool Better(RunSplitReference candidate, RunSplitReference current)
     {
-        return candidate != null && candidate.Seconds > 0 && !double.IsInfinity(candidate.Seconds) &&
+        return candidate != null && candidate.Outcome == 1 && candidate.Seconds > 0 && !double.IsInfinity(candidate.Seconds) &&
             !double.IsNaN(candidate.Seconds) && candidate.Collected.Length > 0 &&
             candidate.Collected.Length == candidate.PickupSeconds.Length &&
             (current == null || candidate.Valid && !current.Valid || candidate.Valid == current.Valid &&
                 (candidate.Seconds < current.Seconds || candidate.Seconds == current.Seconds && candidate.Id < current.Id));
     }
+}
+
+public sealed class RunSplitHistory
+{
+    public long TargetId;
+    public RunSegmentBook.Profile Profile;
+    public bool Ready;
+    public double Theoretical = -1, BestExit = -1;
 }
 
 public static class RunSplitArchive
@@ -71,13 +86,51 @@ public static class RunSplitArchive
         public RunSplitReference Target;
         public RunSplitReference[] Recent;
         public string Directory;
+        public int Version;
     }
     private static readonly object gate = new object();
     private static readonly AutoResetEvent wake = new AutoResetEvent(false);
+    private static readonly ManualResetEvent idle = new ManualResetEvent(true);
     private static readonly Dictionary<string, Cached> cache = new Dictionary<string, Cached>(StringComparer.OrdinalIgnoreCase);
     private static Request pending;
+    private static readonly Queue<RunSplitReference> ended = new Queue<RunSplitReference>();
+    private static RunSegmentBook book;
+    private static string bookDirectory;
+    private static RunSplitHistory history;
+    public static volatile string Error;
+    private static void EnsureWorker()
+    {
+        if (worker != null) return;
+        worker = new Thread(Work) { IsBackground = true, Name = "Elite.SetSeedSplits", Priority = System.Threading.ThreadPriority.BelowNormal };
+        worker.Start();
+    }
+    private static void EnsureBook(string directory)
+    {
+        if (book != null && directory == bookDirectory) return;
+        if (book != null) book.Save();
+        bookDirectory = directory;
+        book = new RunSegmentBook(string.IsNullOrEmpty(directory) ? null :
+            Path.Combine(Path.GetDirectoryName(directory), "set-seed-sectors-v1.bin"));
+        Error = book.Error;
+    }
+    public static RunSplitHistory History(long run)
+    {
+        var item = Volatile.Read(ref history);
+        return item != null && item.TargetId == run ? item : null;
+    }
+    public static void RecordEnd(RunSplitReference run)
+    {
+        if (run == null || !run.Valid || run.Collected.Length == 0) return;
+        lock (gate)
+        {
+            if (ended.Count >= 128) { Error = "Sector-save queue full; latest sectors were not saved."; return; }
+            ended.Enqueue(run); idle.Reset(); EnsureWorker(); wake.Set();
+        }
+    }
     private static Thread worker;
     private static long targetId;
+    private static int version, requestedCount = -1;
+    public static int RequestedCount(long run) { return Interlocked.Read(ref targetId) == run ? Volatile.Read(ref requestedCount) : -1; }
     private static RunSplitReference result;
     private static int state;
     public static string DirectoryPath;
@@ -92,8 +145,10 @@ public static class RunSplitArchive
         lock (gate)
         {
             Interlocked.Exchange(ref targetId, run);
+            version++; Volatile.Write(ref requestedCount, -1);
             pending = null;
             Volatile.Write(ref result, null);
+            Volatile.Write(ref history, null);
             Volatile.Write(ref state, 0);
         }
     }
@@ -102,69 +157,103 @@ public static class RunSplitArchive
         if (target == null || target.Id != Interlocked.Read(ref targetId)) return;
         lock (gate)
         {
-            pending = new Request { Target = target, Recent = recent, Directory = DirectoryPath };
+            idle.Reset();
+            pending = new Request { Target = target, Recent = recent, Directory = DirectoryPath, Version = ++version };
+            Volatile.Write(ref requestedCount, target.Collected.Length);
             Volatile.Write(ref state, 1);
-            if (worker == null)
-            {
-                worker = new Thread(Work) { IsBackground = true, Name = "Elite.SetSeedSplits", Priority = System.Threading.ThreadPriority.BelowNormal };
-                worker.Start();
-            }
+            EnsureWorker();
             wake.Set();
         }
+    }
+    public static bool Flush(int milliseconds = 2500)
+    {
+        lock (gate)
+        {
+            if (worker == null) return true;
+            Interlocked.Exchange(ref targetId, 0); pending = null; wake.Set();
+        }
+        return idle.WaitOne(milliseconds) && Error == null;
     }
     private static void Work()
     {
         for (;;)
         {
             wake.WaitOne();
-            Request request;
-            lock (gate) { request = pending; pending = null; }
-            if (request == null) continue;
-            RunSplitReference best = null;
-            bool failed = false;
-            Action<RunSplitReference> consider = item => {
-                if (item != null && item.Id != request.Target.Id && request.Target.Matches(item) && RunSplitReference.Better(item, best)) best = item;
-            };
-            foreach (var item in request.Recent) consider(item);
+            Request request; RunSplitReference[] completed;
+            lock (gate) { request = pending; pending = null; completed = ended.ToArray(); ended.Clear(); }
             try
             {
-                if (!string.IsNullOrEmpty(request.Directory) && Directory.Exists(request.Directory))
+                EnsureBook(request == null ? DirectoryPath : request.Directory);
+                foreach (var run in completed) book.Observe(run);
+                if (request == null) { book.Save(); Error = book.Error; continue; }
+                RunSplitReference best = null;
+                bool failed = false;
+                Action<RunSplitReference> consider = item => {
+                    if (item == null || item.Id == request.Target.Id) return;
+                    book.Observe(item);
+                    if (request.Target.Matches(item) && item.Follows(request.Target.Collected) && RunSplitReference.Better(item, best)) best = item;
+                };
+                foreach (var item in request.Recent) consider(item);
+                try
                 {
-                    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (string path in Directory.GetFiles(request.Directory, "run-*.isrun"))
+                    if (!string.IsNullOrEmpty(request.Directory) && Directory.Exists(request.Directory))
                     {
-                        if (request.Target.Id != Interlocked.Read(ref targetId)) break;
-                        seen.Add(path);
-                        try
+                        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (string path in Directory.GetFiles(request.Directory, "run-*.isrun"))
                         {
-                            var info = new FileInfo(path);
-                            Cached entry;
-                            if (!cache.TryGetValue(path, out entry) || entry.Size != info.Length || entry.Modified != info.LastWriteTimeUtc.Ticks)
+                            if (request.Target.Id != Interlocked.Read(ref targetId)) break;
+                            seen.Add(path);
+                            try
                             {
-                                entry = new Cached { Size = info.Length, Modified = info.LastWriteTimeUtc.Ticks };
-                                if (info.Length <= PracticeMapChannel.Capacity - 64)
+                                var info = new FileInfo(path);
+                                Cached entry;
+                                if (!cache.TryGetValue(path, out entry) || entry.Size != info.Length || entry.Modified != info.LastWriteTimeUtc.Ticks)
                                 {
-                                    var map = PracticeMapArchive.Decode(File.ReadAllBytes(path));
-                                    if (map.Review != null && map.Review.Outcome == (int)RunOutcome.Completed)
-                                        entry.Item = RunSplitReference.Capture(map);
+                                    entry = new Cached { Size = info.Length, Modified = info.LastWriteTimeUtc.Ticks };
+                                    if (info.Length <= PracticeMapChannel.Capacity - 64)
+                                    {
+                                        var map = PracticeMapArchive.Decode(File.ReadAllBytes(path));
+                                        if (map.Review != null) entry.Item = RunSplitReference.Capture(map);
+                                    }
+                                    cache[path] = entry;
                                 }
-                                cache[path] = entry;
+                                consider(entry.Item);
                             }
-                            consider(entry.Item);
+                            catch (IOException) { /* A recording can still be committing. Try again next run. */ }
+                            catch (Exception) { /* Corrupt recordings cannot be a reference. */ }
                         }
-                        catch (IOException) { /* A recording can still be committing. Try again next run. */ }
-                        catch (Exception) { /* Corrupt recordings cannot be a reference. */ }
+                        foreach (var path in new List<string>(cache.Keys)) if (!seen.Contains(path)) cache.Remove(path);
                     }
-                    foreach (var path in new List<string>(cache.Keys)) if (!seen.Contains(path)) cache.Remove(path);
+                }
+                catch (Exception) { failed = true; }
+                book.Save(); Error = book.Error;
+                var profile = book.Snapshot(request.Target);
+                var summary = new RunSplitHistory { TargetId = request.Target.Id, Profile = profile, Ready = book.Error == null };
+                if (best != null && best.Collected.Length == best.Selected.Length)
+                {
+                    summary.Theoretical = profile.Theoretical(best.Collected);
+                    summary.BestExit = profile.Exit(best.Collected);
+                }
+                lock (gate)
+                {
+                    if (request.Target.Id != Interlocked.Read(ref targetId) || request.Version != version) continue;
+                    Volatile.Write(ref history, summary);
+                    if (best != null) best.TargetId = request.Target.Id;
+                    Volatile.Write(ref result, best);
+                    Volatile.Write(ref state, best != null ? 2 : failed ? 3 : 0);
                 }
             }
-            catch (Exception) { failed = true; }
-            lock (gate)
+            catch (Exception e)
             {
-                if (request.Target.Id != Interlocked.Read(ref targetId)) continue;
-                if (best != null) best.TargetId = request.Target.Id;
-                Volatile.Write(ref result, best);
-                Volatile.Write(ref state, best != null ? 2 : failed ? 3 : 0);
+                Error = "Split history unavailable: " + e.Message;
+                if (request != null && request.Target.Id == Interlocked.Read(ref targetId))
+                    Volatile.Write(ref state, 3);
+            }
+            finally
+            {
+                lock (gate)
+                    if (pending == null && ended.Count == 0) idle.Set();
+                    else wake.Set();
             }
         }
     }

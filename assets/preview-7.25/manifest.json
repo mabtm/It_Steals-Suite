@@ -1,0 +1,10 @@
+{
+  "version": "7.25.0 Preview",
+  "testData": true,
+  "renderer": "production ImGui",
+  "images": {
+    "01-independent-splits.png": "6d79437288981fd9d985f183c91bbe7ad1da0c57a8e5444925ab8c85110d3210",
+    "02-split-editor.png": "c10f1468f70877f26b2f64e3b64250619e8efc1153b8a23bbc2e07d9d144ae50",
+    "03-split-settings.png": "e48b0eed3b8ce79782e84e86e8ea1e69feb34a9a42f85ea999306e7315785260"
+  }
+}

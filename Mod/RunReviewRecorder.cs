@@ -255,14 +255,7 @@ public static class RunReviewRecorder
                 geometryReady = active.Indices.Length > 0 && active.AgentHeight > 0;
                 if (geometryReady && active.Review.Category == RunCategory.SetSeed)
                 {
-                    var candidates = new List<RunSplitReference>();
-                    foreach (var previous in recent)
-                        if (previous.Review.Outcome == (int)RunOutcome.Completed)
-                        {
-                            var item = RunSplitReference.Capture(previous);
-                            if (item != null) candidates.Add(item);
-                        }
-                    RunSplitArchive.Find(RunSplitReference.Capture(active), candidates.ToArray());
+                    RequestSplits(active);
                 }
             }
         }
@@ -355,6 +348,7 @@ public static class RunReviewRecorder
         active.Review.Aids = (uint)record.Aids;
         active.Review.Warnings = (uint)record.Warnings;
         active.Review.ValidityReason = RunValidity.Reason(record);
+        RunSplitArchive.RecordEnd(RunSplitReference.Capture(active));
         ReplayCapture.End();
         var motion = ReplayInputCapture.Finish(record.Seconds);
         bool ranked = store.RetainRankedReplay(record);
@@ -398,11 +392,27 @@ public static class RunReviewRecorder
         return null;
     }
 
+    private static void RequestSplits(PracticeMapData target)
+    {
+        var candidates = new List<RunSplitReference>();
+        foreach (var previous in recent)
+            if (previous.Review.Outcome == (int)RunOutcome.Completed)
+            {
+                var item = RunSplitReference.Capture(previous);
+                if (item != null) candidates.Add(item);
+            }
+        RunSplitArchive.Find(RunSplitReference.Capture(target), candidates.ToArray());
+    }
+    private static RunSplitHistory splitHistory;
+    private static int splitHistoryCount = -1;
+    private static double splitBestExit = -1;
+    private static readonly double[] splitBests = new double[64];
     public static void WriteSplits(SnapshotBuffer data, long expectedRun)
     {
         var map = active != null && active.Review.Id == expectedRun ? active : Find(expectedRun);
         if (map == null || map.Review.Category != RunCategory.SetSeed) return;
         data.Write(SharedLayout.SplitRunId, expectedRun);
+        data.Write(SharedLayout.SplitExpectedPickups, map.Selected.Length);
         var review = map.Review;
         int count = Math.Min(64, Math.Min(review.Collected.Count, review.PickupSeconds.Count));
         data.Write(SharedLayout.SplitPickupCount, count);
@@ -411,10 +421,34 @@ public static class RunReviewRecorder
             data.Write(SharedLayout.SplitPickupIds + i * 4, review.Collected[i]);
             data.Write(SharedLayout.SplitPickupSeconds + i * 8, review.PickupSeconds[i]);
         }
+        var history = RunSplitArchive.History(expectedRun);
+        if (history != null)
+        {
+            if (history != splitHistory || count != splitHistoryCount)
+            {
+                splitHistory = history; splitHistoryCount = count;
+                int[] order = review.Collected.ToArray();
+                splitBestExit = history.Profile.Exit(order);
+                for (int i = 0; i < count; i++) splitBests[i] = history.Profile.Best(order, i + 1);
+            }
+            data.Write(SharedLayout.SplitHistoryReady, history.Ready);
+            data.Write(SharedLayout.SplitTheoreticalBest, history.Theoretical);
+            data.Write(SharedLayout.SplitBestExit, count == map.Selected.Length ? splitBestExit : history.BestExit);
+            for (int i = 0; i < count; i++) data.Write(SharedLayout.SplitSectorBest + i * 8, splitBests[i]);
+        }
         var reference = RunSplitArchive.Reference(expectedRun);
+        if (active == map && geometryReady && reference != null && count > 0 &&
+            RunSplitArchive.RequestedCount(expectedRun) != count)
+        {
+            bool prefix = count <= reference.Collected.Length;
+            for (int i = 0; prefix && i < count; i++) prefix = review.Collected[i] == reference.Collected[i];
+            if (!prefix) RequestSplits(map);
+        }
         data.Write(SharedLayout.SplitReferenceState, (byte)RunSplitArchive.State(expectedRun));
         if (reference == null) return;
         data.Write(SharedLayout.SplitReferenceId, reference.Id);
+        data.Write(SharedLayout.SplitReferenceFinish, reference.Seconds);
+        data.Write(SharedLayout.SplitReferenceComplete, reference.Collected.Length == reference.Selected.Length && reference.Collected.Length <= 64);
         data.Write(SharedLayout.SplitReferenceValid, reference.Valid);
         count = Math.Min(64, Math.Min(reference.Collected.Length, reference.PickupSeconds.Length));
         data.Write(SharedLayout.SplitReferenceCount, count);

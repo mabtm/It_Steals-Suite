@@ -2,6 +2,15 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.25.0 Changelog
+
+- Improved live Set-Seed splits with an independently positioned panel, defaulting to the bottom center. Choose timer HUD, independent panel or both; drag, resize, undo and save the panel in the on-screen editor. Position, opacity, visible rows and pace displays persist independently of timer metrics.
+- Improved sector timing with separate sector and total deltas, neutral equal times and gold indicators for new observed sector bests. Sector comparisons require the same pickup prefix; same-crystal total deltas remain available when pickup order changes.
+- Improved Set-Seed pace with a checkpoint-based finish forecast that updates at crystals and increases when the current sector runs late. A changed route suspends the forecast; completed runs show their observed finish time. Forecasts are estimates, not guaranteed finish times.
+- Improved theoretical-best timing by summing the best observed sector durations on the exact seed, recipe, spawn, layout and route, including the finish sector. Zero-duration simultaneous pickups and finishes remain valid. In-progress improvements stay provisional until final eligibility checks pass.
+- Improved sector history with independent, checksummed storage and atomic replacement, last-good recovery and future-version preservation. Eligible reset/death attempts contribute even below replay-retention thresholds; existing retained clean replays are backfilled. Practice, invalid attempts and missing historical timestamps do not invent bests.
+- Improved background-only sector persistence and bounded per-pickup lookups, with shutdown flushing and visible storage failures. The preview remains outside stable automatic updates.
+
 ### v7.24.0 Changelog
 
 - Improved category visibility in the live speedrun HUD, recorded-run verification and clip information. Run setup now shows the best time for its draft mode/category, including separately stored, explicitly unranked Practice bests.

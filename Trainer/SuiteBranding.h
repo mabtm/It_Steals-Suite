@@ -1,8 +1,8 @@
 #pragma once
 
-#define SUITE_VERSION "7.24.0"
-#define SUITE_VERSION_COMPONENTS 7, 24, 0, 0
-#define SUITE_MOD_VERSION "7.24.0"
+#define SUITE_VERSION "7.25.0"
+#define SUITE_VERSION_COMPONENTS 7, 25, 0, 0
+#define SUITE_MOD_VERSION "7.25.0"
 #define SUITE_AUTHOR "mab"
 #define SUITE_PRODUCT_NAME "Elite-Suite"
 #define SUITE_PREVIEW 1

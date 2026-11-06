@@ -103,6 +103,7 @@ inline void RenderTimerOverlay(const std::string &mode)
                            g_pShared ? *g_pShared : disconnected,
                            compactPractice ? g_hudLayout : g_speedrunLayout, true, mode,
                            g_pShared ? SnapshotAge() : 1., compactPractice);
+        if (g_pShared) suite_splits::RenderPanel(*g_pShared, suite_ui::replayPreferences, SnapshotAge());
     }
 }
 
@@ -197,6 +198,14 @@ inline void RenderHudSettings()
             RenderOverlaySettings(g_hudLayout, false);
             suite_ui::EndTabItem();
         }
+        if (suite_ui::BeginTabItem("Splits / pace"))
+        {
+            suite_splits::Settings(suite_ui::replayPreferences);
+            ImGui::BeginDisabled(g_pShared && g_pShared->timerState == 1);
+            if (suite_ui::Button("Place split panel on screen")) { suite_hud::Open(); suite_hud::selected = 3; }
+            ImGui::EndDisabled();
+            suite_ui::EndTabItem();
+        }
         if (suite_ui::BeginTabItem("Inputs"))
         {
             suite_input::Settings();
@@ -207,7 +216,7 @@ inline void RenderHudSettings()
             RenderHudPreview(g_speedrunLayout, true);
             RenderOverlaySettings(g_speedrunLayout, true);
             suite_ui::Checkbox("Set-Seed crystal splits", &suite_ui::replayPreferences.liveSplits);
-            Help("Compares each collected crystal with your fastest completed recording on the same seed, spawn and layout. A valid PB is preferred. Green is ahead; red is behind. The split panel moves with the speedrun HUD.");
+            Help("Compares each collected crystal with your fastest completed recording on the same seed, spawn and layout. A valid PB is preferred. Green is ahead; red is behind. Choose the position and pace options in Splits / pace.");
             suite_ui::EndTabItem();
         }
         ImGui::EndTabBar();

@@ -22,7 +22,7 @@ struct Canvas
 
 inline Canvas canvas;
 inline bool active = false;
-inline Rect bounds[3];
+inline Rect bounds[4];
 
 inline float Fraction(float at, float extent, float panel, float margin)
 {

@@ -1,8 +1,8 @@
 {
-  "version": 31,
+  "version": 32,
   "mappingSize": 32768,
   "payloadOffset": 256,
-  "payloadSize": 19806,
+  "payloadSize": 20348,
   "fields": [
     {
       "name": "playerX",
@@ -1563,6 +1563,48 @@
       "type": "double",
       "count": 64,
       "offset": 19294
+    },
+    {
+      "name": "splitReferenceFinish",
+      "type": "double",
+      "count": 1,
+      "offset": 19806
+    },
+    {
+      "name": "splitSectorBest",
+      "type": "double",
+      "count": 64,
+      "offset": 19814
+    },
+    {
+      "name": "splitTheoreticalBest",
+      "type": "double",
+      "count": 1,
+      "offset": 20326
+    },
+    {
+      "name": "splitBestExit",
+      "type": "double",
+      "count": 1,
+      "offset": 20334
+    },
+    {
+      "name": "splitHistoryReady",
+      "type": "byte",
+      "count": 1,
+      "offset": 20342
+    },
+    {
+      "name": "splitReferenceComplete",
+      "type": "byte",
+      "count": 1,
+      "offset": 20343
+    },
+    {
+      "name": "splitExpectedPickups",
+      "type": "int",
+      "count": 1,
+      "offset": 20344
     }
   ],
   "commandSize": 192

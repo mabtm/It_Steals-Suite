@@ -539,9 +539,9 @@ public sealed class SpeedrunManager
         data.WriteString(SharedLayout.ReportError, store.LastReportError ?? store.ReportQueueWarning ?? "",
                          96);
         data.WriteString(SharedLayout.StatsWarning,
-                         store.LoadWarning ?? store.LedgerWarning ?? RunReviewRecorder.RecoveryWarning ?? "", 96);
-        data.Write(SharedLayout.StatsSaveStatus, store.LastError != null || store.LastLedgerError != null ? 2 : store.SavePending ? 1 : 0);
-        data.WriteString(SharedLayout.StatsError, store.LastError ?? store.LastLedgerError ?? "", 96);
+                         RunSplitArchive.Error ?? store.LoadWarning ?? store.LedgerWarning ?? RunReviewRecorder.RecoveryWarning ?? "", 96);
+        data.Write(SharedLayout.StatsSaveStatus, store.LastError != null || store.LastLedgerError != null || RunSplitArchive.Error != null ? 2 : store.SavePending ? 1 : 0);
+        data.WriteString(SharedLayout.StatsError, store.LastError ?? store.LastLedgerError ?? RunSplitArchive.Error ?? "", 96);
         data.Write(SharedLayout.SeedSourcesVerified, PracticeRandom.SourcesVerified);
         if (record != null)
         {
@@ -603,6 +603,8 @@ public sealed class SpeedrunManager
     {
         if (timerState == 1)
             End(RunOutcome.Interrupted);
+        if (!RunSplitArchive.Flush())
+            MelonLoader.MelonLogger.Warning(RunSplitArchive.Error ?? "Sector history save is still pending during shutdown");
         store.Dispose();
         if (Instance == this)
             Instance = null;

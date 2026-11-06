@@ -5,9 +5,9 @@
 #include <cmath>
 #include <cstring>
 using byte = std::uint8_t;
-inline constexpr char kMapName[] = "ItStealsSharedMem.v31";
-inline constexpr char kMutexName[] = "ItStealsSharedMem.v31.Lock";
-inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 31;
+inline constexpr char kMapName[] = "ItStealsSharedMem.v32";
+inline constexpr char kMutexName[] = "ItStealsSharedMem.v32.Lock";
+inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 32;
 inline constexpr size_t kMappingSize = 32768, kCommandOffset = 64, kPayloadOffset = 256;
 inline constexpr uint32_t kTelemetryConfigured = 0x80000000u, kTelemetryMap = 1, kTelemetryPath = 2, kTelemetryDetails = 4, kTelemetryLive = 8;
 inline constexpr uint32_t kTelemetryWalls=16,kTelemetryCrystals=32,kTelemetryMonster=64,kTelemetryPlanner=128,kTelemetryGeometry=256,kTelemetryInputs=1024,kTelemetryInspector=2048;
@@ -278,6 +278,13 @@ struct GameData {
     int splitReferenceCount;
     int splitReferenceIds[64];
     double splitReferenceSeconds[64];
+    double splitReferenceFinish;
+    double splitSectorBest[64];
+    double splitTheoreticalBest;
+    double splitBestExit;
+    byte splitHistoryReady;
+    byte splitReferenceComplete;
+    int splitExpectedPickups;
 };
 struct TrainerCommands {
     uint32_t serial = 0, heartbeat = 0;
@@ -309,7 +316,7 @@ struct SharedHeader {
     byte reserved[20];
 };
 #pragma pack(pop)
-static_assert(sizeof(GameData) == 19806);
+static_assert(sizeof(GameData) == 20348);
 static_assert(sizeof(TrainerCommands) == 192);
 static_assert(sizeof(SharedHeader) == 64);
 static_assert(offsetof(SharedHeader, commandAck) == 40);
@@ -590,6 +597,13 @@ static_assert(offsetof(GameData, splitPickupSeconds) == 18522);
 static_assert(offsetof(GameData, splitReferenceCount) == 19034);
 static_assert(offsetof(GameData, splitReferenceIds) == 19038);
 static_assert(offsetof(GameData, splitReferenceSeconds) == 19294);
+static_assert(offsetof(GameData, splitReferenceFinish) == 19806);
+static_assert(offsetof(GameData, splitSectorBest) == 19814);
+static_assert(offsetof(GameData, splitTheoreticalBest) == 20326);
+static_assert(offsetof(GameData, splitBestExit) == 20334);
+static_assert(offsetof(GameData, splitHistoryReady) == 20342);
+static_assert(offsetof(GameData, splitReferenceComplete) == 20343);
+static_assert(offsetof(GameData, splitExpectedPickups) == 20344);
 
 inline bool ValidCoordinate(float value) {
     return std::isfinite(value) && std::fabs(value) <= 1000000.0f;
