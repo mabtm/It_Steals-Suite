@@ -3,6 +3,8 @@
 #include "SharedProtocol.h"
 #include "imgui.h"
 #include <cstdio>
+#include <array>
+#include <cstring>
 
 namespace suite_splits
 {
@@ -16,7 +18,7 @@ inline const std::vector<practice::PickupSplit> &Live(const GameData &data)
         std::vector<practice::PickupSplit> rows;
     };
     static Cache cache;
-    int count = std::clamp(data.splitPickupCount, 0, 64), referenceCount = std::clamp(data.splitReferenceCount, 0, 64);
+    int count = std::clamp(int(data.splitPickupCount), 0, 64), referenceCount = std::clamp(int(data.splitReferenceCount), 0, 64);
     if (cache.run == data.splitRunId && cache.reference == data.splitReferenceId && cache.count == count &&
         cache.referenceCount == referenceCount && cache.pid == data.pid &&
         cache.history == bool(data.splitHistoryReady) && cache.eligible == (data.runValidity == 1)) return cache.rows;
@@ -57,10 +59,16 @@ inline bool Completed(const GameData &data) { return data.timerState == 2 && dat
 inline std::optional<double> Pace(const GameData &data, const std::vector<practice::PickupSplit> &rows, double now)
 {
     if (Completed(data)) return std::isfinite(now) && now >= 0 ? std::optional<double>(now) : std::nullopt;
-    int count = std::clamp(data.splitReferenceCount, 0, 64);
+    int count = std::clamp(int(data.splitReferenceCount), 0, 64);
     if (!data.splitReferenceComplete || data.splitReferenceId <= 0) return {};
-    return practice::ProjectedFinish(rows, std::span<const int>(data.splitReferenceIds, size_t(count)),
-        std::span<const double>(data.splitReferenceSeconds, size_t(count)), data.splitReferenceFinish, now);
+    // IPC is packed byte-for-byte. Copy into aligned storage before giving
+    // standard-library spans/references to its numeric checkpoint arrays.
+    std::array<int, 64> order{};
+    std::array<double, 64> times{};
+    std::memcpy(order.data(), data.splitReferenceIds, size_t(count) * sizeof(int));
+    std::memcpy(times.data(), data.splitReferenceSeconds, size_t(count) * sizeof(double));
+    return practice::ProjectedFinish(rows, std::span<const int>(order.data(), size_t(count)),
+        std::span<const double>(times.data(), size_t(count)), data.splitReferenceFinish, now);
 }
 inline std::optional<double> Theoretical(const GameData &data, const std::vector<practice::PickupSplit> &rows)
 {
@@ -71,12 +79,12 @@ inline std::optional<double> Theoretical(const GameData &data, const std::vector
         double total = 0;
         for (const auto &row : rows) total += row.bestSegment >= 0 ? std::min(row.segment, row.bestSegment) : row.segment;
         double exit = std::max(0., data.currentRunTimeSeconds - rows.back().at);
-        total += data.splitHistoryReady && data.splitBestExit >= 0 ? std::min(exit, data.splitBestExit) : exit;
+        total += data.splitHistoryReady && data.splitBestExit >= 0 ? std::min(exit, double(data.splitBestExit)) : exit;
         return std::isfinite(total) && total >= 0 ? std::optional<double>(total) : std::nullopt;
     }
     if (!known) return {};
     double total = data.splitTheoreticalBest;
-    int count = std::clamp(data.splitReferenceCount, 0, 64);
+    int count = std::clamp(int(data.splitReferenceCount), 0, 64);
     for (size_t i = 0; i < rows.size(); i++)
     {
         if (i >= size_t(count) || rows[i].crystal != data.splitReferenceIds[i]) return {};

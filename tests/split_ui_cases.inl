@@ -58,7 +58,7 @@ void IndependentSplitPanelCases(const std::string &output)
     data.runValidity=2; rows=suite_splits::Live(data);
     assert(!rows[2].gold && suite_splits::Theoretical(data,rows)==40.5);
     data.runValidity=1;data.splitRunId++;
-    std::swap(data.splitPickupIds[1],data.splitPickupIds[2]);rows=suite_splits::Live(data);
+    int first=data.splitPickupIds[1];data.splitPickupIds[1]=data.splitPickupIds[2];data.splitPickupIds[2]=first;rows=suite_splits::Live(data);
     assert(rows[1].comparable && !rows[1].sectorComparable && !suite_splits::Pace(data,rows,31) && !suite_splits::Theoretical(data,rows));
     data=suite_splits::PreviewData(GameData{});
     auto frame=[&](double age=0) {

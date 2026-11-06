@@ -67,8 +67,8 @@ try {
     $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
     $msbuild=& $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
     if (-not $msbuild) { throw 'MSBuild is required for the native checks.' }
-    $nativeIncludes=[Security.SecurityElement]::Escape((Join-Path $repo 'Trainer'))
-    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','seed_neighbor_tests','hotkey_tests','font_catalog_tests','physical_repair_tests','timer_preparation_tests','navigation_diagnostic_tests','ui_motion_audio_tests','performance_timing_tests','replay_library_tests','run_statistics_tests','navigation_visibility_tests','navigation_startup_tests','run_data_tests','replay_split_tests')) {
+    $nativeIncludes=[Security.SecurityElement]::Escape(((Join-Path $repo 'Trainer')+';'+(Join-Path $repo 'Trainer/imgui')))
+    foreach ($nativeTest in @('startup_logos_tests','route_order_tests','route_bound_tests','seed_neighbor_tests','hotkey_tests','font_catalog_tests','physical_repair_tests','timer_preparation_tests','navigation_diagnostic_tests','ui_motion_audio_tests','performance_timing_tests','replay_library_tests','run_statistics_tests','navigation_visibility_tests','navigation_startup_tests','run_data_tests','replay_split_tests','split_pace_tests')) {
         $check = $nativeTest
         Write-Output "Verifying Windows native contract: $check"
         $nativeSource=[Security.SecurityElement]::Escape((Join-Path $repo ('tests/'+$nativeTest+'.cpp')))

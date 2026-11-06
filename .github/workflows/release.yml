@@ -45,7 +45,7 @@ jobs:
       - name: Test production logic, UI, and managed contracts
         run: python3 tests/run.py --ui --managed --jobs 2 --output build/verification
       - name: Check search memory and undefined behavior
-        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests navigation_visibility_tests navigation_startup_tests physical_repair_tests timer_preparation_tests navigation_diagnostic_tests font_catalog_tests ui_motion_audio_tests performance_timing_tests milestone_tests replay_motion_tests run_data_tests replay_split_tests --sanitize --jobs 2 --output build/gpu-sanitizers
+        run: python3 tests/run.py --only seed_gpu_tests seed_gpu_catalog_tests seed_gpu_kernel_tests navigation_visibility_tests navigation_startup_tests physical_repair_tests timer_preparation_tests navigation_diagnostic_tests font_catalog_tests ui_motion_audio_tests performance_timing_tests milestone_tests replay_motion_tests run_data_tests replay_split_tests split_pace_tests --sanitize --jobs 2 --output build/gpu-sanitizers
       - name: Retain verification logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
