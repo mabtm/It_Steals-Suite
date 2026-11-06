@@ -1198,7 +1198,9 @@ class ReplayArchive
                     std::string error;
                     auto data = DecodeMap(Read(row->file, MapCapacity - 64), error);
                     if (data && data->review && data->review->id == row->id &&
-                        data->review->outcome == 1 && MatchingSplitLayout(*job.data, *data))
+                        data->review->outcome == 1 && !data->review->collected.empty() &&
+                        data->review->collected.size() == data->review->pickupSeconds.size() &&
+                        MatchingSplitLayout(*job.data, *data))
                     { answer->data = std::move(data); break; }
                 }
                 catch (const std::exception &) { /* Next intact compatible recording. */ }

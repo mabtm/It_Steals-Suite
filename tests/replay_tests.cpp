@@ -142,10 +142,11 @@ int main(int argc, char **argv)
         targetReview->valid = targetReview->validationChecked = true;
         targetReview->seconds = 15;
         target->review = targetReview;
-        auto save = [&](int64_t id, double seconds, bool valid, bool wrongSpawn) {
+        auto save = [&](int64_t id, double seconds, bool valid, bool wrongSpawn, bool noPickups = false) {
             auto item = *target;
             auto review = std::make_shared<RunReview>(*targetReview);
             review->id = id; review->seconds = seconds; review->valid = review->validationChecked = valid;
+            if (noPickups) { review->collected.clear(); review->pickupSeconds.clear(); }
             item.review = review;
             if (wrongSpawn) item.spawns[item.spawn].x += 10;
             auto bytes = EncodeFixture(item, 15);
@@ -159,9 +160,10 @@ int main(int argc, char **argv)
         save(6001,25,true,false);
         save(6002,20,false,false); // faster unverified replay loses to valid PB
         save(6003,16,true,true); // same seed, different spawn cannot match
+        save(6004,17,true,false,true); // incomplete legacy pickup channel is not a useful reference
         ReplayArchive archive;
         archive.SetDirectory(root / "split-saved"); archive.SetSourceDirectory(folder);
-        Await([&] { return archive.Get()->runs.size() == 5; });
+        Await([&] { return archive.Get()->runs.size() == 6; });
         archive.FindMatchingReference(target);
         Await([&] { return !archive.ReferenceLoading(9000); });
         assert(archive.MatchingReference(9000) && archive.MatchingReference(9000)->review->id == 6001);
