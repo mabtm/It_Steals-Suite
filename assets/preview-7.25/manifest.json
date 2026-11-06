@@ -2,9 +2,11 @@
   "version": "7.25.0 Preview",
   "testData": true,
   "renderer": "production ImGui",
+  "defaultStyle": "latest delta text only; fully transparent",
   "images": {
-    "01-independent-splits.png": "6d79437288981fd9d985f183c91bbe7ad1da0c57a8e5444925ab8c85110d3210",
-    "02-split-editor.png": "c10f1468f70877f26b2f64e3b64250619e8efc1153b8a23bbc2e07d9d144ae50",
-    "03-split-settings.png": "e48b0eed3b8ce79782e84e86e8ea1e69feb34a9a42f85ea999306e7315785260"
+    "01-independent-splits.png": "b20840af4731be0b52055bbeaa1bc165751dbfcf8f4500ca21284cdb6551b925",
+    "02-split-editor.png": "ec47561d60a08ad03b31e6b348ee5e4ff123a463f107633982c491ad3b5d423b",
+    "03-split-settings.png": "faadb552b9ebd23f9af61378f13d647b4a7fe4625e40ffc2e0098e876e0c6c28",
+    "04-compact-panel.png": "2f88beecb399044609a4907822e393c3ce1bdd1dcd7cc512db9f1f8188b05194"
   }
 }

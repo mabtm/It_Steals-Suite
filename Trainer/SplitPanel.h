@@ -13,6 +13,10 @@ inline void ResetPresentation(ReplayPreferences &p)
     p.splitRows = defaults.splitRows; p.splitX = defaults.splitX; p.splitY = defaults.splitY;
     p.splitScale = defaults.splitScale; p.splitWidth = defaults.splitWidth; p.splitOpacity = defaults.splitOpacity;
     p.splitPace = defaults.splitPace; p.splitTheory = defaults.splitTheory;
+    p.splitStyle = defaults.splitStyle; p.splitMetric = defaults.splitMetric; p.splitAnimation = defaults.splitAnimation;
+    p.splitTextSize = defaults.splitTextSize; p.splitDuration = defaults.splitDuration;
+    p.splitBackgroundOpacity = defaults.splitBackgroundOpacity;
+    p.splitAhead = defaults.splitAhead; p.splitBehind = defaults.splitBehind; p.splitEqual = defaults.splitEqual;
 }
 inline void Settings(ReplayPreferences &p)
 {
@@ -21,6 +25,14 @@ inline void Settings(ReplayPreferences &p)
     ImGui::TextDisabled("Display");
     ImGui::SetNextItemWidth(-1);
     ImGui::Combo("##SplitDisplay", &p.splitPlacement, places, 3);
+    const char *styles[] = {"Delta text / transparent", "Compact panel"};
+    ImGui::TextDisabled("Style"); ImGui::SetNextItemWidth(-1); ImGui::Combo("##SplitStyle", &p.splitStyle, styles, 2);
+    if (p.splitStyle == 0)
+    {
+        const char *metrics[] = {"Crystal delta vs reference", "Sector delta vs reference", "Sector delta vs best"};
+        ImGui::TextDisabled("Compare"); ImGui::SetNextItemWidth(-1); ImGui::Combo("##SplitMetric", &p.splitMetric, metrics, 3);
+        ImGui::TextDisabled("Latest crystal only / no background");
+    }
     suite_ui::Checkbox("Projected finish / pace", &p.splitPace);
     suite_ui::Checkbox("Theoretical best", &p.splitTheory);
     ImGui::TextWrapped("Sector +/- compares the last sector with the matching PB route. Total +/- compares arrival at the same crystal. Gold marks a new local sector best.");
@@ -29,10 +41,24 @@ inline void Settings(ReplayPreferences &p)
         ImGui::TextWrapped("Pace is a forecast: reference finish plus your observed split delta. It rises if a sector takes longer than expected. Different pickup order suspends the forecast until a compatible route is used.");
         ImGui::TextWrapped("Theoretical best adds the best observed sectors on this exact seed, recipe, spawn and route, including the finish sector. Clean reset and death attempts also contribute, independently of replay retention. Live improvements are provisional until final run checks pass. Older unrecorded resets cannot be reconstructed.");
     }
+    if (p.splitStyle == 0)
+    {
+        ImGui::SliderFloat("Text size", &p.splitTextSize, 24, 96, "%.0f");
+        const char *animations[] = {"None", "Fade", "Soft pop", "Slide"};
+        ImGui::SetNextItemWidth(-1); ImGui::Combo("##SplitAnimation", &p.splitAnimation, animations, 4);
+        bool keep = p.splitDuration == 0;
+        if (suite_ui::Checkbox("Keep until next crystal", &keep)) p.splitDuration = keep ? 0 : 3;
+        if (!keep) ImGui::SliderFloat("Show seconds", &p.splitDuration, .5f, 10, "%.1f");
+        if (suite_ui::CollapsingHeader("Delta colors"))
+        {
+            ImGui::ColorEdit4("Ahead", p.splitAhead.data(), ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit4("Behind", p.splitBehind.data(), ImGuiColorEditFlags_NoInputs);
+            ImGui::ColorEdit4("Equal", p.splitEqual.data(), ImGuiColorEditFlags_NoInputs);
+        }
+    }
+    else ImGui::SliderFloat("Panel background", &p.splitBackgroundOpacity, 0, 1, "%.2f");
     if (p.splitPlacement != 0)
     {
-        ImGui::TextDisabled("Visible crystals");
-        ImGui::SetNextItemWidth(-1); ImGui::SliderInt("##SplitRows", &p.splitRows, 1, 6);
         if (suite_ui::Button("Bottom center")) { p.splitX = .5f; p.splitY = 1; }
         if (suite_ui::CollapsingHeader("Position / size / opacity"))
         {
@@ -50,7 +76,7 @@ inline suite_hud::Rect PanelBounds(const ReplayPreferences &p)
     auto viewport = suite_hud::canvas.active ? ImVec2(suite_hud::canvas.w, suite_hud::canvas.h) : ImGui::GetIO().DisplaySize;
     float preview = suite_hud::canvas.active ? suite_hud::canvas.scale : 1;
     float margin = 12 * preview;
-    float nominal = 54.f + p.splitRows * 26.f + (p.splitPace || p.splitTheory ? 52.f : 10.f);
+    float nominal = (p.splitStyle == 0 ? p.splitTextSize * 1.35f : 80.f) + (p.splitPace || p.splitTheory ? 52.f : 10.f);
     float width = std::min(p.splitWidth * p.splitScale * g_dpiScale * preview, std::max(24.f, viewport.x - 2 * margin));
     float height = width / 480 * nominal;
     if (height > viewport.y - 2 * margin)
@@ -83,12 +109,12 @@ inline void DrawPanel(ImDrawList *draw, ImFont *font, suite_hud::Rect box, const
         text(edge-extent,y,size,ink,value);
     };
     draw->PushClipRect({box.x,box.y},{box.x+box.w,box.y+box.h},true);
-    draw->AddRectFilled({box.x,box.y},{box.x+box.w,box.y+box.h},color(12,20,28),6*u);
+    draw->AddRectFilled({box.x,box.y},{box.x+box.w,box.y+box.h},color(12,20,28,p.splitBackgroundOpacity),6*u);
     draw->AddLine({box.x+12*u,box.y+u},{box.x+box.w-12*u,box.y+u},color(111,209,255,.65f),u);
     text(13,10,14,color(131,211,249),demo ? "SET-SEED SPLITS / PREVIEW" : "SET-SEED SPLITS");
     text(13,32,11,color(150,170,187),"CRYSTAL");
     right(314,32,11,color(150,170,187),"SECTOR +/-"); right(466,32,11,color(150,170,187),"TOTAL +/-");
-    size_t end=rows.size(),begin=end>size_t(p.splitRows) ? end-size_t(p.splitRows) : 0;
+    size_t end=rows.size(),begin=end ? end-1 : 0;
     for (size_t i=begin;i<end;i++)
     {
         const auto &row=rows[i];
@@ -106,7 +132,7 @@ inline void DrawPanel(ImDrawList *draw, ImFont *font, suite_hud::Rect box, const
     if (rows.empty()) text(17,56,14,color(164,184,199),data.splitReferenceState==1 ? "Finding matching route..." : "Ready for the first crystal");
     if (p.splitPace || p.splitTheory)
     {
-        float y=54+float(p.splitRows)*26;
+        float y=80;
         draw->AddLine({box.x+13*u,box.y+(y-3)*u},{box.x+box.w-13*u,box.y+(y-3)*u},color(100,131,153,.25f),u);
         auto pace=Pace(data,rows,data.currentRunTimeSeconds),theory=Theoretical(data,rows);
         if (p.splitPace)
@@ -123,6 +149,61 @@ inline void DrawPanel(ImDrawList *draw, ImFont *font, suite_hud::Rect box, const
         }
     }
     draw->PopClipRect();
+}
+inline std::optional<double> Delta(const practice::PickupSplit &row, const ReplayPreferences &p)
+{
+    if (p.splitMetric == 1) return row.sectorComparable ? std::optional<double>(row.sectorDelta) : std::nullopt;
+    if (p.splitMetric == 2) return row.bestSegment >= 0 ? std::optional<double>(row.segment-row.bestSegment) : std::nullopt;
+    return row.comparable ? std::optional<double>(row.delta) : std::nullopt;
+}
+// No solid primitives in the text style: only glyph alpha reaches the game.
+inline void DrawDeltaText(ImDrawList *draw, ImFont *font, suite_hud::Rect box, const GameData &data,
+                          const ReplayPreferences &p, bool motion, double displayAge)
+{
+    const auto &rows=Live(data);
+    if (rows.empty()) return;
+    auto value=Delta(rows.back(),p);
+    if (!value || !std::isfinite(*value)) return;
+    double number=std::abs(*value)<.0005 ? 0 : *value;
+    char delta[48]; std::snprintf(delta,sizeof(delta),"%+.3f",number);
+    float enter=motion && p.splitAnimation ? float(std::clamp(displayAge/.2,0.,1.)) : 1;
+    float ease=1-(1-enter)*(1-enter)*(1-enter),alpha=ease;
+    if (p.splitDuration>0)
+    {
+        if (displayAge>=p.splitDuration) return;
+        float remaining=float(p.splitDuration-displayAge);
+        alpha*=motion ? std::clamp(remaining/std::min(.3f,p.splitDuration),0.f,1.f) : 1;
+    }
+    float u=box.w/480, size=p.splitTextSize*u;
+    if (motion && p.splitAnimation==2) size*=1+.12f*(1-ease);
+    const auto &tint=number<0 ? p.splitAhead : number>0 ? p.splitBehind : p.splitEqual;
+    auto color=ImGui::ColorConvertFloat4ToU32({tint[0],tint[1],tint[2],tint[3]*p.splitOpacity*alpha});
+    auto extent=font->CalcTextSizeA(size,FLT_MAX,0,delta);
+    float mainHeight=p.splitTextSize*1.35f*u;
+    ImVec2 at{box.x+(box.w-extent.x)*.5f,box.y+(mainHeight-extent.y)*.5f};
+    if (motion && p.splitAnimation==3) at.y+=10*u*(1-ease);
+    draw->PushClipRect({box.x,box.y},{box.x+box.w,box.y+box.h},true);
+    draw->AddText(font,size,at,color,delta);
+    float x=box.x+12*u,y=box.y+mainHeight+8*u;
+    auto summary=[&](const char *name,std::optional<double> time) {
+        std::string text=std::string(name)+" "+(time ? FormatRunTime(*time) : "--:--.---");
+        draw->AddText(font,16*u,{x,y},ImGui::GetColorU32(ImVec4(.83f,.89f,.94f,p.splitOpacity*alpha)),text.c_str());
+        x+=box.w*.5f;
+    };
+    if(p.splitPace) summary("PACE",Pace(data,rows,data.currentRunTimeSeconds));
+    if(p.splitTheory) summary("BEST",Theoretical(data,rows));
+    draw->PopClipRect();
+}
+inline double DeltaAge(const GameData &data, const ReplayPreferences &p)
+{
+    struct State { int pid=0,count=-1,metric=-1;int64_t run=0,reference=0;double started=0; };
+    static State state;
+    if(state.pid!=data.pid || state.run!=data.splitRunId || state.count!=data.splitPickupCount ||
+        state.reference!=data.splitReferenceId || state.metric!=p.splitMetric)
+    {
+        state={data.pid,data.splitPickupCount,p.splitMetric,data.splitRunId,data.splitReferenceId,ImGui::GetTime()};
+    }
+    return std::max(0.,ImGui::GetTime()-state.started);
 }
 inline GameData PreviewData(const GameData &current)
 {
@@ -149,7 +230,10 @@ inline void RenderPanel(const GameData &data, const ReplayPreferences &p, double
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize,0);
     ImGui::Begin(preview ? "Editor / Splits" : "Set-Seed splits",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoInputs|
         ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoNav|ImGuiWindowFlags_NoFocusOnAppearing);
-    DrawPanel(preview ? ImGui::GetForegroundDrawList() : ImGui::GetWindowDrawList(),suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont(),box,data,p,suite_ui::preferences.motion,preview);
+    auto *draw=preview ? ImGui::GetForegroundDrawList() : ImGui::GetWindowDrawList();
+    if (p.splitStyle == 0)
+        DrawDeltaText(draw,g_timerFont ? g_timerFont : ImGui::GetFont(),box,data,p,suite_ui::preferences.motion,preview ? .4 : DeltaAge(data,p));
+    else DrawPanel(draw,suite_ui::hudFont ? suite_ui::hudFont : ImGui::GetFont(),box,data,p,suite_ui::preferences.motion,preview);
     ImGui::Dummy({box.w,box.h}); ImGui::End(); ImGui::PopStyleVar(2); ImGui::PopStyleColor();
 }
 }

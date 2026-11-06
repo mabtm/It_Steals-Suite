@@ -4,7 +4,7 @@ Changes by version. The full development history is in Git.
 
 ### v7.25.0 Changelog
 
-- Improved live Set-Seed splits with an independently positioned panel, defaulting to the bottom center. Choose timer HUD, independent panel or both; drag, resize, undo and save the panel in the on-screen editor. Position, opacity, visible rows and pace displays persist independently of timer metrics.
+- Improved live Set-Seed splits with an independently positioned panel, defaulting to the bottom center. Choose timer HUD, independent panel or both; drag, resize, undo and save the panel in the on-screen editor. Position, text size, colors, animation, display duration, opacity and optional pace displays persist independently of timer metrics. The default is the latest crystal delta as text on a fully transparent background; a compact panel remains optional, also showing only the latest pickup.
 - Improved sector timing with separate sector and total deltas, neutral equal times and gold indicators for new observed sector bests. Sector comparisons require the same pickup prefix; same-crystal total deltas remain available when pickup order changes.
 - Improved Set-Seed pace with a checkpoint-based finish forecast that updates at crystals and increases when the current sector runs late. A changed route suspends the forecast; completed runs show their observed finish time. Forecasts are estimates, not guaranteed finish times.
 - Improved theoretical-best timing by summing the best observed sector durations on the exact seed, recipe, spawn, layout and route, including the finish sector. Zero-duration simultaneous pickups and finishes remain valid. In-progress improvements stay provisional until final eligibility checks pass.

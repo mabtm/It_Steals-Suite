@@ -8,7 +8,7 @@ inline std::vector<suite_run::Rect> OccupiedPanels()
     for (const char *name : {"Minimap", "Compact HUD", "Speedrun overlay", "Set-Seed splits", "It Steals | Practice Suite"})
     {
         auto *w = ImGui::FindWindowByName(name);
-        if (w && w->LastFrameActive == ImGui::GetFrameCount() && !w->Hidden)
+        if (w && w->LastFrameActive == ImGui::GetFrameCount() && !w->Hidden && !w->DrawList->VtxBuffer.empty())
             out.push_back({w->Pos.x, w->Pos.y, w->Size.x, w->Size.y});
     }
     return out;

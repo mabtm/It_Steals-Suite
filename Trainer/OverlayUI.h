@@ -194,6 +194,8 @@ inline bool HudFieldAllowed(OverlayField f, bool speedrunProfile, bool clean)
     return true;
 }
 
+#include "SplitPanel.h"
+
 inline void RenderOverlayPanel(const char *name, const GameData &d, const OverlayLayout &layout,
                                bool speedrun, const std::string &mode, double age, bool compactConfig = false,
                                bool inlinePreview = false)
@@ -331,19 +333,26 @@ inline void RenderOverlayPanel(const char *name, const GameData &d, const Overla
             ImGui::Dummy({w, 5 * u});
         }
     }
-    if (speedrun && d.runCategory == 1 && d.splitReferenceId > 0 && d.splitRunId == d.reviewRunId &&
+    if (speedrun && d.runCategory == 1 && d.splitPickupCount > 0 && d.splitRunId == d.reviewRunId &&
         (d.timerState == 1 || d.timerState == 2) && suite_ui::replayPreferences.liveSplits && suite_ui::replayPreferences.splitPlacement != 1)
     {
+        const auto &preferences = suite_ui::replayPreferences;
         auto at = ImGui::GetCursorScreenPos();
         float space = viewport.y - 24 * preview - (at.y - start.y) - 72 * u;
         float splitWidth = std::min(ImGui::GetContentRegionAvail().x, 360 * u);
-        float splitHeight = std::min(145 * splitWidth / 320.f, space);
-        if (splitHeight >= 62 * splitWidth / 320.f)
+        float nominal = (preferences.splitStyle == 0 ? preferences.splitTextSize * 1.35f : 80.f) +
+                        (preferences.splitPace || preferences.splitTheory ? 52.f : 10.f);
+        float splitHeight = std::min(nominal * splitWidth / 480.f, space);
+        if (splitHeight >= 30 * splitWidth / 480.f)
         {
-            suite_splits::Draw(ImGui::GetWindowDrawList(), ImGui::GetFont(), at, splitWidth, splitHeight,
-                suite_splits::Live(d), d.currentRunTimeSeconds, d.splitReferenceValid != 0,
-                suite_ui::preferences.motion);
-            ImGui::Dummy({splitWidth, splitHeight});
+            auto *draw = ImGui::GetWindowDrawList();
+            int before = draw->VtxBuffer.Size;
+            suite_hud::Rect box{at.x,at.y,splitWidth,splitHeight};
+            if (preferences.splitStyle == 0)
+                suite_splits::DrawDeltaText(draw,g_timerFont ? g_timerFont : ImGui::GetFont(),box,d,preferences,
+                    suite_ui::preferences.motion,inlinePreview || suite_hud::canvas.active ? .4 : suite_splits::DeltaAge(d,preferences));
+            else suite_splits::DrawPanel(draw,ImGui::GetFont(),box,d,preferences,suite_ui::preferences.motion,inlinePreview);
+            if (draw->VtxBuffer.Size > before) ImGui::Dummy({splitWidth,splitHeight});
         }
     }
     const bool shortView = viewport.y < 480 * u;

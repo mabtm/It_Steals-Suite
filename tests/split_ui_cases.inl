@@ -61,6 +61,30 @@ void IndependentSplitPanelCases(const std::string &output)
     int first=data.splitPickupIds[1];data.splitPickupIds[1]=data.splitPickupIds[2];data.splitPickupIds[2]=first;rows=suite_splits::Live(data);
     assert(rows[1].comparable && !rows[1].sectorComparable && !suite_splits::Pace(data,rows,31) && !suite_splits::Theoretical(data,rows));
     data=suite_splits::PreviewData(GameData{});
+    // The default screen renderer emits only the newest signed delta glyphs.
+    // There are no background/outline primitives, labels or older crystals.
+    {
+        auto prefs=ReplayPreferences();
+        assert(prefs.splitStyle==0 && !prefs.splitPace && !prefs.splitTheory && prefs.splitRows==1);
+        assert(suite_splits::Delta(suite_splits::Live(data).back(),prefs)==-1);
+        auto *font=ImGui::GetFont();
+        auto draw=[&](double age) {
+            ImDrawList list(ImGui::GetDrawListSharedData());
+            list._ResetForNewFrame();
+            list.PushTextureID(io.Fonts->TexID);list.PushClipRect({0,0},{1280,720});
+            suite_splits::DrawDeltaText(&list,font,{100,100,480,90},data,prefs,false,age);
+            return std::vector<ImDrawVert>(list.VtxBuffer.begin(),list.VtxBuffer.end());
+        };
+        auto glyphs=draw(.4);assert(glyphs.size()==24); // six glyphs in -1.000
+        for(size_t i=0;i<glyphs.size();i+=4)
+            assert(glyphs[i].uv.x<glyphs[i+1].uv.x && glyphs[i].uv.y<glyphs[i+2].uv.y);
+        auto *one=font->FindGlyph('1');
+        assert(one && glyphs[4].uv.x==one->U0 && glyphs[4].uv.y==one->V0);
+        assert(draw(3.1).empty());
+        prefs.splitDuration=0;assert(draw(99).size()==24);
+        prefs.splitMetric=1;assert(std::abs(*suite_splits::Delta(suite_splits::Live(data).back(),prefs)+1.2)<1e-6);
+        prefs.splitMetric=2;assert(std::abs(*suite_splits::Delta(suite_splits::Live(data).back(),prefs)+.2)<1e-6);
+    }
     auto frame=[&](double age=0) {
         ImGui::NewFrame();
         g_validityBadgeDrawn = false;

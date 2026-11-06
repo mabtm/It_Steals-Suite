@@ -97,7 +97,7 @@ inline std::optional<double> Theoretical(const GameData &data, const std::vector
 // exported frames at the same timestamp produce the same overlay.
 inline void Draw(ImDrawList *draw, ImFont *font, ImVec2 at, float width, float height,
                  const std::vector<practice::PickupSplit> &splits, double seconds,
-                 bool verifiedReference, bool motion, float opacity = 1)
+                 bool verifiedReference, bool motion, float opacity = 1, bool latestOnly = false)
 {
     float u = width / 320.f;
     auto color = [&](int r, int g, int b, float alpha = 1.f) {
@@ -110,7 +110,7 @@ inline void Draw(ImDrawList *draw, ImFont *font, ImVec2 at, float width, float h
     size_t end = size_t(std::upper_bound(splits.begin(), splits.end(), seconds,
         [](double time, const auto &split) { return time < split.at; }) - splits.begin());
     size_t rows = std::min<size_t>(4, size_t(std::max(0.f, (height / u - 36) / 26)));
-    size_t begin = end > rows ? end - rows : 0;
+    size_t begin = latestOnly ? (end ? end - 1 : 0) : end > rows ? end - rows : 0;
     draw->AddRectFilled(at, {at.x + width, at.y + height}, color(13, 22, 30, .91f), 5 * u);
     draw->AddRectFilled(at, {at.x + 3 * u, at.y + height}, color(111, 209, 255, .8f), 2 * u);
     text(13, 9, 13, color(131, 211, 249), verifiedReference ? "SET-SEED SPLITS / PB" : "SET-SEED SPLITS / REPLAY");
