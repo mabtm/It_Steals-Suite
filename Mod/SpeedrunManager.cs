@@ -3,7 +3,7 @@ using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public sealed class SpeedrunManager
+public sealed partial class SpeedrunManager
 {
     public static bool IsHideSeekScene(int scene)
     {
@@ -21,7 +21,7 @@ public sealed class SpeedrunManager
     public bool Running
     {
         get {
-            return timerState == 1;
+            return timerState == 1 || fullGame.Active;
         }
     }
     public bool Restricted
@@ -217,6 +217,7 @@ public sealed class SpeedrunManager
     public SpeedrunManager(string dataDirectory, string legacyRoot = null, GameBuildInfo gameBuild = null)
     {
         build = gameBuild;
+        fullGameStore = new FullGameStore(dataDirectory);
         store = new RunStore(dataDirectory, legacyRoot);
         tracker = new RunTracker(store);
         Instance = this;
@@ -265,6 +266,7 @@ public sealed class SpeedrunManager
 
     public void SceneLoaded(int index)
     {
+        FullGameSceneLoaded(index);
         // A quick reload can return to the same mode; never credit its loading interval.
         store.Modes.Observe(index, 0, false, Time.realtimeSinceStartupAsDouble);
         if (timerState == 1)
@@ -287,6 +289,7 @@ public sealed class SpeedrunManager
         if (mouse == null || !IsPlayableScene)
             return;
         player = mouse;
+        if (liveCommands.FullGameMode != 0 && fullGame.Record != null && !fullGame.Active) return;
         if (active && timerState == 0 && !NeedsDeathReload && MouseLook.Health > 0 && !Replay3D.Reserved)
             BeginRun(startObserved);
     }
@@ -305,6 +308,7 @@ public sealed class SpeedrunManager
                            Category(liveCommands), liveCommands.PracticeSeed, RawSeed(liveCommands)))
             return;
         started = Stopwatch.GetTimestamp();
+        FullGamePlayerReady(runScene, started / (double)Stopwatch.Frequency);
         timerState = 1;
         finalTime = 0;
         nextCheckpoint = Time.realtimeSinceStartupAsDouble + 5;
@@ -333,6 +337,7 @@ public sealed class SpeedrunManager
             nextPlaySave = playNow + 5;
             store.QueueSave();
         }
+        TickFullGame();
         if (Replay3D.Reserved)
             return;
         MovementCapture.Tick();
@@ -379,7 +384,8 @@ public sealed class SpeedrunManager
 
     private void End(RunOutcome outcome)
     {
-        double elapsed = Elapsed;
+        long endedStamp = Stopwatch.GetTimestamp();
+        double elapsed = timerState == 1 ? (endedStamp - started) / (double)Stopwatch.Frequency : finalTime;
         if (outcome == RunOutcome.Interrupted)
             tracker.Warn(RunWarnings.ModeInterrupted);
         HarmonyPatches.RefreshSeedCoverage();
@@ -389,7 +395,8 @@ public sealed class SpeedrunManager
         RunReviewRecorder.Observe(player, elapsed, true);
         bool ended = tracker.End(outcome, DateTime.UtcNow.Ticks, elapsed, Progress);
         if (ended)
-            RunReviewRecorder.Finish(tracker.Last, store);
+            RunReviewRecorder.Finish(tracker.Last, store, fullGame.Active);
+        if (ended) FullGameAttemptEnded(tracker.Last, endedStamp / (double)Stopwatch.Frequency);
         MovementCapture.End();
         // Leaving a level (including Escape -> TitleScreen) must also stop the
         // live clock. Keep the same final time in the HUD, history and report.
@@ -420,6 +427,7 @@ public sealed class SpeedrunManager
     {
         if (timerState == 1)
             End(RunOutcome.Reset);
+        FullGameBeforeReload(scene);
         RunReviewRecorder.DiscardTransient();
         FreeCam.DisableActive();
         MouseLook.Health = 2;
@@ -477,6 +485,7 @@ public sealed class SpeedrunManager
             }
         RunRecord record = timerState == 0 ? tracker.Active : Record;
         RunReviewRecorder.WriteSplits(data, record == null ? 0 : record.Id);
+        WriteFullGame(data);
         if (record != null && record.Environment != null && record.Environment.GameHash == "UNKNOWN" &&
             build != null && build.Supported)
             record.Environment.GameHash = build.Hash;
@@ -603,6 +612,8 @@ public sealed class SpeedrunManager
     {
         if (timerState == 1)
             End(RunOutcome.Interrupted);
+        StopFullGame(FullGameState.Interrupted);
+        fullGameStore.Dispose();
         if (!RunSplitArchive.Flush())
             MelonLoader.MelonLogger.Warning(RunSplitArchive.Error ?? "Sector history save is still pending during shutdown");
         store.Dispose();

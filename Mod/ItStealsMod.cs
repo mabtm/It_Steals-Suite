@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 
 public sealed class ItStealsMod : MelonMod
 {
-    public const string Version = "7.25.0";
+    public const string Version = "7.26.0";
     private readonly FrameCostMeter workCost = new FrameCostMeter();
     private long updateWork;
     private SharedMemoryProtocol connection;
@@ -242,11 +242,12 @@ public sealed class ItStealsMod : MelonMod
                 FreeCam.DisableActive();
             }
             if (request && (commands.LevelLoadCmd == 1 || commands.SpeedrunLoadLevelCmd == 1 ||
-                            commands.SetSeedCmd == 1))
+                            commands.SetSeedCmd == 1 || commands.FullGameCmd != 0))
                 Replay3D.Stop();
             if (Replay3D.Reserved || request && commands.Replay3dCmd == 1)
                 fullbright.SetFullbright(false);
             Replay3D.Tick(commands, request, trainerConnected);
+            commands = speedrun.ResolveFullGameCommands(commands, request);
             if ((!commands.Speedrun || !commands.UsesControlledSeed) && !Replay3D.Reserved)
                 PracticeRandom.Disable();
             LiveInputCapture.Enabled = trainerConnected && commands.RequestsInputs;
@@ -336,6 +337,14 @@ public sealed class ItStealsMod : MelonMod
                     Report(error);
                 }
             speedrun.Tick();
+            if (!Replay3D.Reserved && speedrun.TakeFullGameTransition())
+            {
+                // Resolve the next stage before its RNG hooks run, and leave
+                // the completed level without the game's result-screen delay.
+                commands = speedrun.ResolveFullGameCommands(commands, false);
+                LoadSpeedrunLevel();
+                return;
+            }
             if (!Replay3D.Reserved &&
                 (speedrun.NeedsDeathReload ||
                  (commands.LegacyRestartAllowed(trainerConnected) && MenuCursor.GameHotkeysAllowed &&
@@ -365,8 +374,9 @@ public sealed class ItStealsMod : MelonMod
 
     private void LoadSpeedrunLevel()
     {
+        if (commands.FullGameMode != 0 && !speedrun.FullGameActive) return;
         int selection = Mathf.Clamp(commands.SpeedrunLevelIndex, 0, SpeedrunManager.LevelIndices.Length - 1);
-        LoadScene(SpeedrunManager.LevelIndices[selection], true);
+        LoadScene(speedrun.FullGameActive ? speedrun.FullGameScene : SpeedrunManager.LevelIndices[selection], true);
     }
 
     private void LoadScene(int index, bool controlled)
@@ -396,6 +406,21 @@ public sealed class ItStealsMod : MelonMod
             PracticeRandom.Disable();
         }
         menuCursor.Restore();
+        if (controlled && speedrun.FullGameActive && connection != null)
+            try
+            {
+                // Publish the held clock before Unity enters its synchronous
+                // scene load. The trainer must not extrapolate the preceding
+                // running snapshot while the game thread is loading.
+                snapshot.Write(SharedLayout.PlayerReady, false);
+                speedrun.WriteSnapshot(snapshot, commands);
+                connection.Publish(snapshot, Time.realtimeSinceStartupAsDouble);
+                nextPublish = 0;
+            }
+            catch (Exception error)
+            {
+                Report(error);
+            }
         SceneManager.LoadScene(index);
     }
 

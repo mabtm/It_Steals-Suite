@@ -17,6 +17,7 @@ enum Action
     Analyze,
     Picker,
     Restart,
+    FullReset,
     Count
 };
 
@@ -29,7 +30,7 @@ enum Modifier
 
 inline constexpr const char *Actions[] = {"Toggle overlay",       "Open / close menu",     "Compact HUD",
                                           "Refresh map",          "Borderless fullscreen", "Speedrun mode",
-                                          "Analyze finished run", "Inspector picker", "Quick restart / reset"};
+                                          "Analyze finished run", "Inspector picker", "Quick restart / reset", "Full-game reset / Classic"};
 
 struct Binding
 {
@@ -39,19 +40,34 @@ struct Binding
 
 inline constexpr std::array<Binding, Count> Defaults = {Binding{0x71}, Binding{0x72}, Binding{0x73},
                                                         Binding{0x74}, Binding{0x75}, Binding{'T', Shift},
-                                                        Binding{0x77}, Binding{0x76}, Binding{'T'}};
+                                                        Binding{0x77}, Binding{0x76}, Binding{'T'}, Binding{'T',Control|Shift}};
 inline std::string (*nativeKeyName)(int) = nullptr;
+// Win32 virtual keys, in ImGui/physical mouse-button order. Extra hardware
+// buttons mapped to keyboard keys by the mouse driver use the normal key path.
+inline constexpr std::array<int,5> MouseKeys={0x01,0x02,0x04,0x05,0x06};
+inline bool MouseKey(int key)
+{
+    for(int value:MouseKeys)if(value==key)return true;
+    return false;
+}
+inline bool DispatchAllowed(Binding binding,int action,bool menuInteractive)
+{
+    if(!MouseKey(binding.key) || !menuInteractive)return true;
+    // Ordinary clicks operate the menu. Side buttons may still close/reopen
+    // it, but must not reset a run while the runner is editing a control.
+    return (binding.key==0x05 || binding.key==0x06) && (action==Menu || action==Panels);
+}
 
 inline const char *Problem(Binding b)
 {
     if (!b.key && !b.modifiers)
         return nullptr;
-    bool key = (b.key >= '0' && b.key <= '9') || (b.key >= 'A' && b.key <= 'Z') ||
+    bool key = MouseKey(b.key) || (b.key >= '0' && b.key <= '9') || (b.key >= 'A' && b.key <= 'Z') ||
                (b.key >= 0x60 && b.key <= 0x87) || b.key == 9 || b.key == 13 ||
                (b.key >= 0x20 && b.key <= 0x28) || b.key == 0x2d || b.key == 0x2e ||
                (b.key >= 0xba && b.key <= 0xc0) || (b.key >= 0xdb && b.key <= 0xdf) || b.key == 0xe2;
     if (!key || b.modifiers < 0 || b.modifiers > 7)
-        return "Choose a letter, number, function or navigation key.";
+        return "Choose a keyboard key or mouse button (M1-M5).";
     if (b.key == 0x70)
         return "F1 (Freecam) is a game control. Choose another shortcut.";
     if (b.key == 0x7b || (b.key == 0x73 && (b.modifiers & Alt)) || (b.key == 9 && (b.modifiers & Alt)) ||
@@ -79,6 +95,16 @@ inline std::string Name(Binding b)
         return name + "Num " + std::to_string(b.key - 0x60);
     switch (b.key)
     {
+    case 0x01:
+        return name + "M1 / Left mouse";
+    case 0x02:
+        return name + "M2 / Right mouse";
+    case 0x04:
+        return name + "M3 / Middle mouse";
+    case 0x05:
+        return name + "M4 / Mouse back";
+    case 0x06:
+        return name + "M5 / Mouse forward";
     case 9:
         return name + "Tab";
     case 13:
@@ -185,6 +211,7 @@ inline int recording = -1;
 inline bool openRequested = false;
 inline unsigned unavailable = 0;
 inline std::string error;
+inline bool mouseCaptureArmed=false;
 
 inline const std::string &Hint(Action action)
 {
@@ -209,6 +236,7 @@ inline void Capture(int action)
     recording = action;
     openRequested = true;
     error.clear();
+    mouseCaptureArmed=false;
 }
 
 // Called by the native key-message handler, before game/UI actions are dispatched.
@@ -238,6 +266,16 @@ inline void Offer(int key, int modifiers)
     preferences.bindings[recording] = candidate;
     recording = -1;
     error.clear();
+}
+
+// Evaluate after modal controls have their current-frame hover state. This
+// avoids binding the click that opened the dialog, Cancel or Unassign.
+inline void OfferMouse(unsigned down,unsigned clicked,int modifiers,bool overControl)
+{
+    if(recording<0){mouseCaptureArmed=false;return;}
+    if(!mouseCaptureArmed){if(!down)mouseCaptureArmed=true;return;}
+    if(overControl)return;
+    for(int i=0;i<5;i++)if(clicked&(1u<<i)){Offer(MouseKeys[i],modifiers);return;}
 }
 
 inline bool NeedsPolling(bool allowed, unsigned registered, unsigned eligible = ~0u)

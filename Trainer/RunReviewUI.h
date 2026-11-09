@@ -50,7 +50,7 @@ inline void ReplayStatusHelp(int outcome, bool valid, const std::string &reason)
 
 inline bool RequestRunReview(int64_t id, int scene)
 {
-    if (!g_pShared || g_pShared->timerState == 1 || !g_pShared->reviewReady || HasPendingRequest() ||
+    if (!g_pShared || RunInProgress(*g_pShared) || !g_pShared->reviewReady || HasPendingRequest() ||
         id <= 0 || g_pShared->reviewRunId != id || g_pShared->reviewScene != scene ||
         MapLevelIndex(scene) < 0)
         return false;
@@ -83,7 +83,7 @@ inline auto &g_reviewPlayback = suite_replay::playback;
 
 inline void OpenSavedReplay(const practice::ReplayInfo &row)
 {
-    if (HasPendingRequest() || (g_pShared && g_pShared->timerState == 1))
+    if (HasPendingRequest() || (g_pShared && RunInProgress(*g_pShared)))
         return;
     StopReplay3D();
     if (g_runReviewOpen && !g_reviewFromArchive)
@@ -131,7 +131,7 @@ inline FinishedReplayAccess FinishedReplayAvailable()
     const auto &d = p.completed;
     if (!p.hasResult)
         return {};
-    if (g_pShared && g_pShared->timerState == 1)
+    if (g_pShared && RunInProgress(*g_pShared))
         return {FinishedReplaySource::Missing, "Replay is unavailable during an active run."};
     if (HasPendingRequest())
         return {FinishedReplaySource::Missing, "Waiting for the previous command to finish."};
@@ -183,7 +183,7 @@ inline bool AnalyseFinishedRun()
 
 inline void OpenReplayLibrary()
 {
-    if (HasPendingRequest() || (g_pShared && g_pShared->timerState == 1))
+    if (HasPendingRequest() || (g_pShared && RunInProgress(*g_pShared)))
         return;
     StopReplay3D();
     if (g_runReviewOpen && !g_reviewFromArchive)
@@ -265,6 +265,8 @@ inline void ReplayRows(const std::shared_ptr<const practice::ReplayArchiveState>
     ImGui::EndChild();
 }
 
+#include "FullGameReplayUI.h"
+
 inline void ReplayList()
 {
     struct Remember { ~Remember() { RememberReplayFilters(); } } remember;
@@ -340,6 +342,8 @@ inline void ReplayList()
     if (suite_ui::Button(style == 0 ? "List *###ReplayListView" : "List###ReplayListView")) style = 0;
     ImGui::SameLine();
     if (suite_ui::Button(style == 1 ? "Table *###ReplayTableView" : "Table###ReplayTableView")) style = 1;
+    SameLineIfFits("Full-Game");
+    if(suite_ui::Button(style==2?"Full-Game *###FullGameReplayView":"Full-Game###FullGameReplayView"))style=2;
     SameLineIfFits("Sort");
     const char *sorts[] = {"Recorded", "Name", "Game mode", "Run time", "Seed", "Status", "Run category"};
     int sort = int(filter.sort);
@@ -348,6 +352,7 @@ inline void ReplayList()
     SameLineIfFits("Ascending");
     suite_ui::Checkbox("Ascending", &filter.ascending);
     auto state = practice::g_replayArchive.Get();
+    if(style==2){suite_full::ReplayGroups(state,filter);return;}
     if (!state->error.empty())
     {
         ImGui::TextColored(g_accentCol, "Replay archive warning");
@@ -622,7 +627,7 @@ inline void RenderReplayPolicy()
 inline void RenderRunReview()
 {
     g_reviewTabActive = true;
-    if (g_pShared && g_pShared->timerState == 1)
+    if (g_pShared && RunInProgress(*g_pShared))
     {
         ImGui::TextDisabled("Replay is unavailable during an active run.");
         return;
@@ -679,7 +684,7 @@ inline void RenderRunReview()
             g_replayMapWorker.Submit(data->bytes);
         }
     }
-    if (g_pShared && g_pShared->timerState == 1)
+    if (g_pShared && RunInProgress(*g_pShared))
     {
         ImGui::TextDisabled("Replay is unavailable during an active run.");
         return;

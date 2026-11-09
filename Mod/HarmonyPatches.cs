@@ -496,8 +496,12 @@ public static class HarmonyPatches
 
     private static IEnumerable<CodeInstruction> CaptureFinish(IEnumerable<CodeInstruction> instructions)
     {
+        var loadScene = typeof(UnityEngine.SceneManagement.SceneManager).GetMethod("LoadScene", new[] { typeof(string) });
+        var completionScene = typeof(SpeedrunManager).GetMethod("LoadCompletionScene");
         foreach (CodeInstruction instruction in instructions)
         {
+            if (instruction.opcode == OpCodes.Call && Equals(instruction.operand, loadScene))
+                instruction.operand = completionScene;
             yield return instruction;
             if (instruction.opcode == OpCodes.Stfld && Equals(instruction.operand, objectives))
             {

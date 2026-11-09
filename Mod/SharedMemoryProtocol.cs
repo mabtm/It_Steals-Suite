@@ -39,6 +39,15 @@ public struct TrainerCommands
     public float Replay3dSpeed;
     public double Replay3dLoopA, Replay3dLoopB;
     public float Replay3dFollowDistance, Replay3dFollowHeight, Replay3dTrailSeconds;
+    public uint FullGameMode, FullGameCmd, FullGameRawMask;
+    public int FullGameSeed0, FullGameSeed1, FullGameSeed2, FullGameSeed3, FullGameSeed4, FullGameSeed5, FullGameSeed6, FullGameSeed7;
+    public uint FullGameReserved0, FullGameReserved1, FullGameReserved2, FullGameReserved3, FullGameReserved4;
+    public int FullGameSeed(int index)
+    {
+        switch(index) { case 0:return FullGameSeed0;case 1:return FullGameSeed1;case 2:return FullGameSeed2;case 3:return FullGameSeed3;
+            case 4:return FullGameSeed4;case 5:return FullGameSeed5;case 6:return FullGameSeed6;case 7:return FullGameSeed7;default:throw new ArgumentOutOfRangeException("index"); }
+    }
+
     public bool RequestsPlanner
     {
         get {
@@ -222,10 +231,10 @@ public sealed class SnapshotBuffer
 
 public sealed class SharedMemoryProtocol : IDisposable
 {
-    public const string MapName = "ItStealsSharedMem.v32";
-    public const string MutexName = "ItStealsSharedMem.v32.Lock";
-    public const int Capacity = 32768, PayloadOffset = 256, PayloadSize = SharedLayout.Size;
-    public const uint Magic = 0x53535449, Version = 32;
+    public const string MapName = "ItStealsSharedMem.v33";
+    public const string MutexName = "ItStealsSharedMem.v33.Lock";
+    public const int Capacity = 32768, PayloadOffset = 512, PayloadSize = SharedLayout.Size;
+    public const uint Magic = 0x53535449, Version = 33;
     private MemoryMappedFile map;
     private MemoryMappedViewAccessor view;
     private Mutex gate;
@@ -236,7 +245,7 @@ public sealed class SharedMemoryProtocol : IDisposable
 
     public SharedMemoryProtocol()
     {
-        if (!BitConverter.IsLittleEndian || Marshal.SizeOf(typeof(TrainerCommands)) != 192)
+        if (!BitConverter.IsLittleEndian || Marshal.SizeOf(typeof(TrainerCommands)) != 256)
             throw new NotSupportedException("Unsupported shared-memory layout.");
         using (var process = System.Diagnostics.Process.GetCurrentProcess()) ownerPid = (uint)process.Id;
         try
@@ -284,7 +293,7 @@ public sealed class SharedMemoryProtocol : IDisposable
                 view.Write(0, Magic);
                 view.Write(4, Version);
                 view.Write(8, PayloadSize);
-                view.Write(12, 192);
+                view.Write(12, 256);
                 Session = unchecked((uint)Environment.TickCount);
                 view.Write(16, Session);
                 view.Write(20, ownerPid);

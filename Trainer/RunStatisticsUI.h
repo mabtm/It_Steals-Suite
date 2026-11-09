@@ -387,7 +387,7 @@ inline bool CanRestart()
 {
     auto version = g_pShared ? suite_update::Version::Parse(g_pShared->version) : std::nullopt;
     return version && *version >= suite_update::Version{{7, 21, 0}} && g_speedrunMode &&
-           g_pShared->speedrunModeActive &&
+           g_pShared->speedrunModeActive && (!g_commands.fullGameMode || suite_full::Active(*g_pShared)) &&
            !(g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3) &&
            !HasPendingRequest() && !g_commands.runReviewRequest;
 }
@@ -529,6 +529,7 @@ inline void RecentAttempts()
 inline void Render()
 {
     float u = suite_ui::Unit();
+    if(suite_full::preferences.mode){suite_full::Setup();return;}
     SyncSetupSelection();
     if (ImGui::GetContentRegionAvail().y < 300 * u || ImGui::GetContentRegionAvail().x < 650 * u)
     {

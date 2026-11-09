@@ -366,19 +366,20 @@ inline void RenderReplayImport()
     if (suite_ui::Button("Import package"))
         ImGui::OpenPopup("Import run package");
     Help(
-        "Import a Suite ZIP. Checksums, run identity and companion files are checked before preserving the recording in the archive.");
+        "Import a Suite ZIP, or select the .isfg file in a full-game replay folder. Keep its eight numbered ZIPs together. Run identity, checksums and companions are verified.");
     ImGui::SetNextWindowSize({std::min(600.f * suite_ui::Unit(), ImGui::GetIO().DisplaySize.x - 30), 0},
                              ImGuiCond_Appearing);
     if (ImGui::BeginPopup("Import run package"))
     {
         ImGui::SetNextItemWidth(-1);
-        ImGui::InputTextWithHint("##Package path", "Full path to run-....zip", path, sizeof(path));
+        ImGui::InputTextWithHint("##Package path", "Full path to run-....zip or full-....isfg", path, sizeof(path));
         ImGui::BeginDisabled(path[0] == 0);
         if (suite_ui::Button("Import"))
         {
             std::string value = path;
             if (value.size() > 1 && value.front() == '\"' && value.back() == '\"')
                 value = value.substr(1, value.size() - 2);
+            if(std::filesystem::path(value).extension()==".isfg")suite_ui::replayPreferences.libraryView=2;
             practice::g_replayArchive.ImportPackage(
                 std::filesystem::path(std::u8string(value.begin(), value.end())));
             ImGui::CloseCurrentPopup();

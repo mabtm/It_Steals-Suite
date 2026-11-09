@@ -37,6 +37,7 @@ public sealed class RunStore : IDisposable
     {
         public string Name, Text, ReviewReport, Protection;
         public byte[] Bytes;
+        public Func<byte[]> ReviewEncoder;
         public ReplayMotionData Motion;
         public long Memory;
     }
@@ -770,7 +771,19 @@ public sealed class RunStore : IDisposable
 
     public void QueueReview(long id, byte[] bytes, ReplayMotionData motion, string report, string protection = null)
     {
-        long memory = (bytes == null ? 0 : bytes.LongLength) + (motion == null ? 0 : motion.EstimatedBytes);
+        QueueReviewInternal(id, bytes, null, motion, report, protection);
+    }
+    public void QueueFullGameReview(long id, Func<byte[]> encoder, ReplayMotionData motion, string report, string protection)
+    {
+        // The recorder has finished every numeric track and relinquishes the
+        // map. Encoding is pure numeric IO, so it can run off Unity's thread.
+        // Keep the storage queue independent of Unity's scene data types.
+        if(encoder == null)throw new ArgumentNullException("encoder");
+        QueueReviewInternal(id, null, encoder, motion, report, protection);
+    }
+    private void QueueReviewInternal(long id, byte[] bytes, Func<byte[]> encoder, ReplayMotionData motion, string report, string protection)
+    {
+        long memory = (encoder != null ? PracticeMapChannel.Capacity : bytes == null ? 0 : bytes.LongLength) + (motion == null ? 0 : motion.EstimatedBytes);
         lock (queueGate)
         {
             if (stopping)
@@ -799,7 +812,7 @@ public sealed class RunStore : IDisposable
             }
             EnsureWriter();
             reviewQueueBytes += memory;
-            var job = new ReportJob { Name = "run-" + id + ".isrun", Bytes = bytes, Motion = motion,
+            var job = new ReportJob { Name = "run-" + id + ".isrun", Bytes = bytes, ReviewEncoder = encoder, Motion = motion,
                                       ReviewReport = report, Memory = memory, Protection = protection };
             if (protection == null) reports.Enqueue(job); else rankedReviews.Enqueue(job);
             wake.Set();
@@ -818,6 +831,13 @@ public sealed class RunStore : IDisposable
     {
         try
         {
+            if(job.ReviewEncoder != null)
+            {
+                job.Bytes = job.ReviewEncoder();
+                job.ReviewEncoder = null;
+                if(job.Bytes == null || job.Bytes.Length == 0 || job.Bytes.Length > PracticeMapChannel.Capacity)
+                    throw new InvalidDataException("Full-game replay encoder returned an invalid payload");
+            }
             string directory =
                 Path.Combine(Path.GetDirectoryName(path), job.Bytes == null ? "Reports" : "RunReviews");
             Directory.CreateDirectory(directory);

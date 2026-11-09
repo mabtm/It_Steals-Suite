@@ -1,6 +1,7 @@
 #pragma once
 #include "PracticeMapData.h"
 #include "ReplaySplitModel.h"
+#include "FullGameModel.h"
 #include "ReplayPackage.h"
 #include "ReplayAudioIO.h"
 #include "ReplayHealth.h"
@@ -105,6 +106,9 @@ inline std::string ReplayName(const MapData &data)
 struct ReplayArchiveState
 {
     std::vector<ReplayInfo> runs;
+    std::vector<suite_full::Record> fullGames;
+    std::set<int64_t> fullGameChildren;
+    std::string fullGameError;
     std::unordered_map<int64_t, size_t> byId;
     std::shared_ptr<const ReplayRevalidation> revalidation;
     std::string error, motionError, exportPath;
@@ -113,7 +117,7 @@ struct ReplayArchiveState
     int64_t annotationRun = 0;
     uint64_t annotationRevision = 0;
     std::string annotationError;
-    int64_t savedRun = 0, motionRun = 0, exportedRun = 0, stagedRun = 0;
+    int64_t savedRun = 0, motionRun = 0, exportedRun = 0, stagedRun = 0, exportedFullGame = 0;
 };
 
 // All directory walks, bounded decoding, loads and atomic writes happen on a
@@ -131,6 +135,7 @@ class ReplayArchive
         MatchReference,
         SaveRecording,
         ExportPackage,
+        ExportFullGame,
         LoadMotion,
         ImportPackage,
         Stage3D,
@@ -163,6 +168,12 @@ class ReplayArchive
 
     std::filesystem::path root, source;
     std::map<std::filesystem::path, Cached> cache;
+    struct FullCached
+    {
+        uintmax_t size=0;std::filesystem::file_time_type modified;
+        std::optional<suite_full::Record> record;std::string error;
+    };
+    std::map<std::filesystem::path,FullCached> fullCache;
     std::set<int64_t> favorites;
     std::shared_ptr<const ReplayArchiveState> state = std::make_shared<ReplayArchiveState>();
     std::shared_ptr<const MapData> loaded;
@@ -180,7 +191,7 @@ class ReplayArchive
     int64_t annotationRun = 0;
     uint64_t annotationRevision = 0;
     std::string annotationError;
-    int64_t motionRun = 0, exportedRun = 0, stagedRun = 0;
+    int64_t motionRun = 0, exportedRun = 0, stagedRun = 0, exportedFullGame = 0;
     std::string motionError, exportPath;
     std::deque<Job> jobs;
     std::mutex gate;
@@ -285,6 +296,55 @@ class ReplayArchive
     uint64_t savedRevision = 0;
     int64_t savedRun = 0;
 
+    void ScanFullGames()
+    {
+        std::map<std::filesystem::path,FullCached> next;
+        std::vector<std::filesystem::path> directories;
+        if(!source.empty())directories.push_back(source.parent_path()/"FullGame");
+        if(!root.empty())directories.push_back(root/"FullGame");
+        size_t count=0;
+        for(const auto &directory:directories)
+        {
+            if(!std::filesystem::exists(directory))continue;
+            for(const auto &file:std::filesystem::directory_iterator(directory))
+            {
+                if(!file.is_regular_file() || file.path().extension()!=".isfg")continue;
+                if(++count>100000)throw std::runtime_error("Full-game archive scan limit reached; files are preserved");
+                try
+                {
+                    auto size=file.file_size();auto modified=file.last_write_time();
+                    auto old=fullCache.find(file.path());
+                    if(old!=fullCache.end() && old->second.size==size && old->second.modified==modified)
+                    {next.emplace(file.path(),old->second);continue;}
+                    FullCached entry;entry.size=size;entry.modified=modified;
+                    auto decode=[&](const std::filesystem::path &path) {
+                        auto bytes=Read(path,16384);
+                        return suite_full::Decode(std::string_view(reinterpret_cast<const char *>(bytes.data()),bytes.size()));
+                    };
+                    auto metadataPath=file.path();
+                    try
+                    {
+                        try {entry.record=decode(file.path());}
+                        catch(const std::exception &first)
+                        {
+                            // A newer format is preserved, never substituted by
+                            // an older backup that could misrepresent the run.
+                            if(std::string(first.what()).starts_with("Unsupported full-game"))throw;
+                            auto backup=file.path();backup+=".bak";entry.record=decode(backup);metadataPath=backup;
+                            entry.error="Recovered full-game metadata from backup";
+                        }
+                        auto &r=*entry.record;r.file=metadataPath;
+                        if(file.path().filename()!="full-"+std::to_string(r.id)+".isfg")throw std::runtime_error("Full-game filename and identity differ");
+                    }
+                    catch(const std::exception &e){entry.record.reset();entry.error=e.what();}
+                    next.emplace(file.path(),std::move(entry));
+                }
+                catch(const std::exception &e){problem="Full-game history: "+std::string(e.what());}
+            }
+        }
+        fullCache=std::move(next);
+    }
+
     void Publish(bool busy = false)
     {
         auto snapshot = std::make_shared<ReplayArchiveState>();
@@ -299,6 +359,7 @@ class ReplayArchive
         snapshot->motionError = motionError;
         snapshot->motionRun = motionRun;
         snapshot->exportedRun = exportedRun;
+        snapshot->exportedFullGame = exportedFullGame;
         snapshot->exportPath = exportPath;
         snapshot->stagedRun = stagedRun;
         std::map<int64_t, ReplayInfo> rows;
@@ -341,6 +402,30 @@ class ReplayArchive
                 }
             snapshot->byId.emplace(row.id, snapshot->runs.size());
             snapshot->runs.push_back(std::move(row));
+        }
+        std::map<int64_t,suite_full::Record,std::greater<int64_t>> groups;
+        for(const auto &[path,item]:fullCache)
+        {
+            if(!item.error.empty())snapshot->fullGameError=item.error;
+            if(!item.record)continue;
+            auto old=groups.find(item.record->id);
+            if(old==groups.end() || path.parent_path()==root/"FullGame")groups[item.record->id]=*item.record;
+        }
+        for(auto &[id,group]:groups)
+        {
+            (void)id;
+            for(int i=0;i<group.stage;i++)
+            {
+                snapshot->fullGameChildren.insert(group.replays[i]);
+                auto found=snapshot->byId.find(group.replays[i]);
+                if(found==snapshot->byId.end())continue;
+                const auto &row=snapshot->runs[found->second];
+                if((group.eligible && !row.valid) || row.outcome!=1 || row.scene!=kMapScenes[i] || row.runCategory!=group.mode-1 ||
+                    std::abs(row.seconds-group.attempts[i])>.000001 ||
+                    (group.mode==2 && (row.selectedSeed!=group.seeds[i] || row.rawSeed!=bool(group.raw&(1u<<i)))))
+                {group.eligible=false;snapshot->fullGameError="A full-game level replay does not match its recorded group";}
+            }
+            snapshot->fullGames.push_back(std::move(group));
         }
         std::atomic_store(&state, std::shared_ptr<const ReplayArchiveState>(snapshot));
     }
@@ -411,6 +496,7 @@ class ReplayArchive
             }
         }
         cache = std::move(next);
+        ScanFullGames();
         Publish();
     }
 
@@ -673,8 +759,35 @@ class ReplayArchive
             throw std::runtime_error("Unverified package entry");
     }
 
-    void Import(const std::filesystem::path &path)
+    void ImportFullGameSet(const std::filesystem::path &path)
     {
+        auto metadata=Read(path,16384);
+        auto group=suite_full::Decode(std::string_view(reinterpret_cast<const char *>(metadata.data()),metadata.size()));
+        if(group.state!=3 || group.stage!=8)throw std::runtime_error("Import a completed full-game replay set");
+        auto target=root/"FullGame"/("full-"+std::to_string(group.id)+".isfg");
+        if(std::filesystem::exists(target) && Read(target,16384)!=metadata)
+            throw std::runtime_error("Existing full-game identity preserved; metadata differs");
+        std::array<std::filesystem::path,8> levels;
+        for(int i=0;i<8;i++)
+        {
+            levels[i]=path.parent_path()/("0"+std::to_string(i+1)+" - "+kMapLevelNames[i]+".zip");
+            auto files=DecodeReplayZip(Read(levels[i],ReplayPackageCapacity));VerifyPackageChecksums(files);
+            auto name="run-"+std::to_string(group.replays[i])+".isrun";auto found=files.find(name);
+            if(found==files.end())throw std::runtime_error("A full-game level package has a different run identity");
+            std::string error;auto data=DecodeMap(found->second,error);
+            if(!data || !data->review || data->scene!=kMapScenes[i] || data->review->outcome!=1 ||
+                data->review->category!=group.mode-1 || std::abs(data->review->seconds-group.attempts[i])>.000001 ||
+                (group.mode==2 && (data->review->selectedSeed!=group.seeds[i] || data->review->rawSpawnSeed!=bool(group.raw&(1u<<i)))))
+                throw std::runtime_error("Full-game replay set does not match its level metadata: "+error);
+        }
+        // Normal import revalidates every companion before committing each
+        // individual recording. The group is published only after all eight.
+        for(const auto &level:levels)Import(level,false);
+        Atomic(target,metadata,false);savedRevision++;Scan();
+    }
+    void Import(const std::filesystem::path &path,bool publish=true)
+    {
+        if(path.extension()==".isfg"){ImportFullGameSet(path);return;}
         auto files = DecodeReplayZip(Read(path, ReplayPackageCapacity));
         VerifyPackageChecksums(files);
         std::shared_ptr<const MapData> d;
@@ -770,7 +883,7 @@ class ReplayArchive
         Atomic(File(d->review->id, ".isrun"), d->bytes, false);
         savedRun = d->review->id;
         savedRevision++;
-        Scan();
+        if(publish)Scan();
     }
 
     void InitializeLibrary(const Job &job)
@@ -938,6 +1051,45 @@ class ReplayArchive
         exportedRun = job.data->review->id;
         exportPath = p.string();
         Publish();
+    }
+
+    void ExportFullGameFolder(const Job &job)
+    {
+        auto snapshot=Get();
+        auto group=std::find_if(snapshot->fullGames.begin(),snapshot->fullGames.end(),[&](const auto &r){return r.id==job.id;});
+        if(group==snapshot->fullGames.end() || group->state!=3 || group->stage!=8)
+            throw std::runtime_error("Finish the full-game run before exporting its replay folder");
+        auto metadata=Read(group->file,16384);
+        auto original=suite_full::Decode(std::string_view(reinterpret_cast<const char *>(metadata.data()),metadata.size()));
+        if(original.id!=group->id || original.key!=group->key || original.replays!=group->replays || original.seconds!=group->seconds)
+            throw std::runtime_error("Full-game metadata changed; refresh the archive before exporting");
+        auto name="full-game-"+std::to_string(job.id);
+        auto target=root/"Exports"/name;
+        auto previousStaging=target;previousStaging+=".partial";
+        if(std::filesystem::exists(target) || std::filesystem::exists(previousStaging))
+            target+=std::string("-")+std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+        auto staging=target;staging+=".partial";
+        std::filesystem::create_directories(staging);
+        // Package one level at a time: no combined multi-level motion object or
+        // all-game ZIP is ever allocated in memory.
+        for(int i=0;i<8;i++)
+        {
+            auto found=snapshot->byId.find(group->replays[i]);
+            if(found==snapshot->byId.end())throw std::runtime_error("A completed level replay is missing; incomplete export kept at "+staging.string());
+            const auto &row=snapshot->runs[found->second];std::string error;
+            auto data=DecodeMap(Read(row.file,MapCapacity-64),error);
+            if(!data || !data->review || data->review->id!=group->replays[i] || data->scene!=kMapScenes[i] ||
+                data->review->outcome!=1 || data->review->category!=group->mode-1 ||
+                std::abs(data->review->seconds-group->attempts[i])>.000001 ||
+                (group->mode==2 && (data->review->selectedSeed!=group->seeds[i] || data->review->rawSpawnSeed!=bool(group->raw&(1u<<i)))))
+                throw std::runtime_error("Full-game replay identity mismatch: "+error);
+            auto files=Package(*data);
+            Atomic(staging/("0"+std::to_string(i+1)+" - "+kMapLevelNames[i]+".zip"),EncodeReplayZip(files),false);
+        }
+        Atomic(staging/("full-"+std::to_string(group->id)+".isfg"),metadata,false);
+        Atomic(staging/"README.txt",ReplayText("Elite-Suite full-game replay set\nKeep this folder intact. Each numbered ZIP is the completed attempt for one level, in campaign order.\nThe .isfg metadata records full-game sectors, including retry time. Death/reset recordings are deliberately not part of this set.\n"),false);
+        std::filesystem::rename(staging,target);
+        exportedFullGame=group->id;exportPath=target.string();Publish();
     }
 
     void LoadRecordedMotion(const Job &job)
@@ -1244,6 +1396,9 @@ class ReplayArchive
         case JobKind::ExportPackage:
             ExportRecording(job);
             break;
+        case JobKind::ExportFullGame:
+            ExportFullGameFolder(job);
+            break;
         case JobKind::SaveVerification:
             if (job.verification && job.verification->data.reviewRetained)
             {
@@ -1443,6 +1598,10 @@ class ReplayArchive
         Queue({.kind = JobKind::LoadMotion, .data = std::move(data)});
     }
 
+    void ExportFullGame(int64_t id)
+    {
+        Queue({.kind=JobKind::ExportFullGame,.id=id});
+    }
     void Export(std::shared_ptr<const MapData> data)
     {
         Queue({.kind = JobKind::ExportPackage, .data = std::move(data)});

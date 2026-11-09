@@ -141,7 +141,7 @@ public static class ManagedTests
         }
         Check(wrongEndpoints, "complete-path insertion rejects unrelated endpoints");
         CheckPlayerWallRouting(args[0]);
-        Check(Marshal.SizeOf(typeof(TrainerCommands)) == 192, "command size");
+        Check(Marshal.SizeOf(typeof(TrainerCommands)) == 256, "command size");
         Check(Marshal.OffsetOf(typeof(TrainerCommands), "ReplayMinSeconds").ToInt32() == 128 &&
                   Marshal.OffsetOf(typeof(TrainerCommands), "ReplayMinCrystals").ToInt32() == 132,
               "v16 retention command offsets");
@@ -230,6 +230,7 @@ public static class ManagedTests
               "all 22 stock seed sources are verified (TickCount, milliseconds, position)");
         Check(cursorWrites >= 8, "managed cursor writes are discoverable in the supplied game");
         CheckGameControls();
+        CheckFullGameCompletionPatch();
         var culling =
             Array.Find(typeof(HideAndSeekIt).GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic),
                        t => t.Name.StartsWith("<OccludeWalls>"));
@@ -1320,6 +1321,29 @@ public static class ManagedTests
               "extended telemetry retains the existing hitbox offsets");
         Console.WriteLine(
             "Spawn selection, first Timer override, Clean-mode gating, actual Start transpiler and RNG finally: PASS");
+    }
+
+    public static void CheckFullGameCompletionPatch()
+    {
+        var original=GameInstructions("OnTriggerEnter");
+        int vanilla=0;
+        foreach(var instruction in original)
+            if(IsCall(instruction,typeof(UnityEngine.SceneManagement.SceneManager),"LoadScene"))vanilla++;
+        var patch=typeof(HarmonyPatches).GetMethod("CaptureFinish",BindingFlags.Static|BindingFlags.NonPublic);
+        int redirected=0,remaining=0,observed=0;
+        foreach(var instruction in (IEnumerable<CodeInstruction>)patch.Invoke(null,new object[]{original}))
+        {
+            if(IsCall(instruction,typeof(SpeedrunManager),"LoadCompletionScene"))redirected++;
+            if(IsCall(instruction,typeof(UnityEngine.SceneManagement.SceneManager),"LoadScene"))remaining++;
+            if(IsCall(instruction,typeof(SpeedrunManager),"ObjectivesObserved"))observed++;
+        }
+        Check(vanilla==5 && redirected==vanilla && remaining==0 && observed>0,
+            "actual pickup IL observes completion before redirecting every synchronous vanilla ending/menu load");
+        int escapes=0;
+        foreach(var instruction in GameInstructions("Update"))
+            if(IsCall(instruction,typeof(UnityEngine.SceneManagement.SceneManager),"LoadScene"))escapes++;
+        Check(escapes>0,"the game's unrelated Escape/menu load remains outside the completion patch");
+        Console.WriteLine("Actual game IL: five pickup completion loads redirected, objective hooks retained, Escape path untouched: PASS");
     }
 
     private static List<CodeInstruction> GameInstructions(string name)

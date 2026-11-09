@@ -41,7 +41,7 @@ struct ReplayPreferences
         libraryCategory = std::clamp(libraryCategory, -1, 2);
         libraryStatus = std::clamp(libraryStatus, 0, 4);
         librarySort = std::clamp(librarySort, 0, 6);
-        libraryView = std::clamp(libraryView, 0, 1);
+        libraryView = std::clamp(libraryView, 0, 2);
     }
 
     void Encode(std::ostream &out) const
@@ -95,7 +95,7 @@ struct ReplayPreferences
         else if (key == "splitPace" && (v == 0 || v == 1)) splitPace = v == 1;
         else if (key == "splitTheory" && (v == 0 || v == 1)) splitTheory = v == 1;
         else if (key == "liveSplits" && (v == 0 || v == 1)) liveSplits = v == 1;
-        else if (key == "libraryView") libraryView = int(std::clamp(v, 0., 1.));
+        else if (key == "libraryView") libraryView = int(std::clamp(v, 0., 2.));
         else if (key == "libraryLevel") libraryLevel = int(std::clamp(v, -1., 7.));
         else if (key == "libraryCategory") libraryCategory = int(std::clamp(v, -1., 2.));
         else if (key == "libraryStatus") libraryStatus = int(std::clamp(v, 0., 4.));

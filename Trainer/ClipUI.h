@@ -251,7 +251,7 @@ inline void RefreshSplitReference()
 inline void Open(std::shared_ptr<const practice::MapAnalysis> a,
                  std::shared_ptr<const practice::ReplayMotion> motion)
 {
-    if (!a || !a->data || !a->data->review || (g_pShared && g_pShared->timerState == 1) ||
+    if (!a || !a->data || !a->data->review || (g_pShared && RunInProgress(*g_pShared)) ||
         encoder.State() == 1)
         return;
     suite_replay::Bind(a->data);
@@ -1362,7 +1362,7 @@ inline void Render()
 {
     if (!open || !content.analysis)
         return;
-    if (g_pShared && g_pShared->timerState == 1)
+    if (g_pShared && RunInProgress(*g_pShared))
     {
         cancelRequested = true;
         open = false;

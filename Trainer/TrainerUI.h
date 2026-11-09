@@ -85,6 +85,7 @@ inline void SameLineIfFits(const char *label)
 #include "SeedMapUI.h"
 #include "RunReviewUI.h"
 #include "InspectorUI.h"
+#include "FullGameUI.h"
 
 inline void RenderTimerOverlay(const std::string &mode)
 {
@@ -93,6 +94,11 @@ inline void RenderTimerOverlay(const std::string &mode)
     if (g_pShared && g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3)
     {
         RenderReplay3DOverlay();
+        return;
+    }
+    if (g_pShared && g_commands.fullGameMode && g_pShared->fullGameRunId>0 && SpeedrunHudAllowed(g_speedrunMode,g_practiceMode))
+    {
+        suite_full::RenderOverlay(*g_pShared,SnapshotAge());
         return;
     }
     if (SpeedrunHudAllowed(g_speedrunMode, g_practiceMode))
@@ -142,6 +148,11 @@ inline bool SetSpeedrunMode(bool enabled, bool currentLevel = false)
     if (!g_pShared || HasPendingRequest() || suite_hud::active || suite_clip::open)
         return false;
     StopReplay3D();
+    if(g_commands.fullGameMode)
+    {
+        g_commands.fullGameCmd=3;g_commands.fullGameMode=0;
+        suite_full::resultOpen=false;
+    }
     g_speedrunMode = enabled;
     if (currentLevel)
     {
@@ -172,6 +183,31 @@ inline bool SetSpeedrunMode(bool enabled, bool currentLevel = false)
     suite_ui::requested = suite_ui::Tone::None;
     return true;
 }
+
+inline bool StartFullGame(bool reset)
+{
+    if(!g_pShared || HasPendingRequest() || suite_hud::active || suite_clip::open || suite_full::preferences.mode==0)return false;
+    StopReplay3D();
+    if(g_runReviewOpen){g_commands.runReviewRequest=2;g_runReviewOpen=false;}
+    const auto &plan=suite_full::preferences;
+    g_speedrunMode=true;g_practiceMode=false;g_seededPractice=plan.mode==2;
+    g_selectedSpeedrunLevel=0;g_practiceSeed=plan.seeds[0];g_rawPracticeSpawn=(plan.raw&1)!=0;
+    g_commands.speedrunModeActive=1;g_commands.practiceModeActive=0;g_commands.seededPractice=g_seededPractice;
+    g_commands.speedrunLevelIndex=0;g_commands.practiceSeed=plan.seeds[0];
+    g_commands.fullGameMode=uint32_t(plan.mode);g_commands.fullGameCmd=reset?2:1;g_commands.fullGameRawMask=plan.mode==2?plan.raw:0;
+    std::memcpy(g_commands.fullGameSeeds,plan.seeds.data(),sizeof(g_commands.fullGameSeeds));
+    g_commands.speedrunLoadLevelCmd=g_commands.setSeedCmd=0;
+    suite_full::resultOpen=false;suite_run::presentation.Reset();
+    g_overlayVisible=false;g_compactMode=false;SetOverlayInteractive(false);
+    suite_ui::PostGameTone(suite_ui::Tone::On);
+    return true;
+}
+inline const bool g_fullGameCallbacks=[] {
+    suite_full::launch=StartFullGame;
+    suite_full::disable=[] {return SetSpeedrunMode(false);};
+    suite_full::openReplays=[] {suite_ui::replayPreferences.libraryView=2;OpenReplayLibrary();};
+    return true;
+}();
 
 #include "TrainingUI.h"
 
@@ -324,7 +360,7 @@ inline void RenderSystemSettings()
 inline void RenderShortcutSettings()
 {
     ImGui::TextWrapped(
-        "Click a shortcut, then press the new key combination. Ctrl, Alt and Shift are supported.");
+        "Click a shortcut, then press a key or mouse button (M1-M5). Ctrl, Alt and Shift are supported.");
     if (ImGui::BeginTable("Trainer shortcuts", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg))
     {
         ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch, .56f);
@@ -341,7 +377,7 @@ inline void RenderShortcutSettings()
             if (suite_ui::Button(suite_keys::Hint(suite_keys::Action(i)).c_str(), {-1, 0}))
                 suite_keys::Capture(i);
             Help(suite_keys::Hint(suite_keys::Action(i)).c_str());
-            if (suite_keys::unavailable & (1u << i))
+            if ((suite_keys::unavailable & (1u << i)) && !suite_keys::MouseKey(suite_keys::preferences.bindings[i].key))
             {
                 ImGui::TextDisabled("Focused input fallback");
                 Help(
@@ -354,7 +390,7 @@ inline void RenderShortcutSettings()
     if (suite_ui::Button("Restore default shortcuts"))
         suite_keys::preferences = {};
     ImGui::TextWrapped(
-        "Shortcuts apply while the game or trainer has focus and pause during text entry. Quick restart defaults to T and can be reassigned above. Custom trainer shortcuts take priority over replay keys. F1 (Freecam) and replay playback controls remain game controls.");
+        "Shortcuts apply while the game or trainer has focus and pause during text entry. Mouse run actions pause while a trainer menu is open; M4/M5 can still toggle the menu. Quick restart defaults to T; full-game reset to Ctrl+Shift+T. F1 (Freecam) and replay controls remain game controls.");
     ImGui::TextDisabled("The tray menu can always reopen the trainer.");
     if (suite_keys::openRequested)
     {
@@ -370,7 +406,7 @@ inline void RenderShortcutSettings()
         else
         {
             ImGui::TextWrapped("%s", suite_keys::Actions[suite_keys::recording]);
-            ImGui::TextWrapped("Press shortcut now.\nEsc: cancel / Backspace: clear");
+            ImGui::TextWrapped("Press a key, M4/M5, or click an empty area for M1/M2/M3.\nEsc: cancel / Backspace: clear");
             ImGui::BeginChild("Shortcut feedback", {0, 2.5f * ImGui::GetTextLineHeight()});
             if (!suite_keys::error.empty())
                 ImGui::TextWrapped("%s", suite_keys::error.c_str());
@@ -380,6 +416,14 @@ inline void RenderShortcutSettings()
             SameLineIfFits("Cancel");
             if (suite_ui::Button("Cancel"))
                 suite_keys::recording = -1;
+            unsigned down=0,clicked=0;auto &io=ImGui::GetIO();
+            for(int i=0;i<5;i++)
+            {
+                if(ImGui::IsMouseDown(i))down|=1u<<i;
+                if(ImGui::IsMouseClicked(i))clicked|=1u<<i;
+            }
+            suite_keys::OfferMouse(down,clicked,(io.KeyCtrl?suite_keys::Control:0) |
+                (io.KeyAlt?suite_keys::Alt:0) | (io.KeyShift?suite_keys::Shift:0),ImGui::IsAnyItemHovered());
         }
         ImGui::EndPopup();
     }

@@ -17,7 +17,7 @@ int main()
     replayOptions.replay3dFollowDistance = 99;
     replayOptions.replay3dFollowHeight = 99;
     SanitizeSnapshot(replayOptions);
-    assert(kProtocolVersion == 32 && replayOptions.replay3dOptions == 0x7F03DBFF &&
+    assert(kProtocolVersion == 33 && replayOptions.replay3dOptions == 0x7F03DBFF &&
            !(replayOptions.replay3dOptions & 1024) && replayOptions.replay3dFollowDistance == 20 &&
            replayOptions.replay3dFollowHeight == 0);
     replayOptions.replay3dFollowDistance = -10;
@@ -31,7 +31,7 @@ int main()
     inputs.inputPadAxes[2] = -9;
     inputs.inputGameAxes[0] = std::numeric_limits<float>::infinity();
     SanitizeSnapshot(inputs);
-    assert(sizeof(GameData) == 20348 && inputs.inputSequence == 0 && inputs.inputSeconds == 0 &&
+    assert(sizeof(GameData) == 21004 && inputs.inputSequence == 0 && inputs.inputSeconds == 0 &&
            inputs.inputState == 2047 && inputs.inputFlags == 0x00ff070f && inputs.inputMouse == 127 &&
            inputs.inputEventCount == 0 && inputs.inputPadAxes[0] == 1 && inputs.inputPadAxes[2] == -1 &&
            inputs.inputGameAxes[0] == 0);

@@ -325,11 +325,11 @@ public static class RunReviewRecorder
         SpeedrunManager.ObjectivesChanged(__instance);
     }
 
-    public static void Finish(RunRecord record, RunStore store)
+    public static void Finish(RunRecord record, RunStore store, bool fullGameAttempt = false)
     {
         if (active == null || active.Review.Id != record.Id)
         {
-            if (store.RetainRankedReplay(record))
+            if ((fullGameAttempt && record.Outcome == RunOutcome.Completed) || store.RetainRankedReplay(record))
                 store.LastReportError = "PB / Top 5 replay " + record.Id + " is unavailable: map capture did not start.";
             return;
         }
@@ -353,8 +353,8 @@ public static class RunReviewRecorder
         ReplayCapture.End();
         var motion = ReplayInputCapture.Finish(record.Seconds);
         bool ranked = store.RetainRankedReplay(record);
-        bool retain = ranked ||
-                      recording.Accept(record.Seconds, active.Review.Collected.Count);
+        bool fullGameLevel = fullGameAttempt && record.Outcome == RunOutcome.Completed;
+        bool retain = fullGameLevel || !fullGameAttempt && (ranked || recording.Accept(record.Seconds, active.Review.Collected.Count));
         if (!retain && motion != null && motion.AudioSession != null)
             motion.AudioSession.Discard();
         if (retain)
@@ -368,9 +368,12 @@ public static class RunReviewRecorder
         try
         {
             if (retain)
-                store.QueueReview(record.Id, active.Encode(), motion, VerificationReport.Encode(record),
-                                  ranked ? "ELITE_REPLAY_KEEP|1|" + record.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) +
-                                           (record.PersonalBest ? "|PB" : "|TOP5") : null);
+            {
+                string protection = fullGameLevel ? "ELITE_REPLAY_KEEP|1|" + record.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|FULLGAME" :
+                    ranked ? "ELITE_REPLAY_KEEP|1|" + record.Id.ToString(System.Globalization.CultureInfo.InvariantCulture) + (record.PersonalBest ? "|PB" : "|TOP5") : null;
+                if(fullGameLevel)store.QueueFullGameReview(record.Id, active.Encode, motion, VerificationReport.Encode(record), protection);
+                else store.QueueReview(record.Id, active.Encode(), motion, VerificationReport.Encode(record), protection);
+            }
         }
         catch (Exception e)
         {

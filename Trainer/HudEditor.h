@@ -37,7 +37,7 @@ inline float originalScale = 1;
 
 inline void Open()
 {
-    if (g_pShared && g_pShared->timerState == 1)
+    if (g_pShared && RunInProgress(*g_pShared))
         return;
     draft.compact = g_hudLayout;
     draft.speedrun = g_speedrunLayout;
@@ -78,7 +78,7 @@ inline void Render()
 {
     if (!active)
         return;
-    if (g_pShared && g_pShared->timerState == 1)
+    if (g_pShared && RunInProgress(*g_pShared))
     {
         Close(false);
         return;

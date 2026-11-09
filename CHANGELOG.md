@@ -2,6 +2,15 @@
 
 Changes by version. The full development history is in Git.
 
+### v7.26.0 Changelog
+
+- Improved speedrun support with RSFG (Random Seed Full Game) and SSFG (Set Seed Full Game), covering Classic, Camera, Hide & Seek, Timer, Ghost, Classic Bonus, Camera Bright and Hide & Seek Outside in order. Completed levels advance automatically; only finishing the eighth level ends the campaign.
+- Improved full-game timing with one loadless total, eight level sectors and cumulative PB deltas. Level restarts and deaths retain elapsed gameplay time; Full reset returns to Classic at zero. SSFG freezes a separate seed and spawn recipe for every level, with PBs matched to the complete seed plan.
+- Improved full-game organization with separate PBs, Top 5, sortable history, statistics and a final campaign result. Completed level replays appear in expandable full-game folders; failed attempts still contribute time and integrity observations without cluttering these folders.
+- Improved replay sharing with full-game folder export and import: eight numbered level packages plus checksummed campaign metadata, processed one level at a time. Successful level recordings are protected from ordinary retention thresholds; missing files and storage failures remain visible.
+- Improved full-game transitions by publishing the held timer before synchronous scene loading, advancing without a per-level result dialog and encoding completed level maps on the existing background storage worker. The live overlay uses cached references, bounded data and the existing motion preference. This build is a pre-release and is excluded from stable automatic updates.
+- Improved shortcut support with M1-M5 mouse bindings, including M4/M5 side buttons and Ctrl/Alt/Shift combinations. Assignment waits for the opening click to release and preserves Cancel/Unassign controls; mouse run actions pause while trainer menus are open.
+
 ### v7.25.0 Changelog
 
 - Improved Elite-Suite's stable speedrun workflow with the native Run workspace, separate Random Seed / Set-Seed categories, sortable personal bests and replays, local Top 5 and permanent per-mode/category history and statistics. Categories are visible in setup, the live HUD and run verification. Public stable updates require no GitHub account or token.

@@ -1,4 +1,5 @@
 #pragma once
+#include "FullGameArchiveUI.h"
 #include "RunDataService.h"
 
 namespace suite_runs
@@ -246,6 +247,7 @@ inline void Statistics(const View &view)
 
 inline void Archive()
 {
+    if(suite_full::preferences.mode){suite_full::ArchivePage(page);return;}
     // A run's journal entry can arrive before its larger replay file commits.
     // Follow completed recordings while this view is open, using the existing
     // cached IO worker rather than waiting for a manual visit to Replays.
@@ -282,6 +284,7 @@ inline void Archive()
 
 inline void Render()
 {
+    suite_full::TypeSelector();
     const char *pages[] = {"Setup", "PBs", "Top 5", "History", "Statistics"};
     // Tiny windows keep the Start control visible; use one compact native selector.
     if (ImGui::GetContentRegionAvail().y < 230 * suite_ui::Unit())

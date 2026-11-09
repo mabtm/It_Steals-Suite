@@ -1,8 +1,8 @@
 {
-  "version": 32,
+  "version": 33,
   "mappingSize": 32768,
-  "payloadOffset": 256,
-  "payloadSize": 20348,
+  "payloadOffset": 512,
+  "payloadSize": 21004,
   "fields": [
     {
       "name": "playerX",
@@ -1605,7 +1605,169 @@
       "type": "int",
       "count": 1,
       "offset": 20344
+    },
+    {
+      "name": "fullGameRunId",
+      "offset": 20348,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "fullGameMode",
+      "offset": 20356,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "fullGameState",
+      "offset": 20357,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "fullGameStage",
+      "offset": 20358,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "fullGameEligible",
+      "offset": 20359,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "fullGameChecked",
+      "offset": 20360,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "fullGameNewPb",
+      "offset": 20361,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "fullGameHistoryReady",
+      "offset": 20362,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "_pad_fullGame",
+      "offset": 20363,
+      "type": "byte",
+      "count": 1
+    },
+    {
+      "name": "fullGameSeconds",
+      "offset": 20364,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "fullGameSectorSeconds",
+      "offset": 20372,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "fullGameLoadingSeconds",
+      "offset": 20380,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "fullGameReferenceTotal",
+      "offset": 20388,
+      "type": "double",
+      "count": 1
+    },
+    {
+      "name": "fullGameStartedUtc",
+      "offset": 20396,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "fullGameEndedUtc",
+      "offset": 20404,
+      "type": "long long",
+      "count": 1
+    },
+    {
+      "name": "fullGameAids",
+      "offset": 20412,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "fullGameWarnings",
+      "offset": 20416,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "fullGameRawMask",
+      "offset": 20420,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "fullGameRevision",
+      "offset": 20424,
+      "type": "int",
+      "count": 1
+    },
+    {
+      "name": "fullGameSectors",
+      "offset": 20428,
+      "type": "double",
+      "count": 8
+    },
+    {
+      "name": "fullGameCumulative",
+      "offset": 20492,
+      "type": "double",
+      "count": 8
+    },
+    {
+      "name": "fullGameReferenceSectors",
+      "offset": 20556,
+      "type": "double",
+      "count": 8
+    },
+    {
+      "name": "fullGameAttemptSeconds",
+      "offset": 20620,
+      "type": "double",
+      "count": 8
+    },
+    {
+      "name": "fullGameReplayIds",
+      "offset": 20684,
+      "type": "long long",
+      "count": 8
+    },
+    {
+      "name": "fullGameRetries",
+      "offset": 20748,
+      "type": "int",
+      "count": 8
+    },
+    {
+      "name": "fullGameSeeds",
+      "offset": 20780,
+      "type": "int",
+      "count": 8
+    },
+    {
+      "name": "fullGameStorageError",
+      "offset": 20812,
+      "type": "char",
+      "count": 192
     }
   ],
-  "commandSize": 192
+  "commandSize": 256
 }

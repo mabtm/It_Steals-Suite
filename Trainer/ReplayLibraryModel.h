@@ -19,7 +19,7 @@ struct ReplayLibraryFilter
 {
     std::string query;
     int level = -1, status = 0, category = -1;
-    bool favorites = false, ascending = false;
+    bool favorites = false, ascending = false, includeFullGameLevels = false;
     ReplaySort sort = ReplaySort::Date;
     bool operator==(const ReplayLibraryFilter &) const = default;
 };
@@ -92,7 +92,7 @@ class ReplayLibraryView
                           (filter.status == 2 && !ReplayAborted(row.outcome) && row.valid) ||
                           (filter.status == 3 && !ReplayAborted(row.outcome) && !row.valid) ||
                           (filter.status == 4 && ReplayAborted(row.outcome));
-            if ((filter.level < 0 || MapLevelIndex(row.scene) == filter.level) && status &&
+            if ((filter.includeFullGameLevels || !source->fullGameChildren.contains(row.id)) && (filter.level < 0 || MapLevelIndex(row.scene) == filter.level) && status &&
                 (filter.category < 0 || row.runCategory == filter.category) &&
                 (!filter.favorites || row.favorite) &&
                 (text[i].search.find(query) != std::string::npos || NotesMatch(row.notes, query)))

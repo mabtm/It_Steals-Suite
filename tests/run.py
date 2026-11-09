@@ -17,6 +17,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "full_game_coordinator_tests": ["FullGameSpeedrun.cs", "FullGameRun.cs", "FullGameFormat.cs", "FullGameStore.cs", "SharedMemoryProtocol.cs", "SharedLayout.cs"],
+    "full_game_tests": ["FullGameRun.cs", "FullGameFormat.cs", "FullGameStore.cs"],
     "run_split_reference_tests": ["RunSplitReference.cs", "RunSegmentBook.cs", "RunSplitFile.cs"],
     "capture_profiler_tests": ["FrameCostMeter.cs", "CaptureProfiler.cs"],
     "replay_camera_sampling_tests": ["ReplaySceneData.cs", "ReplayCameraSampling.cs"],
@@ -81,6 +83,9 @@ def run_logged(command, log, cwd, env=None, timeout=600):
 
 def arguments(name, work, fixtures):
     pairs = {
+        "full_game_tests": [work],
+        "full_game_coordinator_tests": [work],
+        "full_game_model_tests": [fixtures / "full-game-wire.isfg"],
         "run_split_reference_tests": [fixtures / "set-seed-splits-v15.isrun"],
         "split_file_tests": [fixtures / "set-seed-splits-v15.isrun"],
         "statistics_store_tests": [work],

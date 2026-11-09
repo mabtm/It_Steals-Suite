@@ -25,6 +25,7 @@ for field in fields:
 cs += "}\n"
 header_path = root / "Trainer/SharedProtocol.h"
 header = header_path.read_text()
+header = re.sub(r"kPayloadOffset = \d+", f"kPayloadOffset = {layout['payloadOffset']}", header)
 header = re.sub(
     r"ItStealsSharedMem\.v\d+", f"ItStealsSharedMem.v{layout['version']}", header
 )
@@ -89,6 +90,9 @@ checks += [
     "static_assert(offsetof(TrainerCommands, replay3dFollowDistance) == 180);",
     "static_assert(offsetof(TrainerCommands, replay3dFollowHeight) == 184);",
     "static_assert(offsetof(TrainerCommands, replay3dTrailSeconds) == 188);",
+    "static_assert(offsetof(TrainerCommands, fullGameMode) == 192);",
+    "static_assert(offsetof(TrainerCommands, fullGameCmd) == 196);",
+    "static_assert(offsetof(TrainerCommands, fullGameSeeds) == 204);",
 ]
 checks += [
     f"static_assert(offsetof(GameData, {field['name']}) == {field['offset']});"
@@ -97,6 +101,10 @@ checks += [
 header = header[:start] + "\n".join(checks) + "\n\n" + header[end:]
 protocol_path = root / "Mod/SharedMemoryProtocol.cs"
 protocol = protocol_path.read_text()
+protocol = re.sub(r"PayloadOffset = \d+", f"PayloadOffset = {layout['payloadOffset']}", protocol)
+protocol = re.sub(r"(Marshal.SizeOf\(typeof\(TrainerCommands\)\) != )\d+", rf"\g<1>{layout['commandSize']}", protocol)
+protocol = re.sub(r"(view.Write\(12, )\d+(\);)", rf"\g<1>{layout['commandSize']}\2", protocol)
+
 protocol = re.sub(
     r"ItStealsSharedMem\.v\d+", f"ItStealsSharedMem.v{layout['version']}", protocol
 )

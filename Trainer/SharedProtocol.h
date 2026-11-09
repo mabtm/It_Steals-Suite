@@ -5,10 +5,10 @@
 #include <cmath>
 #include <cstring>
 using byte = std::uint8_t;
-inline constexpr char kMapName[] = "ItStealsSharedMem.v32";
-inline constexpr char kMutexName[] = "ItStealsSharedMem.v32.Lock";
-inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 32;
-inline constexpr size_t kMappingSize = 32768, kCommandOffset = 64, kPayloadOffset = 256;
+inline constexpr char kMapName[] = "ItStealsSharedMem.v33";
+inline constexpr char kMutexName[] = "ItStealsSharedMem.v33.Lock";
+inline constexpr uint32_t kMagic = 0x53535449, kProtocolVersion = 33;
+inline constexpr size_t kMappingSize = 32768, kCommandOffset = 64, kPayloadOffset = 512;
 inline constexpr uint32_t kTelemetryConfigured = 0x80000000u, kTelemetryMap = 1, kTelemetryPath = 2, kTelemetryDetails = 4, kTelemetryLive = 8;
 inline constexpr uint32_t kTelemetryWalls=16,kTelemetryCrystals=32,kTelemetryMonster=64,kTelemetryPlanner=128,kTelemetryGeometry=256,kTelemetryInputs=1024,kTelemetryInspector=2048;
 inline constexpr uint32_t kTelemetrySkipIntro = 4096;
@@ -285,6 +285,33 @@ struct GameData {
     byte splitHistoryReady;
     byte splitReferenceComplete;
     int splitExpectedPickups;
+    long long fullGameRunId;
+    byte fullGameMode;
+    byte fullGameState;
+    byte fullGameStage;
+    byte fullGameEligible;
+    byte fullGameChecked;
+    byte fullGameNewPb;
+    byte fullGameHistoryReady;
+    byte _pad_fullGame;
+    double fullGameSeconds;
+    double fullGameSectorSeconds;
+    double fullGameLoadingSeconds;
+    double fullGameReferenceTotal;
+    long long fullGameStartedUtc;
+    long long fullGameEndedUtc;
+    int fullGameAids;
+    int fullGameWarnings;
+    int fullGameRawMask;
+    int fullGameRevision;
+    double fullGameSectors[8];
+    double fullGameCumulative[8];
+    double fullGameReferenceSectors[8];
+    double fullGameAttemptSeconds[8];
+    long long fullGameReplayIds[8];
+    int fullGameRetries[8];
+    int fullGameSeeds[8];
+    char fullGameStorageError[192];
 };
 struct TrainerCommands {
     uint32_t serial = 0, heartbeat = 0;
@@ -307,6 +334,9 @@ struct TrainerCommands {
     float replayMinSeconds=10;uint32_t replayMinCrystals=0;
     uint32_t replay3dCmd=0;int64_t replay3dRunId=0;double replay3dSeconds=0;uint32_t replay3dOptions=0;float replay3dSpeed=1;
     double replay3dLoopA=0,replay3dLoopB=0;float replay3dFollowDistance=4.3f,replay3dFollowHeight=0,replay3dTrailSeconds=3;
+    uint32_t fullGameMode=0, fullGameCmd=0, fullGameRawMask=0;
+    int32_t fullGameSeeds[8]{};
+    uint32_t fullGameReserved[5]{};
 };
 struct SharedHeader {
     uint32_t magic, version, payloadSize, commandSize;
@@ -316,8 +346,8 @@ struct SharedHeader {
     byte reserved[20];
 };
 #pragma pack(pop)
-static_assert(sizeof(GameData) == 20348);
-static_assert(sizeof(TrainerCommands) == 192);
+static_assert(sizeof(GameData) == 21004);
+static_assert(sizeof(TrainerCommands) == 256);
 static_assert(sizeof(SharedHeader) == 64);
 static_assert(offsetof(SharedHeader, commandAck) == 40);
 static_assert(offsetof(TrainerCommands, hitboxEnabled) == 8);
@@ -353,6 +383,9 @@ static_assert(offsetof(TrainerCommands, replay3dLoopB) == 172);
 static_assert(offsetof(TrainerCommands, replay3dFollowDistance) == 180);
 static_assert(offsetof(TrainerCommands, replay3dFollowHeight) == 184);
 static_assert(offsetof(TrainerCommands, replay3dTrailSeconds) == 188);
+static_assert(offsetof(TrainerCommands, fullGameMode) == 192);
+static_assert(offsetof(TrainerCommands, fullGameCmd) == 196);
+static_assert(offsetof(TrainerCommands, fullGameSeeds) == 204);
 static_assert(offsetof(GameData, playerX) == 0);
 static_assert(offsetof(GameData, playerY) == 4);
 static_assert(offsetof(GameData, playerZ) == 8);
@@ -604,11 +637,66 @@ static_assert(offsetof(GameData, splitBestExit) == 20334);
 static_assert(offsetof(GameData, splitHistoryReady) == 20342);
 static_assert(offsetof(GameData, splitReferenceComplete) == 20343);
 static_assert(offsetof(GameData, splitExpectedPickups) == 20344);
+static_assert(offsetof(GameData, fullGameRunId) == 20348);
+static_assert(offsetof(GameData, fullGameMode) == 20356);
+static_assert(offsetof(GameData, fullGameState) == 20357);
+static_assert(offsetof(GameData, fullGameStage) == 20358);
+static_assert(offsetof(GameData, fullGameEligible) == 20359);
+static_assert(offsetof(GameData, fullGameChecked) == 20360);
+static_assert(offsetof(GameData, fullGameNewPb) == 20361);
+static_assert(offsetof(GameData, fullGameHistoryReady) == 20362);
+static_assert(offsetof(GameData, fullGameSeconds) == 20364);
+static_assert(offsetof(GameData, fullGameSectorSeconds) == 20372);
+static_assert(offsetof(GameData, fullGameLoadingSeconds) == 20380);
+static_assert(offsetof(GameData, fullGameReferenceTotal) == 20388);
+static_assert(offsetof(GameData, fullGameStartedUtc) == 20396);
+static_assert(offsetof(GameData, fullGameEndedUtc) == 20404);
+static_assert(offsetof(GameData, fullGameAids) == 20412);
+static_assert(offsetof(GameData, fullGameWarnings) == 20416);
+static_assert(offsetof(GameData, fullGameRawMask) == 20420);
+static_assert(offsetof(GameData, fullGameRevision) == 20424);
+static_assert(offsetof(GameData, fullGameSectors) == 20428);
+static_assert(offsetof(GameData, fullGameCumulative) == 20492);
+static_assert(offsetof(GameData, fullGameReferenceSectors) == 20556);
+static_assert(offsetof(GameData, fullGameAttemptSeconds) == 20620);
+static_assert(offsetof(GameData, fullGameReplayIds) == 20684);
+static_assert(offsetof(GameData, fullGameRetries) == 20748);
+static_assert(offsetof(GameData, fullGameSeeds) == 20780);
+static_assert(offsetof(GameData, fullGameStorageError) == 20812);
 
 inline bool ValidCoordinate(float value) {
     return std::isfinite(value) && std::fabs(value) <= 1000000.0f;
 }
+inline bool RunInProgress(const GameData &data)
+{
+    return data.timerState == 1 || (data.fullGameMode != 0 && data.fullGameRunId > 0 &&
+        (data.fullGameState == 1 || data.fullGameState == 2));
+}
+
 inline void SanitizeSnapshot(GameData& data) {
+    data.fullGameMode = byte(std::clamp(int(data.fullGameMode),0,2));
+    data.fullGameState = byte(std::clamp(int(data.fullGameState),0,5));
+    data.fullGameStage = byte(std::clamp(int(data.fullGameStage),0,8));
+    data.fullGameStorageError[191] = 0;
+    data.fullGameEligible = data.fullGameEligible == 1;
+    data.fullGameChecked = data.fullGameChecked == 1;
+    data.fullGameNewPb = data.fullGameNewPb == 1;
+    if(data.fullGameRunId < 0 || data.fullGameRunId > 3155378975999999999ll) data.fullGameRunId=0;
+    auto fullTime=[](double value) {return std::isfinite(value) && value>=0 && value<=315360000 ? value : 0.;};
+    data.fullGameSeconds=fullTime(data.fullGameSeconds);
+    data.fullGameSectorSeconds=fullTime(data.fullGameSectorSeconds);
+    data.fullGameLoadingSeconds=fullTime(data.fullGameLoadingSeconds);
+    data.fullGameReferenceTotal=fullTime(data.fullGameReferenceTotal);
+    for(int i=0;i<8;i++)
+    {
+        if(!std::isfinite(data.fullGameSectors[i]) || data.fullGameSectors[i]<-1 || data.fullGameSectors[i]>315360000)data.fullGameSectors[i]=-1;
+        if(!std::isfinite(data.fullGameCumulative[i]) || data.fullGameCumulative[i]<-1 || data.fullGameCumulative[i]>315360000)data.fullGameCumulative[i]=-1;
+        if(!std::isfinite(data.fullGameReferenceSectors[i]) || data.fullGameReferenceSectors[i]<-1 || data.fullGameReferenceSectors[i]>315360000)data.fullGameReferenceSectors[i]=-1;
+        if(!std::isfinite(data.fullGameAttemptSeconds[i]) || data.fullGameAttemptSeconds[i]<-1 || data.fullGameAttemptSeconds[i]>315360000)data.fullGameAttemptSeconds[i]=-1;
+        if(data.fullGameRetries[i]<0)data.fullGameRetries[i]=0;
+        if(data.fullGameReplayIds[i]<0 || data.fullGameReplayIds[i]>3155378975999999999ll)data.fullGameReplayIds[i]=0;
+    }
+
     for(auto& v:data.inputGameAxes)if(!ValidCoordinate(v))v=0;
     data.inputState&=2047;data.inputFlags&=0x00ff070f;data.inputMouse&=127;data.inputEventCount=std::clamp(data.inputEventCount,0,8);
     if(!std::isfinite(data.inputSeconds)||data.inputSeconds<0||data.inputSeconds>315360000){data.inputSequence=0;data.inputSeconds=0;}

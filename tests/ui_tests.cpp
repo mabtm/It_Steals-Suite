@@ -1956,6 +1956,11 @@ void ShortcutUICases(const std::string &output)
             frame();
             frame();
             assert(suite_keys::recording == -1 && suite_keys::Hint(suite_keys::Menu) == "Ctrl+Shift+J");
+            suite_keys::Capture(suite_keys::Restart);frame();frame();
+            io.AddMousePosEvent(-1000,-1000);
+            io.AddMouseButtonEvent(3,true);frame();
+            assert(suite_keys::recording==-1 && suite_keys::Hint(suite_keys::Restart)=="M4 / Mouse back");
+            io.AddMouseButtonEvent(3,false);frame();frame();
             if (!output.empty() && viewport.x == 1280 && dpi == 1)
                 Dump(output + "/shortcuts-settings.draw");
             ImGui::ActivateItemByID(window->GetID("Restore default shortcuts"));
@@ -2260,6 +2265,8 @@ void RunArchiveCases(const std::string &output)
 }
 
 #include "split_ui_cases.inl"
+
+#include "full_game_ui_cases.inl"
 
 int main(int argc, char **argv)
 {
@@ -3583,6 +3590,7 @@ int main(int argc, char **argv)
     }
     SetSeedSplitUICases(argc > 1 ? argv[1] : "");
     IndependentSplitPanelCases(argc > 1 ? argv[1] : "");
+    FullGameUICases(argc > 1 ? argv[1] : "");
     RunStatisticsCases(argc > 1 ? argv[1] : "");
     RunArchiveCases(argc > 1 ? argv[1] : ".");
     if (argc > 1)

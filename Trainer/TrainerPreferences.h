@@ -9,6 +9,7 @@
 #include "OverlayPolicy.h"
 #include "SeedSearchOptions.h"
 #include "ReplayPreferences.h"
+#include "FullGamePreferences.h"
 #include "TrainerHotkeys.h"
 #include <algorithm>
 #include <cmath>
@@ -18,7 +19,7 @@
 
 struct TrainerPreferences
 {
-    static constexpr int FormatVersion = 21;
+    static constexpr int FormatVersion = 22;
     OverlayLayout hud{false}, speedrun{true};
     suite_input::Preferences input;
     MinimapOptions map;
@@ -27,6 +28,7 @@ struct TrainerPreferences
     inspector_fx::Preferences inspector;
     AppearancePreferences appearance;
     ReplayPreferences replay;
+    suite_full::Preferences fullGame;
     suite_keys::Preferences hotkeys;
     bool reports = false;
     bool autoStartGame = true;
@@ -50,6 +52,7 @@ struct TrainerPreferences
         inspector.Validate();
         appearance.Validate();
         replay.Validate();
+        fullGame.Validate();
         hotkeys.Validate();
         hud.Validate();
         speedrun.Validate();
@@ -92,6 +95,7 @@ struct TrainerPreferences
                 out << names[c] << i << '=' << colors[c][i] << '\n';
         input.Encode(out);
         replay.Encode(out);
+        fullGame.Encode(out);
         hotkeys.Encode(out);
         experience.Encode(out);
         inspector.Encode(out);
@@ -143,6 +147,8 @@ struct TrainerPreferences
                 result.input.Decode(key.substr(6), value);
             else if (key.rfind("replay.", 0) == 0)
                 result.replay.Decode(key.substr(7), value);
+            else if (key.rfind("fullgame.", 0) == 0)
+                result.fullGame.Decode(key.substr(9), value);
             else if (key.rfind("hotkey.", 0) == 0)
                 result.hotkeys.Decode(key.substr(7), integer);
             else if (key.rfind("appearance.", 0) == 0)

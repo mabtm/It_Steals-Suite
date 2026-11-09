@@ -2,6 +2,7 @@
 #include <windows.h>
 #endif
 #include "ReplayArchive.h"
+#include "ReplayLibraryModel.h"
 #include "RoutePlayback.h"
 #include "seed_map_fixture.h"
 #include <cassert>
@@ -31,6 +32,8 @@ static auto ReadMap(const char *path)
         throw std::runtime_error(error);
     return d;
 }
+
+#include "full_game_archive_cases.inl"
 
 int main(int argc, char **argv)
 {
@@ -134,6 +137,7 @@ int main(int argc, char **argv)
         << "Cross-language v8: validation, Outside, monster paths/events, timestamps, checksum and conservative legacy validity: PASS\n";
     auto root = std::filesystem::path(argv[2]);
     std::filesystem::remove_all(root);
+    FullGameArchiveCases(root,wire);
     {
         auto folder = root / "split-source";
         std::filesystem::create_directories(folder);

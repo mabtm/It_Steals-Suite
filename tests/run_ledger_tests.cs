@@ -96,6 +96,21 @@ public static class RunLedgerTests
         string rankedPath = Path.Combine(rankedFolder, "RunReviews", "run-" + protectedId);
         Check(File.Exists(rankedPath + ".isrun") && File.Exists(rankedPath + ".keep"), "protected replay committed with durable retention marker");
         Check(!File.Exists(Path.Combine(rankedFolder, "RunReviews", "run-" + fixedId + ".isrun")), "oldest queued ordinary replay gives priority to PB");
+        string fullFolder=Path.Combine(root,"full-game-storage");
+        int mainThread=System.Threading.Thread.CurrentThread.ManagedThreadId,encodedThread=0;
+        using(var store=new RunStore(fullFolder))
+        {
+            object gate=typeof(RunStore).GetField("queueGate",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).GetValue(store);
+            lock(gate)
+            {
+                store.QueueFullGameReview(protectedId,()=> {encodedThread=System.Threading.Thread.CurrentThread.ManagedThreadId;return new byte[]{3,4,5};},
+                    null,"{}","ELITE_REPLAY_KEEP|1|"+protectedId+"|FULLGAME");
+                Check(encodedThread==0,"full-game map encoding deferred until storage worker runs");
+            }
+        }
+        string fullPath=Path.Combine(fullFolder,"RunReviews","run-"+protectedId);
+        Check(encodedThread!=0 && encodedThread!=mainThread && File.ReadAllBytes(fullPath+".isrun").SequenceEqual(new byte[]{3,4,5}) &&
+              File.ReadAllText(fullPath+".keep").EndsWith("|FULLGAME"),"background full-game encoding commits original bytes and protection without Unity scene dependencies");
         string counters = Path.Combine(root, "counter-wire");
         using (var store = new RunStore(counters))
         {

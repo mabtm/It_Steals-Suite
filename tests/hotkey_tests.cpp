@@ -6,10 +6,10 @@
 int main()
 {
     using namespace suite_keys;
-    assert(Count == 9 && Restart == 8 && preferences.Enabled() == 511);
+    assert(Count == 10 && Restart == 8 && FullReset == 9 && preferences.Enabled() == 1023);
     assert((Defaults[Restart] == Binding{'T'}));
-    assert(!NeedsPolling(true, 511) && NeedsPolling(true, 255) && !NeedsPolling(false, 0));
-    assert(!NeedsPolling(true, 255, ~(1u << Restart)));
+    assert(!NeedsPolling(true, 1023) && NeedsPolling(true, 255) && !NeedsPolling(false, 0));
+    assert(!NeedsPolling(true, 255, ~((1u << Restart) | (1u << FullReset))));
     assert(!Problem({'J', Control | Shift}));
     assert(!Problem({'T'}) && !Problem({'T', Control}));
     for (auto key : {Binding{0x70}, Binding{0x7b}, Binding{0x73, Alt},
@@ -29,8 +29,8 @@ int main()
     assert(recording == -1 && preferences.bindings[Picker] == Defaults[Picker]);
     Capture(Panels);
     Offer(8, 0);
-    assert(!preferences.bindings[Panels].key && preferences.Enabled() == 510);
-    assert(!NeedsPolling(true, 510));
+    assert(!preferences.bindings[Panels].key && preferences.Enabled() == 1022);
+    assert(!NeedsPolling(true, 1022));
     // Existing action indices and settings remain stable; the newly appended
     // restart gets T when loading settings written by the eight-action trainer.
     auto previous = TrainerPreferences::Decode("hotkey.1.key=74\nhotkey.1.modifiers=2\nhotkey.7.key=118\n");
@@ -62,7 +62,29 @@ int main()
     KeyEdge edge;
     assert(!edge.Update(true, false) && !edge.Update(true, true));
     assert(!edge.Update(false, true) && edge.Update(true, true) && !edge.Update(true, true));
+    preferences={};
+    for(int i=0;i<5;i++)
+    {
+        int key=MouseKeys[i];assert(MouseKey(key) && !Problem({key,Control|Shift}));
+        assert(Name({key,Control}).starts_with("Ctrl+M"+std::to_string(i+1)));
+        Capture(Restart);OfferMouse(1u<<i,1u<<i,0,false);
+        assert(recording==Restart); // wait for the opening/held click to release
+        OfferMouse(0,0,0,false);
+        OfferMouse(1u<<i,1u<<i,0,true);
+        assert(recording==Restart); // clicking a modal control must not bind
+        OfferMouse(1u<<i,1u<<i,Control|Shift,false);
+        assert(recording==-1 && (preferences.bindings[Restart]==Binding{key,Control|Shift}));
+        TrainerPreferences mouse;mouse.hotkeys=preferences;
+        assert(TrainerPreferences::Decode(mouse.Encode()).hotkeys==preferences);
+        assert(DispatchAllowed({key},Restart,false) && !DispatchAllowed({key},Restart,true));
+        assert(DispatchAllowed({key},Menu,true)==(i>=3));
+    }
+    assert(!MouseKey(3) && !MouseKey(7));
+    assert(DispatchAllowed({'T'},Restart,true));
+    Capture(Menu);Offer(MouseKeys[4],Control|Shift);
+    assert(recording==Menu && !error.empty()); // mouse conflicts share keyboard rules
+    Offer(MouseKeys[3],Alt);assert(recording==-1 && Hint(Menu)=="Alt+M4 / Mouse back");
     preferences = {};
     std::cout
-        << "Shortcut migration, quick restart/reset rebinding, exact modifiers, conflicts, reserved keys, capture/cancel/clear, persistence, focus edges and 9-bit polling mask: PASS\n";
+        << "Shortcut migration, quick/full reset rebinding, M1-M5 capture/release/control guards, exact modifiers, conflicts, persistence, focus edges and 10-bit polling mask: PASS\n";
 }

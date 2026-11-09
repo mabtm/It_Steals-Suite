@@ -29,11 +29,11 @@
 ## What's new
 
 <!-- release:start -->
-**[v7.25.0](https://github.com/mabtm/It_Steals-Suite/releases/tag/v7.25.0)**
+**[v7.26.0 Preview](https://github.com/mabtm/It_Steals-Suite/releases)**
 
-- Improved Elite-Suite's stable speedrun workflow with the native Run workspace, separate Random Seed / Set-Seed categories, sortable personal bests and replays, local Top 5 and permanent per-mode/category history and statistics. Categories are visible in setup, the live HUD and run verification. Public stable updates require no GitHub account or token.
-- Improved live Set-Seed splits with independently positioned, customizable text, defaulting to the latest crystal delta on a fully transparent background at the bottom center. Choose timer HUD, independent display or both; drag, resize, undo and save placement in the on-screen editor. Colors, size, animation, duration and opacity are adjustable; an optional compact panel also shows only the latest pickup.
-- Improved Clip Studio splits with the same transparent delta font, colors and animations as live play. New clips inherit the live style and position; Overlays provides a direct reference chooser and optional appearance controls. Only the current crystal is shown; reverse seeking and export use absolute replay time. Projects retain their appearance and older versions remain readable.
+- Improved speedrun support with RSFG (Random Seed Full Game) and SSFG (Set Seed Full Game), covering Classic, Camera, Hide & Seek, Timer, Ghost, Classic Bonus, Camera Bright and Hide & Seek Outside in order. Completed levels advance automatically; only finishing the eighth level ends the campaign.
+- Improved full-game timing with one loadless total, eight level sectors and cumulative PB deltas. Level restarts and deaths retain elapsed gameplay time; Full reset returns to Classic at zero. SSFG freezes a separate seed and spawn recipe for every level, with PBs matched to the complete seed plan.
+- Improved full-game organization with separate PBs, Top 5, sortable history, statistics and a final campaign result. Completed level replays appear in expandable full-game folders; failed attempts still contribute time and integrity observations without cluttering these folders.
 
 [Full changelog](CHANGELOG.md)
 <!-- release:end -->
@@ -41,6 +41,8 @@
 ## Speedrun workflow
 
 **Elite-Suite 7.25.0 is the stable release.** Use the download buttons above or **Updates → Check**. Public downloads require no account or token; future preview builds remain excluded from stable update checks.
+
+**7.26.0 Full-Game Preview** is available for manual testing on the [releases page](https://github.com/mabtm/It_Steals-Suite/releases). It adds RSFG and SSFG, with eight automatic level sectors and grouped replays. It is a **pre-release**; the stable updater continues to offer 7.25.0. [Full-game setup and controls](assets/preview-7.26/README.md).
 
 Set-Seed is a separate local speedrun category. Choose **Set-Seed** before starting; both the practice base-seed and captured spawn-seed recipes are supported. The selected seed and recipe are fixed for that attempt. All other trainer aids and normal integrity checks still apply. Random-Seed and Set-Seed personal bests remain separate; historical fixed-seed Practice runs keep their recorded status.
 

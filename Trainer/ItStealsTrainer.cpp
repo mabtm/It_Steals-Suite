@@ -164,7 +164,7 @@ inline bool UpdateInputRequested()
     const auto &p = suite_update::service.presentation;
     return (p.changelog || p.prompt ||
             suite_update::service.View()->phase == suite_update::Phase::Installing) &&
-           !(g_pShared && g_pShared->timerState == 1);
+           !(g_pShared && RunInProgress(*g_pShared));
 }
 
 bool OverlayRequested()
@@ -173,9 +173,9 @@ bool OverlayRequested()
     bool hud = g_overlayVisible && g_compactMode && g_hudLayout.enabled &&
                CompactHudAllowed(g_speedrunMode, g_practiceMode);
     bool map = g_showMinimapWindow && !(g_speedrunMode && !g_practiceMode);
-    bool result = suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen);
+    bool result = suite_full::resultOpen || suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen);
     bool startup = suite_ui::lifecycle.WantsStartup(suite_ui::LifecycleNow(), suite_ui::preferences,
-                                                    (g_pShared && g_pShared->timerState == 1) || result);
+                                                    (g_pShared && RunInProgress(*g_pShared)) || result);
     bool replay = g_pShared && g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3;
     return UpdateInputRequested() ||
            suite_update::service.View()->phase == suite_update::Phase::Downloading || inspector::picking ||
@@ -191,7 +191,7 @@ bool MenuInputRequested()
 {
     return UpdateInputRequested() || inspector::picking || inspector::dockInteractive || suite_hud::active ||
            ClipInputRequested() || suite_replay::ControlsRequested(g_pShared) ||
-           suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen) ||
+           suite_full::resultOpen || suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen) ||
            (g_allOverlayEnabled && g_overlayVisible && !g_compactMode);
 }
 
@@ -231,7 +231,7 @@ void SetOverlayInteractive(bool interactive, bool userAction = true)
         !suite_ui::lifecycle.Exiting() &&
         (interactive || UpdateInputRequested() || inspector::picking || inspector::dockInteractive ||
          suite_hud::active || ClipInputRequested() || suite_replay::controls ||
-         suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen)) &&
+         suite_full::resultOpen || suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen)) &&
         MenuInputRequested();
     interactive = g_overlayInteractive;
     if (ImGui::GetCurrentContext())
@@ -804,7 +804,7 @@ void FlushCommands()
     }
     bool request = g_commands.replay3dCmd || g_commands.runReviewRequest || g_commands.levelLoadCmd ||
                    g_commands.speedrunLoadLevelCmd || g_commands.setSeedCmd || g_commands.teleportCmd ||
-                   g_commands.resetMapCmd || g_commands.windowModeCmd || g_commands.plannerRequest;
+                   g_commands.resetMapCmd || g_commands.windowModeCmd || g_commands.plannerRequest || g_commands.fullGameCmd;
     if (request)
         ++g_sentSerial;
     g_commands.serial = g_sentSerial;
@@ -819,6 +819,7 @@ void FlushCommands()
     g_commands.plannerRequest = 0;
     g_commands.runReviewRequest = 0;
     g_commands.replay3dCmd = 0;
+    g_commands.fullGameCmd = 0;
 }
 
 double SnapshotAge();
@@ -830,7 +831,7 @@ bool HasPendingRequest()
 {
     return g_sentSerial != g_ackSerial || g_commands.replay3dCmd || g_commands.levelLoadCmd ||
            g_commands.speedrunLoadLevelCmd || g_commands.setSeedCmd || g_commands.teleportCmd ||
-           g_commands.resetMapCmd || g_commands.windowModeCmd || g_commands.plannerRequest;
+           g_commands.resetMapCmd || g_commands.windowModeCmd || g_commands.plannerRequest || g_commands.fullGameCmd;
 }
 
 TrainerPreferences CollectPreferences()
@@ -839,6 +840,7 @@ TrainerPreferences CollectPreferences()
     p.inspector = inspector_fx::preferences;
     p.input = suite_input::preferences;
     p.replay = suite_ui::replayPreferences;
+    p.fullGame = suite_full::preferences;
     p.hotkeys = suite_keys::preferences;
     p.experience = suite_ui::preferences;
     p.appearance = suite_ui::appearance;
@@ -884,6 +886,7 @@ void ApplyPreferences(TrainerPreferences p)
     inspector_fx::preferences = p.inspector;
     suite_input::preferences = p.input;
     suite_ui::replayPreferences = p.replay;
+    suite_full::preferences = p.fullGame;
     RestoreReplayFilters();
     suite_keys::preferences = p.hotkeys;
     suite_ui::preferences = p.experience;
@@ -942,7 +945,7 @@ void SavePreferencesNow(bool feedback = false)
 
 inline bool ActiveSpeedrun()
 {
-    return g_pShared && g_pShared->timerState == 1 && (g_speedrunMode || g_pShared->speedrunModeActive);
+    return g_pShared && RunInProgress(*g_pShared) && (g_speedrunMode || g_pShared->speedrunModeActive);
 }
 
 void PollExperienceFeedback()
@@ -1571,7 +1574,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     using Clock = std::chrono::steady_clock;
     auto nextFrame = Clock::now();
     ULONGLONG nextExchange = 0, nextSave = 0, nextSurface = 0, nextProcessCheck = 0;
-    KeyEdge f2, f3, f4, f5, f6, shiftT, f8, pickerKey, restartKey, replayTab, replayEscape, replaySpace, replayLeft,
+    KeyEdge f2, f3, f4, f5, f6, shiftT, f8, pickerKey, restartKey, fullResetKey, replayTab, replayEscape, replaySpace, replayLeft,
         replayRight, replayHome, replayEnd, replayFast, replaySlow, replayMark;
     bool occluded = false;
     auto appliedHotkeys = suite_keys::preferences;
@@ -1692,7 +1695,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         bool restartSupported = modVersion && *modVersion >= suite_update::Version{{7, 21, 0}};
         bool replayReserved = g_pShared && g_pShared->replay3dState >= 1 && g_pShared->replay3dState <= 3;
         bool restartAllowed = restartSupported && g_speedrunMode && g_pShared->speedrunModeActive &&
+                              (!g_commands.fullGameMode || suite_full::Active(*g_pShared)) &&
                               !replayReserved && !HasPendingRequest() && !g_commands.runReviewRequest;
+        bool fullResetAllowed = restartSupported && g_speedrunMode && g_pShared->speedrunModeActive &&
+                                g_commands.fullGameMode!=0 && !replayReserved && !HasPendingRequest() && !g_commands.runReviewRequest;
         int modifiers = (GetAsyncKeyState(VK_CONTROL) < 0 ? suite_keys::Control : 0) |
                         (GetAsyncKeyState(VK_MENU) < 0 ? suite_keys::Alt : 0) |
                         (GetAsyncKeyState(VK_SHIFT) < 0 ? suite_keys::Shift : 0);
@@ -1700,14 +1706,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         {
             unsigned bit = 1u << i;
             const auto &shortcut = appliedHotkeys.bindings[i];
-            if (!shortcutsAllowed || !shortcut.key || (i == suite_keys::Restart && !restartAllowed))
+            if (!shortcutsAllowed || !shortcut.key || (i == suite_keys::Restart && !restartAllowed) || (i == suite_keys::FullReset && !fullResetAllowed))
             {
                 if (g_hotkeysRegistered & bit)
                     UnregisterHotKey(g_hWnd, i + 1);
                 g_hotkeysRegistered &= ~bit;
                 g_hotkeysAttempted &= ~bit;
             }
-            else if (IsWindow(g_hWnd) && !(g_hotkeysAttempted & bit))
+            else if (!suite_keys::MouseKey(shortcut.key) && IsWindow(g_hWnd) && !(g_hotkeysAttempted & bit))
             {
                 g_hotkeysAttempted |= bit;
                 if (RegisterHotKey(g_hWnd, i + 1, MOD_NOREPEAT | shortcut.modifiers, shortcut.key))
@@ -1720,8 +1726,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             bool down =
                 shortcut.key && (GetAsyncKeyState(shortcut.key) & 0x8000) && modifiers == shortcut.modifiers;
             bool enabled = shortcutsAllowed && !bindingsChanged &&
+                           suite_keys::DispatchAllowed(shortcut,index,MenuInputRequested()) &&
                            (index == suite_keys::Menu || !UpdateInputRequested()) &&
-                           (index != suite_keys::Restart || restartAllowed);
+                           (index != suite_keys::Restart || restartAllowed) && (index != suite_keys::FullReset || fullResetAllowed);
             bool fallback = key.Update(down, enabled);
             unsigned bit = 1u << index;
             return enabled && shortcut.key &&
@@ -1799,12 +1806,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 inspector_ui::StartPick(3);
             binding.Invalidate();
         }
+        if (keyPressed(fullResetKey, suite_keys::FullReset) && g_commands.fullGameMode)
+            StartFullGame(true);
         if (keyPressed(restartKey, suite_keys::Restart))
         {
             g_commands.speedrunLoadLevelCmd = 1;
             nextExchange = 0;
         }
-        bool replayActive = g_pShared && g_pShared->timerState != 1 && g_pShared->replay3dState >= 2 &&
+        bool replayActive = g_pShared && !RunInProgress(*g_pShared) && g_pShared->replay3dState >= 2 &&
                             g_pShared->replay3dState <= 3;
         if (!replayActive && suite_replay::controls)
         {
@@ -1925,7 +1934,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             update->phase != suite_update::Phase::Installing)
             SetOverlayInteractive(MenuInputRequested());
         previousUpdatePhase = update->phase;
-        bool updateBlocked = (g_pShared && g_pShared->timerState == 1) || suite_clip::open ||
+        bool updateBlocked = (g_pShared && RunInProgress(*g_pShared)) || suite_clip::open ||
                              suite_clip::exporting || suite_hud::active || inspector::picking ||
                              inspector::dockInteractive || suite_replay::ControlsRequested(g_pShared) ||
                              suite_run::VerificationWantsInput(g_pShared, g_runReviewOpen) ||
@@ -2015,7 +2024,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                inspector_fx::feedback.Window(suite_ui::LifecycleNow(), inspector_fx::preferences,
                                              suite_ui::preferences)))),
             suite_ui::preferences.volume);
-        suite_run::presentation.Observe(g_pShared, g_session, suite_ui::LifecycleNow());
+        suite_full::ObserveResult(g_pShared);
+        if(!g_commands.fullGameMode)
+            suite_run::presentation.Observe(g_pShared, g_session, suite_ui::LifecycleNow());
         static int64_t recordedVerification = 0;
         const auto &finished = suite_run::presentation.completed;
         if (finished.reviewRunId != recordedVerification && finished.timerState == 2 &&
@@ -2218,6 +2229,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
                 if (g_quit && DeferExit())
                     g_quit = false;
                 RenderRunExperience();
+                suite_full::RenderResult();
                 suite_hud::Render();
                 suite_clip::Render();
                 suite_ui::RenderLifecycle(visible, introBlocked, introReady);
@@ -2342,7 +2354,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         auto deadline =
             Clock::now() + std::chrono::milliseconds(
                                suite_keys::NeedsPolling(shortcutsAllowed, g_hotkeysRegistered,
-                                                       restartAllowed ? ~0u : ~(1u << suite_keys::Restart))
+                                                       (restartAllowed ? ~0u : ~(1u << suite_keys::Restart)) & (fullResetAllowed ? ~0u : ~(1u << suite_keys::FullReset)))
                                    ? 20 : 100);
         if (visible && g_pd3dDevice)
             deadline = std::min(deadline, nextFrame);

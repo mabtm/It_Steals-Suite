@@ -25,7 +25,7 @@ public static class RestartContractTests
         Check(!currentTrainer.LegacyRestartAllowed(true), "rebinding or unassigning does not reactivate T");
         Check(currentTrainer.LegacyRestartAllowed(false), "a lost trainer connection restores legacy control");
         Check(new TrainerCommands().LegacyRestartAllowed(false), "standalone mod retains its restart key");
-        Check(Marshal.SizeOf(typeof(TrainerCommands)) == 192 &&
+        Check(Marshal.SizeOf(typeof(TrainerCommands)) == 256 &&
                   Marshal.OffsetOf(typeof(TrainerCommands), "TelemetryOptions").ToInt32() == 44 &&
                   Marshal.OffsetOf(typeof(TrainerCommands), "SpeedrunLoadLevelCmd").ToInt32() == 25,
               "restart ownership reuses an option bit without moving command fields");
