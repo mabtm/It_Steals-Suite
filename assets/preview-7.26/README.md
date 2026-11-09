@@ -11,7 +11,7 @@ These images are captures of the actual production renderer with synthetic test 
 
 Level order: Classic → Camera → Hide & Seek → Timer → Ghost → Classic Bonus → Camera Bright → Hide & Seek Outside.
 
-Quick restart **T** retries the current level and keeps total gameplay time. Full reset **Ctrl+Shift+T** returns to Classic at zero. Both are rebindable under Settings → Hotkeys, including **M1-M5** mouse buttons and Ctrl/Alt/Shift combinations. Mouse run actions pause while a trainer menu is open; M4/M5 may still toggle the menu. Deaths retry the current level, and loading time is excluded. The aggregate finishes after the final bonus level. Unexpected scene changes interrupt the campaign.
+Quick restart **T** retries the current level and keeps total gameplay time. Full reset **Ctrl+Shift+T** returns to Classic at zero. Both are rebindable under Settings → Hotkeys, including **M1-M5** mouse buttons and Ctrl/Alt/Shift combinations. M1-M3 keep operating menu controls while a menu is open; M4/M5 shortcuts also work from the result screen. Deaths retry the current level, and loading time is excluded. The aggregate finishes after the final bonus level. Unexpected scene changes interrupt the campaign.
 
 PBs, Top 5, sortable history and statistics are separate from individual-level categories. SSFG PBs match the complete eight-level seed/recipe plan. Previous PB sectors form the comparison reference; a new plan starts without a reference.
 

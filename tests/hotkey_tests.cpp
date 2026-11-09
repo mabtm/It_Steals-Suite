@@ -76,11 +76,10 @@ int main()
         assert(recording==-1 && (preferences.bindings[Restart]==Binding{key,Control|Shift}));
         TrainerPreferences mouse;mouse.hotkeys=preferences;
         assert(TrainerPreferences::Decode(mouse.Encode()).hotkeys==preferences);
-        assert(DispatchAllowed({key},Restart,false) && !DispatchAllowed({key},Restart,true));
-        assert(DispatchAllowed({key},Menu,true)==(i>=3));
+        assert(DispatchAllowed({key},false) && DispatchAllowed({key},true)==(i>=3));
     }
     assert(!MouseKey(3) && !MouseKey(7));
-    assert(DispatchAllowed({'T'},Restart,true));
+    assert(DispatchAllowed({'T'},true));
     Capture(Menu);Offer(MouseKeys[4],Control|Shift);
     assert(recording==Menu && !error.empty()); // mouse conflicts share keyboard rules
     Offer(MouseKeys[3],Alt);assert(recording==-1 && Hint(Menu)=="Alt+M4 / Mouse back");

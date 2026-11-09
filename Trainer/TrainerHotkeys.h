@@ -50,12 +50,12 @@ inline bool MouseKey(int key)
     for(int value:MouseKeys)if(value==key)return true;
     return false;
 }
-inline bool DispatchAllowed(Binding binding,int action,bool menuInteractive)
+inline bool DispatchAllowed(Binding binding,bool menuInteractive)
 {
     if(!MouseKey(binding.key) || !menuInteractive)return true;
-    // Ordinary clicks operate the menu. Side buttons may still close/reopen
-    // it, but must not reset a run while the runner is editing a control.
-    return (binding.key==0x05 || binding.key==0x06) && (action==Menu || action==Panels);
+    // Ordinary clicks operate the menu. Side buttons do not click its controls,
+    // and must remain usable for a reset from the run's result screen as well.
+    return binding.key==0x05 || binding.key==0x06;
 }
 
 inline const char *Problem(Binding b)

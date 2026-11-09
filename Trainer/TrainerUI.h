@@ -390,7 +390,7 @@ inline void RenderShortcutSettings()
     if (suite_ui::Button("Restore default shortcuts"))
         suite_keys::preferences = {};
     ImGui::TextWrapped(
-        "Shortcuts apply while the game or trainer has focus and pause during text entry. Mouse run actions pause while a trainer menu is open; M4/M5 can still toggle the menu. Quick restart defaults to T; full-game reset to Ctrl+Shift+T. F1 (Freecam) and replay controls remain game controls.");
+        "Shortcuts pause during text entry. M1-M3 operate menu controls while a trainer menu is open; M4/M5 shortcuts remain usable, including resets from the result screen. Quick restart defaults to T; full-game reset to Ctrl+Shift+T. F1 (Freecam) and replay controls remain game controls.");
     ImGui::TextDisabled("The tray menu can always reopen the trainer.");
     if (suite_keys::openRequested)
     {

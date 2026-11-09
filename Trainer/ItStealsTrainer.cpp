@@ -1726,7 +1726,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             bool down =
                 shortcut.key && (GetAsyncKeyState(shortcut.key) & 0x8000) && modifiers == shortcut.modifiers;
             bool enabled = shortcutsAllowed && !bindingsChanged &&
-                           suite_keys::DispatchAllowed(shortcut,index,MenuInputRequested()) &&
+                           suite_keys::DispatchAllowed(shortcut,MenuInputRequested()) &&
                            (index == suite_keys::Menu || !UpdateInputRequested()) &&
                            (index != suite_keys::Restart || restartAllowed) && (index != suite_keys::FullReset || fullResetAllowed);
             bool fallback = key.Update(down, enabled);

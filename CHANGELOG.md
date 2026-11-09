@@ -9,7 +9,7 @@ Changes by version. The full development history is in Git.
 - Improved full-game organization with separate PBs, Top 5, sortable history, statistics and a final campaign result. Completed level replays appear in expandable full-game folders; failed attempts still contribute time and integrity observations without cluttering these folders.
 - Improved replay sharing with full-game folder export and import: eight numbered level packages plus checksummed campaign metadata, processed one level at a time. Successful level recordings are protected from ordinary retention thresholds; missing files and storage failures remain visible.
 - Improved full-game transitions by publishing the held timer before synchronous scene loading, advancing without a per-level result dialog and encoding completed level maps on the existing background storage worker. The live overlay uses cached references, bounded data and the existing motion preference. This build is a pre-release and is excluded from stable automatic updates.
-- Improved shortcut support with M1-M5 mouse bindings, including M4/M5 side buttons and Ctrl/Alt/Shift combinations. Assignment waits for the opening click to release and preserves Cancel/Unassign controls; mouse run actions pause while trainer menus are open.
+- Improved shortcut support with M1-M5 mouse bindings, including M4/M5 side buttons and Ctrl/Alt/Shift combinations. Assignment waits for the opening click to release and preserves Cancel/Unassign controls; M1-M3 clicks keep operating menu controls, while M4/M5 shortcuts also work from the result screen.
 
 ### v7.25.0 Changelog
 
