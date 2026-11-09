@@ -55,6 +55,12 @@ Game, Unity, MelonLoader, and Harmony assemblies are local build inputs. Keep th
 
 ## Check a change
 
+### Seed input names and compatibility
+
+`SeedTypeLabels.h` owns the user-facing names Run seed (direct) and Suite seed (calculated). Their stored recipe IDs and calculations retain the previous Captured spawn seed / Practice base seed meanings.
+
+Run `python3 tests/run.py --managed --only seed_reproducibility_tests` to execute the production mod DLL's RNG, derivation and spawn-selection code against 320 frozen vectors and 3,328 repeated selections. Synthetic catalog permutations and Timer first-start overrides are tested as compatibility boundaries, not claimed to be fixed. The source catalog matcher uses a test-only vector arithmetic stand-in; this is not a live Unity or multi-PC test. The identical test executable also passed against retained 7.23.0, 7.24.0 and 7.25.0 helpers. See the [review and training proposals](docs/seed-compatibility-and-training.md) for scope and follow-up work.
+
 ### Full-game preview: 7.26.0
 
 This development build keeps `SUITE_PREVIEW 1` and publishes only `v7.26.0-preview.RUN_NUMBER` pre-releases. Stable 7.25.0 remains available through the normal updater until the owner approves promotion. Build both trainer and mod together: protocol 33 preserves preceding payload offsets and the first 192 command bytes, extends commands to 256 bytes, moves the payload start to 512 and appends 656 bytes of full-game telemetry (21004 bytes total). The shared mapping remains 32768 bytes.
