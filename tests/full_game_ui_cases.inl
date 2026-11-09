@@ -64,12 +64,12 @@ void FullGameUICases(const std::string &output)
     ImGuiWindow *child=nullptr;
     for(auto *window:GImGui->Windows)if(std::strstr(window->Name,"Full-game setup scroll"))child=window;
     assert(child);
-    auto advanced=child->GetID("Advanced spawn recipes");
+    auto advanced=child->GetID("Seed types (advanced)");
     assert(child->StateStorage.GetInt(advanced,0)==0);
     ImGui::ActivateItemByID(advanced);setupFrame();setupFrame();
     assert(child->StateStorage.GetInt(advanced,0)!=0);
     int level=0;auto row=ImHashData(&level,sizeof(level),child->GetID("Full-game spawn recipes"));
-    auto rawCheckbox=ImHashStr("Raw spawn",0,row);
+    auto rawCheckbox=ImHashStr("Use run seed",0,row);
     auto originalMask=suite_full::preferences.raw;
     ImGui::ActivateItemByID(rawCheckbox);setupFrame();assert(suite_full::preferences.raw==(originalMask^1u));
     ImGui::ActivateItemByID(rawCheckbox);setupFrame();assert(suite_full::preferences.raw==originalMask);

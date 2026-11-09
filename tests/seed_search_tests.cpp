@@ -228,7 +228,7 @@ int main(int argc, char **argv)
                            std::abs(result->top[i].route.length - wanted[i].route.length) < 1e-8);
                 auto text = practice::SeedResultsText(*result);
                 assert(text.find("SET PRACTICE research") != std::string::npos &&
-                       text.find("spawn seed") != std::string::npos &&
+                       text.find("Run seed (direct)") != std::string::npos &&
                        text.find("crystal_visit_order") != std::string::npos);
             }
     for (int problem = 0; problem < 2; problem++)

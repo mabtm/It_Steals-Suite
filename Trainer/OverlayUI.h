@@ -500,7 +500,7 @@ inline void RenderOverlaySettings(OverlayLayout &layout, bool speedrun, bool sta
                         "Local PBs require an observed random seed and no detected trainer aids. This is not leaderboard verification.");
                 if (field == static_cast<int>(OverlayField::Seed))
                     Help(
-                        "Random: first observed RNG seed. Set: the helper's applied practice base seed. The game reseeds repeatedly.");
+                        "Random: first observed RNG seed (diagnostic). Set: your selected seed; its type is shown in Run setup. For sharing a layout, copy its seed and type from Seeds & routes. The game reseeds repeatedly.");
                 if (field == static_cast<int>(OverlayField::Resets))
                     Help(
                         "Manual restart of an active run and death reloads. Restarting after a completed run is not a reset.");

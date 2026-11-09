@@ -61,7 +61,7 @@ inline std::string VerificationSummary(const GameData &data)
         << ")\nOutcome: " << OutcomeLabel(data.runOutcome)
         << "\nObserved duration: " << FormatRunTime(data.currentRunTimeSeconds)
         << "\nSeed type: " << SeedTypeLabel(data) << "\n"
-        << (data.seedKind == 2 ? "Practice base seed: " : "Initial RNG seed (not a world replay seed): ")
+        << (data.seedKind == 2 ? "Selected seed (type saved in replay): " : "Initial RNG seed (not a world replay seed): ")
         << (data.seedKnown ? std::to_string(data.runSeed) : "UNKNOWN")
         << "\nReseeds observed: " << data.rngReseedCount
         << "\nCurrent trainer features: " << FeatureNames(static_cast<uint32_t>(data.trainerFeatures))

@@ -1,4 +1,5 @@
 #pragma once
+#include "SeedTypeLabels.h"
 #include "FullGameArchiveUI.h"
 #include "RunDataService.h"
 
@@ -73,7 +74,7 @@ inline void Filters()
         }
         suite_ui::Checkbox("Exact seed", &query.seedFilter);
         if (query.seedFilter) { ImGui::SetNextItemWidth(180 * u); ImGui::InputInt("Seed", &query.seed); }
-        const char *recipes[] = {"Any recipe", "Practice base seed", "Captured spawn seed"};
+        const char *recipes[] = {"Any seed type", suite_seed::Calculated, suite_seed::Direct};
         int recipe = query.recipe + 1;
         ImGui::SetNextItemWidth(-1);
         if (ImGui::Combo("##Archive recipe", &recipe, recipes, 3)) query.recipe = recipe - 1;

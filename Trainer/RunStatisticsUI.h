@@ -1,4 +1,5 @@
 #pragma once
+#include "SeedTypeLabels.h"
 #include "RunStatistics.h"
 
 namespace run_stats
@@ -241,13 +242,13 @@ inline void CategorySetup()
                 setupSpawn = type == 1;
         }
         int recipe = setupSpawn ? 1 : 0;
-        const char *recipes[] = {"Practice base seed", "Captured spawn seed"};
+        const char *recipes[] = {suite_seed::Calculated, suite_seed::Direct};
         ImGui::SetNextItemWidth(std::min(300 * suite_ui::Unit(),
             std::max(100 * suite_ui::Unit(), ImGui::GetContentRegionAvail().x -
-                ImGui::CalcTextSize("Recipe").x - ImGui::GetStyle().ItemInnerSpacing.x)));
-        if (ImGui::Combo("Recipe", &recipe, recipes, 2))
+                ImGui::CalcTextSize("Seed type").x - ImGui::GetStyle().ItemInnerSpacing.x)));
+        if (ImGui::Combo("Seed type", &recipe, recipes, 2))
             setupSpawn = recipe == 1;
-        Help("Practice base seed uses the standard derived recipe. Captured spawn seed reuses the exact seed from Seeds & routes. Both recipes are supported in Set-Seed; changing the recipe during a run invalidates that attempt.");
+        Help(suite_seed::Help);
         if (g_pShared && !g_pShared->rngPatchComplete)
             ImGui::TextWrapped("Set-Seed requires all RNG hooks to be ready before starting.");
         if (!setupPractice && g_pShared)
@@ -311,7 +312,7 @@ inline void Settings()
     {
         ImGui::TextColored(g_headerCol, "%s", SeedTypeLabel(*g_pShared));
         if (g_pShared->seedKnown)
-            ImGui::Text("%s: %d", g_pShared->seedKind == 2 ? "Selected base seed" : "Initial RNG seed",
+            ImGui::Text("%s: %d", g_pShared->seedKind == 2 ? "Selected seed" : "Observed RNG seed",
                         g_pShared->runSeed);
         ImGui::TextDisabled("Reseed hooks: %s",
                             g_pShared->rngPatchComplete ? "22 / 22 ready" : "unavailable");

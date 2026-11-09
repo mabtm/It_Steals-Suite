@@ -2,6 +2,7 @@
 #include "FullGameModel.h"
 #include "FullGamePreferences.h"
 #include "FullGameUIState.h"
+#include "SeedTypeLabels.h"
 #include "SuiteExperience.h"
 
 namespace suite_full
@@ -93,7 +94,7 @@ inline void Setup()
     }
     if(p.mode==2)
     {
-        ImGui::Separator();ImGui::TextDisabled("%s",p.raw?"Seed plan / custom spawn recipes":"Seed plan / fixed per run");
+        ImGui::Separator();ImGui::TextDisabled("%s",p.raw==255?"Seed plan / Run seeds":p.raw?"Seed plan / mixed seed types":"Seed plan / Suite seeds");
         ImGui::BeginDisabled(active || HasPendingRequest());
         if(ImGui::BeginTable("Full-game seed plan",2,ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingStretchProp))
         {
@@ -108,9 +109,9 @@ inline void Setup()
         }
         ImGui::EndDisabled();
         ImGui::TextWrapped("Seeds stay fixed for every retry. PB splits compare the same complete seed plan.");
-        if(suite_ui::CollapsingHeader("Advanced spawn recipes"))
+        if(suite_ui::CollapsingHeader("Seed types (advanced)"))
         {
-            ImGui::TextWrapped("Keep the default recipe for a new plan. Raw spawn is for reusing a captured first-spawn seed. Changing a recipe creates a different comparison plan.");
+            ImGui::TextWrapped("Default: %s. Enable Use run seed for a layout seed copied from Seeds & routes. Seed types are saved with the plan; changing one creates a different comparison plan.",suite_seed::Calculated);
             ImGui::BeginDisabled(active || HasPendingRequest());
             if(ImGui::BeginTable("Full-game spawn recipes",2,ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingStretchProp))
             {
@@ -118,7 +119,7 @@ inline void Setup()
                 {
                     ImGui::PushID(i);ImGui::TableNextRow();ImGui::TableNextColumn();ImGui::TextUnformatted(kMapLevelNames[i]);
                     ImGui::TableNextColumn();bool raw=(p.raw&(1u<<i))!=0;
-                    if(suite_ui::Checkbox("Raw spawn",&raw)){if(raw)p.raw|=1u<<i;else p.raw&=~(1u<<i);}
+                    if(suite_ui::Checkbox(suite_seed::UseDirect,&raw)){if(raw)p.raw|=1u<<i;else p.raw&=~(1u<<i);}
                     ImGui::PopID();
                 }
                 ImGui::EndTable();

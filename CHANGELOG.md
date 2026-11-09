@@ -11,6 +11,7 @@ Changes by version. The full development history is in Git.
 - Improved full-game transitions by publishing the held timer before synchronous scene loading, advancing without a per-level result dialog and encoding completed level maps on the existing background storage worker. The live overlay uses cached references, bounded data and the existing motion preference. This build is a pre-release and is excluded from stable automatic updates.
 - Improved shortcut support with M1-M5 mouse bindings, including M4/M5 side buttons and Ctrl/Alt/Shift combinations. Assignment waits for the opening click to release and preserves Cancel/Unassign controls; M1-M3 clicks keep operating menu controls, while M4/M5 shortcuts also work from the result screen.
 - Improved full-game usability with a focused seed table, optional spawn recipes under Advanced and a compact result window. Active seed plans can be inspected while editing stays locked; setup, results and the overlay retain the Suite styling and small-window/DPI support.
+- Improved seed-type clarity with Run seed (direct) and Suite seed (calculated) across setup, search and filters, retaining existing values and replay compatibility. Added regression coverage for repeatability, historical vectors and the catalog-order/Timer-first-start limitations; universal cross-installation seed compatibility is not claimed.
 
 ### v7.25.0 Changelog
 

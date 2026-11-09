@@ -6,6 +6,7 @@
 #include <windows.h>
 #endif
 #include "SuiteBranding.h"
+#include "SeedTypeLabels.h"
 #include "PracticeRouting.h"
 #include "PlannerRandom.h"
 #include "SeedSearchOptions.h"
@@ -338,7 +339,7 @@ inline std::string SeedResultsText(const SeedSearchState &state)
     out << "# ItSteals PracticeSuite " << suite_brand::Version << " / " << suite_brand::Author
         << " | SET PRACTICE research | "
         << (r.layoutOnly ? "Spawn/layout scan" : ObjectiveName(r.criteria.objective))
-        << "\n# Seed interpretation: " << (r.recipe == 1 ? "spawn seed" : "Practice base seed")
+        << "\n# Seed interpretation: " << suite_seed::Name(r.recipe)
         << " | scene: " << r.scene << " | game hash: " << r.hash << "\n# Search key: " << std::hex << r.key
         << std::dec << " | requested: " << r.count << " | checked: " << state.evaluated
         << " | spawn filtered: " << state.filtered << " | proven outside Top 10: " << state.pruned

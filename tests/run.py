@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 MANAGED = {
+    "seed_reproducibility_tests": ["CatalogOrder.cs"],
     "full_game_coordinator_tests": ["FullGameSpeedrun.cs", "FullGameRun.cs", "FullGameFormat.cs", "FullGameStore.cs", "SharedMemoryProtocol.cs", "SharedLayout.cs"],
     "full_game_tests": ["FullGameRun.cs", "FullGameFormat.cs", "FullGameStore.cs"],
     "run_split_reference_tests": ["RunSplitReference.cs", "RunSegmentBook.cs", "RunSplitFile.cs"],
@@ -83,6 +84,7 @@ def run_logged(command, log, cwd, env=None, timeout=600):
 
 def arguments(name, work, fixtures):
     pairs = {
+        "seed_reproducibility_tests": [fixtures / "portable-rng-wire.bin", work],
         "full_game_tests": [work],
         "full_game_coordinator_tests": [work],
         "full_game_model_tests": [fixtures / "full-game-wire.isfg"],
@@ -175,6 +177,9 @@ def execute(name, managed, args, root, output, fixtures):
             ]
             if name in ("statistics_store_tests", "run_ledger_tests"):
                 command.append("-r:" + str(root / "bin/ItStealsHelper.dll"))
+                shutil.copy2(root / "bin/ItStealsHelper.dll", folder / "ItStealsHelper.dll")
+            if name == "seed_reproducibility_tests":
+                command.append("-r:suite=" + str(root / "bin/ItStealsHelper.dll"))
                 shutil.copy2(root / "bin/ItStealsHelper.dll", folder / "ItStealsHelper.dll")
             if name == "clip_channel_tests":
                 runs = [

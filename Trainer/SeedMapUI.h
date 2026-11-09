@@ -1,4 +1,5 @@
 #pragma once
+#include "SeedTypeLabels.h"
 #include "SuiteExperience.h"
 #include "SuiteDesign.h"
 #include "RoutePlayback.h"
@@ -384,7 +385,7 @@ inline void RenderSeedSearchControls(std::shared_ptr<const practice::MapAnalysis
                                best.route.estimated ? "partial capture"
                                : best.route.exact   ? "checked / exact order"
                                                     : "checked / heuristic order");
-        ImGui::TextDisabled("%s", r.recipe == 1 ? "Captured spawn seed" : "Practice base seed");
+        ImGui::TextDisabled("%s", suite_seed::Name(r.recipe));
         ImGui::BeginDisabled(!verified || !sameCatalog || HasPendingRequest());
         if (suite_ui::Button("Use best seed"))
         {
@@ -942,9 +943,7 @@ inline void RenderSeedMapTab(bool restricted)
             const auto &d = *analysis->data;
             int recipe = d.recipe ? d.recipe : d.liveRecipe;
             ImGui::TextColored(g_headerCol, "Displayed seed: %d | %s | spawn #%d", d.seed,
-                               recipe == 1   ? "captured spawn seed"
-                               : recipe == 2 ? "Practice base seed"
-                                             : "unknown type",
+                               suite_seed::Name(recipe),
                                d.spawn + 1);
             if (analysis->route.complete)
                 ImGui::Text("Route: %.2f units | %zu crystals | %s", analysis->route.length,
@@ -1039,14 +1038,14 @@ inline void RenderSeedMapTab(bool restricted)
             {
                 ImGui::BeginDisabled(g_seedSearch.Busy() || HasPendingRequest());
                 int type = g_plannerOptions.recipe - 1;
-                const char *types[] = {"Captured spawn seed", "Practice base seed"};
+                const char *types[] = {suite_seed::Direct, suite_seed::Calculated};
                 if (ImGui::Combo("Input seed type", &type, types, 2))
                 {
                     g_plannerOptions.recipe = type + 1;
                 }
                 ImGui::EndDisabled();
                 Help(
-                    "Use the matching seed type for numbers entered manually. Use best / Use displayed transfers map, seed and type together. The spawn seed fixes player/crystal positions; monster events may differ.");
+                    "Use best / Use displayed transfers the layout, number and seed type together. Run seed uses the copied layout seed directly; Suite seed calculates one from your number. This controls spawn/crystal selection, not identical monster events. Matching game data and start conditions are required.");
                 ImGui::TextDisabled("Capture verification");
                 Help(d.message.c_str());
                 ImGui::TextDisabled("Navigation model");
