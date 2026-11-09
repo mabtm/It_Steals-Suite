@@ -52,6 +52,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #include "RunExperienceModel.h"
 #include "IntroBackdrop.h"
 #include "RunReviewState.h"
+#include "FullGameUIState.h"
 #include "ReplayArchive.h"
 #include "Replay3DControls.h"
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "FullGameModel.h"
 #include "FullGamePreferences.h"
+#include "FullGameUIState.h"
 #include "SuiteExperience.h"
 
 namespace suite_full
@@ -8,7 +9,6 @@ namespace suite_full
 inline bool (*launch)(bool reset)=nullptr;
 inline bool (*disable)()=nullptr;
 inline void (*openReplays)()=nullptr;
-inline bool resultOpen=false;
 inline int64_t resultSeen=0;
 inline std::optional<Live> result;
 inline std::string resultStorageError;
