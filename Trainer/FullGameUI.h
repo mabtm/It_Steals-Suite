@@ -93,24 +93,38 @@ inline void Setup()
     }
     if(p.mode==2)
     {
-        ImGui::Separator();ImGui::TextDisabled("Seed plan / frozen when the full run starts");
-        ImGui::BeginDisabled(active);
-        if(ImGui::BeginTable("Full-game seed plan",3,ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingStretchProp))
+        ImGui::Separator();ImGui::TextDisabled("%s",p.raw?"Seed plan / custom spawn recipes":"Seed plan / fixed per run");
+        ImGui::BeginDisabled(active || HasPendingRequest());
+        if(ImGui::BeginTable("Full-game seed plan",2,ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingStretchProp))
         {
-            ImGui::TableSetupColumn("Level",ImGuiTableColumnFlags_WidthStretch,1.5f);ImGui::TableSetupColumn("Seed");
-            ImGui::TableSetupColumn("Spawn recipe",ImGuiTableColumnFlags_WidthStretch,.8f);ImGui::TableHeadersRow();
+            ImGui::TableSetupColumn("Level",ImGuiTableColumnFlags_WidthStretch,1.4f);ImGui::TableSetupColumn("Seed");ImGui::TableHeadersRow();
             for(int i=0;i<8;i++)
             {
                 ImGui::PushID(i);ImGui::TableNextRow();ImGui::TableNextColumn();ImGui::TextUnformatted(kMapLevelNames[i]);
                 ImGui::TableNextColumn();ImGui::SetNextItemWidth(-1);ImGui::InputInt("##Seed",&p.seeds[i],0,0);
-                ImGui::TableNextColumn();bool raw=(p.raw&(1u<<i))!=0;
-                if(suite_ui::Checkbox("Raw spawn",&raw)){if(raw)p.raw|=1u<<i;else p.raw&=~(1u<<i);}
                 ImGui::PopID();
             }
             ImGui::EndTable();
         }
         ImGui::EndDisabled();
-        ImGui::TextWrapped("Each level uses its own saved seed. Raw spawn selects the captured first-spawn seed recipe. PBs compare only the same complete seed plan and recipes.");
+        ImGui::TextWrapped("Seeds stay fixed for every retry. PB splits compare the same complete seed plan.");
+        if(suite_ui::CollapsingHeader("Advanced spawn recipes"))
+        {
+            ImGui::TextWrapped("Keep the default recipe for a new plan. Raw spawn is for reusing a captured first-spawn seed. Changing a recipe creates a different comparison plan.");
+            ImGui::BeginDisabled(active || HasPendingRequest());
+            if(ImGui::BeginTable("Full-game spawn recipes",2,ImGuiTableFlags_RowBg|ImGuiTableFlags_SizingStretchProp))
+            {
+                for(int i=0;i<8;i++)
+                {
+                    ImGui::PushID(i);ImGui::TableNextRow();ImGui::TableNextColumn();ImGui::TextUnformatted(kMapLevelNames[i]);
+                    ImGui::TableNextColumn();bool raw=(p.raw&(1u<<i))!=0;
+                    if(suite_ui::Checkbox("Raw spawn",&raw)){if(raw)p.raw|=1u<<i;else p.raw&=~(1u<<i);}
+                    ImGui::PopID();
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndDisabled();
+        }
     }
     ImGui::Separator();
     auto archive=practice::g_replayArchive.Get();
@@ -209,8 +223,8 @@ inline void RenderResult()
     if(!resultOpen || !result)return;
     auto screen=ImGui::GetIO().DisplaySize;
     ImGui::SetNextWindowPos({screen.x*.5f,screen.y*.5f},ImGuiCond_Always,{.5f,.5f});
-    ImGui::SetNextWindowSize({std::min(760.f*g_dpiScale,screen.x-24),std::min(650.f*g_dpiScale,screen.y-24)},ImGuiCond_Always);
-    if(ImGui::Begin("Full-game result",&resultOpen,ImGuiWindowFlags_NoCollapse))
+    ImGui::SetNextWindowSize({std::min(760.f*g_dpiScale,screen.x-24),std::min(530.f*g_dpiScale,screen.y-24)},ImGuiCond_Always);
+    if(ImGui::Begin("Full-game result",&resultOpen,ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoSavedSettings))
     {
         float available=ImGui::GetContentRegionAvail().x,used=0;int rows=1;
         for(const char *label:{"Full reset / Classic","Full-game replays","Close"})

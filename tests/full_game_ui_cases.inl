@@ -63,10 +63,21 @@ void FullGameUICases(const std::string &output)
     setupFrame();setupFrame();
     ImGuiWindow *child=nullptr;
     for(auto *window:GImGui->Windows)if(std::strstr(window->Name,"Full-game setup scroll"))child=window;
-    assert(child);ImGui::ActivateItemByID(child->GetID("Start full game"));setupFrame();
+    assert(child);
+    auto advanced=child->GetID("Advanced spawn recipes");
+    assert(child->StateStorage.GetInt(advanced,0)==0);
+    ImGui::ActivateItemByID(advanced);setupFrame();setupFrame();
+    assert(child->StateStorage.GetInt(advanced,0)!=0);
+    int level=0;auto row=ImHashData(&level,sizeof(level),child->GetID("Full-game spawn recipes"));
+    auto rawCheckbox=ImHashStr("Raw spawn",0,row);
+    auto originalMask=suite_full::preferences.raw;
+    ImGui::ActivateItemByID(rawCheckbox);setupFrame();assert(suite_full::preferences.raw==(originalMask^1u));
+    ImGui::ActivateItemByID(rawCheckbox);setupFrame();assert(suite_full::preferences.raw==originalMask);
+    ImGui::ActivateItemByID(child->GetID("Start full game"));setupFrame();
     assert(g_commands.fullGameCmd==1 && g_commands.fullGameMode==2 && g_commands.speedrunLevelIndex==0 && g_commands.fullGameRawMask==0b10101010);
     for(int i=0;i<8;i++)assert(g_commands.fullGameSeeds[i]==100+i);
     g_commands.fullGameCmd=0;data.speedrunModeActive=1;data.fullGameRunId=726;data.fullGameMode=2;data.fullGameState=2;data.fullGameStage=6;
+    ImGui::ActivateItemByID(rawCheckbox);setupFrame();assert(suite_full::preferences.raw==originalMask);
     setupFrame();ImGui::ActivateItemByID(child->GetID("Restart level"));setupFrame();
     assert(g_commands.speedrunLoadLevelCmd==1 && g_commands.fullGameCmd==0);
     g_commands.speedrunLoadLevelCmd=0;setupFrame();ImGui::ActivateItemByID(child->GetID("Full reset / Classic"));setupFrame();
@@ -116,6 +127,12 @@ void FullGameUICases(const std::string &output)
     g_commands={};g_speedrunMode=false;g_seededPractice=false;g_compactMode=false;
     g_allOverlayEnabled=g_overlayVisible=true;suite_run::presentation.Reset();g_runReviewOpen=false;
     io.DisplaySize={1280,900};suite_ui::navigation.Select(suite_ui::Page::Speedrun,ImGui::GetTime());suite_runs::page=0;
+    for(ImVec2 viewport:{ImVec2(480,360),ImVec2(800,600),ImVec2(1280,900)})for(float dpi:{1.f,1.5f})
+    {
+        io.DisplaySize=viewport;ApplyTheme(dpi);io.Fonts->Build();io.Fonts->SetTexID(1);
+        g_resetLayout=true;Frame();g_resetLayout=false;Frame();Frame();
+    }
+    io.DisplaySize={1280,900};ApplyTheme(1);io.Fonts->Build();io.Fonts->SetTexID(1);
     g_resetLayout=true;Frame();g_resetLayout=false;
     auto *root=ImGui::FindWindowByName("It Steals | Practice Suite");
     ImGui::SetWindowPos(root,{20,20});ImGui::SetWindowSize(root,{1020,860});

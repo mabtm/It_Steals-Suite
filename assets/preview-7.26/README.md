@@ -4,7 +4,7 @@ Pre-release only. Stable automatic updates remain on 7.25.0 until the owner appr
 
 These images are captures of the actual production renderer with synthetic test data. The dark background is not a running game. Example times demonstrate the UI and are not real speedruns.
 
-- [Run setup](01-full-game-setup.png): choose Individual level, RSFG or SSFG under Runs. SSFG accepts a separate seed and spawn recipe for each level. Browsing or editing never starts a run; Start full game launches Classic.
+- [Run setup](01-full-game-setup.png): choose Individual level, RSFG or SSFG under Runs. SSFG shows one seed per level; optional spawn recipes are collapsed under Advanced and remain inspectable during a run. Browsing or editing never starts a run; Start full game launches Classic.
 - [Full-game HUD](02-full-game-hud.png): loadless total, category and validity, eight level sectors, PB sectors and cumulative red/green deltas. The active level moves automatically. Position, width, scale and opacity are adjustable; hiding the table keeps the clock and validity visible.
 - [Full-game result](03-full-game-result.png): final category, total, PB comparison and all eight completed sectors, including retries.
 - [Replay folders](04-full-game-replays.png): expand a campaign to access its eight successful level attempts, export the set or copy an SSFG seed plan. Sector time includes failed attempts; the child replay contains the successful attempt only.
